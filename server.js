@@ -30,8 +30,18 @@ async function latest(id, stage) { return db.one('versions', `project_id=eq.${q(
 async function logUsage(project_id, provider, units, note) { try { await db.insert('usage', { project_id, provider, units, note }); } catch (e) { console.error('usage', e.message); } }
 
 // Arka plan işi: hata olursa proje "failed" olur, hangi adımda kaldığı saklanır
-function background(id, stage, fn) {
-  fn().catch(async e => { console.error(stage, e); await setStatus(id, 'failed', { error: `${stage}|${e.message}`.slice(0, 900) }).catch(() => {}); });
+// Adımlar projects.pending'e yazılır; sunucu yeniden başlarsa kaldığı yerden sürdürülür
+const STEPS = { content: (id, fb) => runContent(id, fb), visuals: (id, k, fb) => runVisuals(id, k, fb), voice: id => runVoiceAndRender(id), render: id => startRender(id) };
+function background(id, stage, args = []) {
+  (async () => {
+    await db.update('projects', `id=eq.${q(id)}`, { pending: { stage, args } });
+    await STEPS[stage](id, ...args);
+    await db.update('projects', `id=eq.${q(id)}`, { pending: null });
+  })().catch(async e => { console.error(stage, e); await setStatus(id, 'failed', { error: `${stage}|${e.message}`.slice(0, 900), pending: null }).catch(() => {}); });
+}
+async function resumePending() {
+  const rows = await db.select('projects', 'select=id,status,pending&pending=not.is.null&status=in.(content_generating,visuals_generating,voicing)');
+  for (const p of rows) { if (STEPS[p.pending.stage]) { console.log('Sürdürülüyor:', p.id, p.pending.stage); background(p.id, p.pending.stage, p.pending.args || []); } }
 }
 async function pool(items, n, fn) { const out = []; let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); } })); return out; }
 
@@ -46,19 +56,26 @@ async function dispatch(workflow, inputs) {
   });
   if (r.status !== 204) throw new Error('GitHub iş başlatılamadı: ' + r.status + ' ' + (await r.text()).slice(0, 200));
 }
+const canon = v => Array.isArray(v) ? '[' + v.map(canon).join(',') + ']' : v && typeof v === 'object' ? '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + canon(v[k])).join(',') + '}' : JSON.stringify(v);
 const sleep = ms => new Promise(ok => setTimeout(ok, ms));
 // Claude isteklerini abonelikle çalışan generate.yml'e gönderir ve sonucu bekler
 const ctxFor = (projectId, kind) => ({
   async viaActions(items, model) {
-    const token = crypto.randomBytes(24).toString('hex');
-    const task = await db.insert('gen_tasks', { project_id: projectId, kind, items, model, token });
-    await dispatch('generate.yml', { task_id: task.id, token });
-    const deadline = Date.now() + 40 * 60 * 1000;
+    // Aynı istem için bekleyen ya da biten görev varsa yeniden çalıştırma, onu kullan
+    const key = canon(items);
+    const open = await db.select('gen_tasks', `select=id,items,status,created_at&project_id=eq.${q(projectId)}&kind=eq.${kind}&consumed=is.false&status=in.(queued,running,done)&order=created_at.desc&limit=5`);
+    let task = open.find(t => canon(t.items) === key && Date.now() - new Date(t.created_at) < 45 * 60 * 1000);
+    if (!task) {
+      const token = crypto.randomBytes(24).toString('hex');
+      task = await db.insert('gen_tasks', { project_id: projectId, kind, items, model, token });
+      await dispatch('generate.yml', { task_id: task.id, token });
+    } else console.log('Var olan Claude görevi kullanılıyor:', task.id);
+    const deadline = new Date(task.created_at || Date.now()).getTime() + 45 * 60 * 1000;
     while (Date.now() < deadline) {
-      await sleep(5000);
       const t = await db.one('gen_tasks', `id=eq.${task.id}&select=status,results,error`);
-      if (t.status === 'done') return t.results;
-      if (t.status === 'failed') throw new Error('Claude (GitHub Actions): ' + (t.error || 'bilinmeyen hata'));
+      if (t.status === 'done') { await db.update('gen_tasks', `id=eq.${task.id}`, { consumed: true }); return t.results; }
+      if (t.status === 'failed') { await db.update('gen_tasks', `id=eq.${task.id}`, { consumed: true }); throw new Error('Claude (GitHub Actions): ' + (t.error || 'bilinmeyen hata')); }
+      await sleep(4000);
     }
     throw new Error('Claude yanıtı 40 dakikada gelmedi');
   },
@@ -152,7 +169,7 @@ on('POST', '/api/projects', async (req, res) => {
   const b = await readBody(req);
   if (!b.title || !b.brief) return send(res, 400, { error: 'Konu ve açıklama gerekli' });
   const p = await db.insert('projects', { title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, status: 'content_generating' });
-  background(p.id, 'content', () => runContent(p.id));
+  background(p.id, 'content', []);
   send(res, 201, p);
 });
 on('GET', '/api/projects/:id', async (req, res, { id }) => {
@@ -164,22 +181,21 @@ on('GET', '/api/projects/:id', async (req, res, { id }) => {
 });
 on('GET', '/api/projects/:id/bundle', async (req, res, { id }) => { const b = await bundleFor(id, new URL(req.url, 'http://x').searchParams.get('audio') === '1'); b ? send(res, 200, b) : send(res, 404, { error: 'Görsel yok' }); });
 
-on('POST', '/api/projects/:id/content/revise', async (req, res, { id }) => { const { feedback } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); background(id, 'content', () => runContent(id, feedback)); send(res, 202, { ok: true }); });
+on('POST', '/api/projects/:id/content/revise', async (req, res, { id }) => { const { feedback } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); background(id, 'content', [feedback]); send(res, 202, { ok: true }); });
 on('POST', '/api/projects/:id/content/approve', async (req, res, { id }) => {
   const v = await latest(id, 'content'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
-  background(id, 'visuals', () => runVisuals(id)); send(res, 202, { ok: true });
+  background(id, 'visuals', []); send(res, 202, { ok: true });
 });
-on('POST', '/api/projects/:id/visuals/revise', async (req, res, { id }) => { const { feedback, k } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); background(id, 'visuals', () => runVisuals(id, k || null, feedback)); send(res, 202, { ok: true }); });
+on('POST', '/api/projects/:id/visuals/revise', async (req, res, { id }) => { const { feedback, k } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); background(id, 'visuals', [k || null, feedback]); send(res, 202, { ok: true }); });
 on('POST', '/api/projects/:id/visuals/approve', async (req, res, { id }) => {
   const v = await latest(id, 'visuals'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
-  background(id, 'voice', () => runVoiceAndRender(id)); send(res, 202, { ok: true });
+  background(id, 'voice', []); send(res, 202, { ok: true });
 });
 on('POST', '/api/projects/:id/cancel', async (req, res, { id }) => { await setStatus(id, 'archived'); send(res, 200, { ok: true }); });
 on('POST', '/api/projects/:id/reopen', async (req, res, { id }) => { await setStatus(id, 'visuals_review'); send(res, 200, { ok: true }); });
 on('POST', '/api/projects/:id/retry', async (req, res, { id }) => {
   const p = await db.one('projects', `id=eq.${q(id)}`); const stage = (p.error || '').split('|')[0];
-  const run = { content: () => runContent(id), visuals: () => runVisuals(id), voice: () => runVoiceAndRender(id), render: () => startRender(id) }[stage] || (() => runContent(id));
-  background(id, stage || 'content', run); send(res, 202, { ok: true });
+  background(id, STEPS[stage] ? stage : 'content', []); send(res, 202, { ok: true });
 });
 
 /* Claude üretim işçisi (generate.yml) uç noktaları — görev jetonuyla korunur */
@@ -251,4 +267,4 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     fs.createReadStream(file).pipe(res);
   } catch (e) { console.error(e); if (!res.headersSent) send(res, 500, { error: e.message }); }
-}).listen(PORT, () => console.log('Sunucu hazır: ' + PORT));
+}).listen(PORT, () => { console.log('Sunucu hazır: ' + PORT); resumePending().catch(e => console.error('resume', e)); });
