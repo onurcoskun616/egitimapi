@@ -60,6 +60,6 @@ button:disabled{opacity:.5;cursor:wait}
 .chips button.on{border-color:var(--yel);color:var(--yel)}
 .bar{height:10px;border-radius:99px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
 .bar i{display:block;height:100%;background:var(--yel);transition:width .6s}
-.err{border-color:rgba(255,79,79,.5);color:#ffb3b3;white-space:pre-wrap}
+.err{border-color:rgba(255,79,79,.5);color:#ffb3b3;white-space:pre-wrap;overflow-wrap:anywhere}
 .note{font-size:13px;color:var(--muted)}
 .empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:14px}
