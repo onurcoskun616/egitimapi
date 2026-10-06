@@ -35,13 +35,43 @@ function background(id, stage, fn) {
 }
 async function pool(items, n, fn) { const out = []; let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); } })); return out; }
 
+/* ---------- GitHub Actions ---------- */
+async function dispatch(workflow, inputs) {
+  const repo = process.env.GITHUB_REPO || 'onurcoskun616/egitimapi';
+  if (!process.env.GITHUB_TOKEN) throw new Error('GITHUB_TOKEN tanımlı değil');
+  const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${workflow}/dispatches`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'egitimapi' },
+    body: JSON.stringify({ ref: process.env.GITHUB_REF || 'main', inputs: { ...inputs, api_base: publicBase() } }),
+  });
+  if (r.status !== 204) throw new Error('GitHub iş başlatılamadı: ' + r.status + ' ' + (await r.text()).slice(0, 200));
+}
+const sleep = ms => new Promise(ok => setTimeout(ok, ms));
+// Claude isteklerini abonelikle çalışan generate.yml'e gönderir ve sonucu bekler
+const ctxFor = (projectId, kind) => ({
+  async viaActions(items, model) {
+    const token = crypto.randomBytes(24).toString('hex');
+    const task = await db.insert('gen_tasks', { project_id: projectId, kind, items, model, token });
+    await dispatch('generate.yml', { task_id: task.id, token });
+    const deadline = Date.now() + 40 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await sleep(5000);
+      const t = await db.one('gen_tasks', `id=eq.${task.id}&select=status,results,error`);
+      if (t.status === 'done') return t.results;
+      if (t.status === 'failed') throw new Error('Claude (GitHub Actions): ' + (t.error || 'bilinmeyen hata'));
+    }
+    throw new Error('Claude yanıtı 40 dakikada gelmedi');
+  },
+});
+const tokensOf = u => u ? (u.input_tokens || 0) + (u.output_tokens || 0) : 0;
+
 /* ---------- üretim adımları ---------- */
 async function runContent(id, feedback) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
   const prev = feedback ? await latest(id, 'content') : null;
   await setStatus(id, 'content_generating', { error: null });
-  const { data, usage } = await claude.generateContent(p, prev && prev.data, feedback);
-  await logUsage(id, 'claude', usage.input_tokens + usage.output_tokens, 'content');
+  const { data, usage } = await claude.generateContent(p, prev && prev.data, feedback, ctxFor(id, 'content'));
+  await logUsage(id, 'claude', tokensOf(usage), 'content');
   await db.insert('versions', { project_id: id, stage: 'content', version: (prev ? prev.version : 0) + 1, data, feedback: feedback || null });
   await setStatus(id, 'content_review');
 }
@@ -52,18 +82,17 @@ async function runVisuals(id, onlyK, feedback) {
   await setStatus(id, 'visuals_generating', { error: null });
   const topic = content.data.topic;
   let scenes;
+  const ctx = ctxFor(id, 'visuals');
   if (onlyK && prevV) {
     scenes = prevV.data.scenes.map(s => ({ ...s }));
     const s = scenes.find(x => x.k === onlyK);
-    const { code, usage } = await claude.generateSceneCode(strip(s), topic, feedback, s.code);
-    s.code = code; await logUsage(id, 'claude', usage.input_tokens + usage.output_tokens, 'scene ' + onlyK);
+    const [r] = await claude.generateSceneCodes([{ scene: strip(s), feedback, prevCode: s.code }], topic, ctx);
+    s.code = r.code; await logUsage(id, 'claude', tokensOf(r.usage), 'scene ' + onlyK);
   } else {
-    scenes = await pool(content.data.scenes, 4, async s => {
-      const old = prevV && feedback ? (prevV.data.scenes.find(x => x.k === s.k) || {}).code : null;
-      const { code, usage } = await claude.generateSceneCode(s, topic, feedback, old);
-      await logUsage(id, 'claude', usage.input_tokens + usage.output_tokens, 'scene ' + s.k);
-      return { ...s, code };
-    });
+    const jobs = content.data.scenes.map(s => ({ scene: s, feedback, prevCode: prevV && feedback ? (prevV.data.scenes.find(x => x.k === s.k) || {}).code : null }));
+    const res = await claude.generateSceneCodes(jobs, topic, ctx);
+    await logUsage(id, 'claude', res.reduce((n, r) => n + tokensOf(r.usage), 0), 'scenes');
+    scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
   await db.insert('versions', { project_id: id, stage: 'visuals', version: (prevV ? prevV.version : 0) + 1, data: { topic, scenes }, feedback: feedback ? (onlyK ? `[${onlyK}] ` : '') + feedback : null });
   await setStatus(id, 'visuals_review');
@@ -91,13 +120,7 @@ async function startRender(id) {
   const token = crypto.randomBytes(24).toString('hex');
   const job = await db.insert('render_jobs', { project_id: id, token, status: 'queued' });
   await setStatus(id, 'rendering', { error: null });
-  const repo = process.env.GITHUB_REPO || 'onurcoskun616/egitimapi';
-  const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/render.yml/dispatches`, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'egitimapi' },
-    body: JSON.stringify({ ref: process.env.GITHUB_REF || 'main', inputs: { job_id: job.id, api_base: publicBase(), token } }),
-  });
-  if (r.status !== 204) throw new Error('GitHub iş başlatılamadı: ' + r.status + ' ' + (await r.text()).slice(0, 200));
+  await dispatch('render.yml', { job_id: job.id, token });
 }
 
 async function bundleFor(id, withAudio) {
@@ -158,6 +181,26 @@ on('POST', '/api/projects/:id/retry', async (req, res, { id }) => {
   const run = { content: () => runContent(id), visuals: () => runVisuals(id), voice: () => runVoiceAndRender(id), render: () => startRender(id) }[stage] || (() => runContent(id));
   background(id, stage || 'content', run); send(res, 202, { ok: true });
 });
+
+/* Claude üretim işçisi (generate.yml) uç noktaları — görev jetonuyla korunur */
+async function taskAuth(req, taskId) {
+  const token = new URL(req.url, 'http://x').searchParams.get('token');
+  const t = await db.one('gen_tasks', `id=eq.${q(taskId)}`);
+  if (!t || !token || !safeEq(token, t.token) || ['done', 'failed'].includes(t.status)) return null;
+  return t;
+}
+on('GET', '/api/task/:taskId', async (req, res, { taskId }) => {
+  const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
+  await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'running' });
+  send(res, 200, { items: t.items, model: t.model });
+}, true);
+on('POST', '/api/task/:taskId/result', async (req, res, { taskId }) => {
+  const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
+  const b = await readBody(req, 20e6);
+  if (b.error) await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'failed', error: String(b.error).slice(0, 900), finished_at: now() });
+  else await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'done', results: b.results, finished_at: now() });
+  send(res, 200, { ok: true });
+}, true);
 
 /* render işçisi (GitHub Actions) uç noktaları — iş jetonuyla korunur */
 async function jobAuth(req, jobId) {

@@ -27,7 +27,7 @@ Konu doğal dille yazılır; Claude içeriği hazırlar, kullanıcı onaylar; Cl
 | `APP_PASSWORD` | Uygulamaya giriş şifresi |
 | `SUPABASE_URL` | `https://vymygihoivdfliunmbdo.supabase.co` |
 | `SUPABASE_SERVICE_KEY` | Supabase → Project Settings → API Keys → secret (service_role) anahtarı |
-| `ANTHROPIC_API_KEY` | Claude API anahtarı |
+| `ANTHROPIC_API_KEY` | İsteğe bağlı. Varsa Claude API doğrudan kullanılır; yoksa Claude adımları GitHub Actions'ta abonelikle çalışır |
 | `CLAUDE_MODEL` | İsteğe bağlı, varsayılan `claude-opus-5-5` |
 | `ELEVENLABS_API_KEY` | ElevenLabs anahtarı |
 | `ELEVENLABS_VOICE_ID` | Varsayılan ses kimliği |
@@ -35,4 +35,10 @@ Konu doğal dille yazılır; Claude içeriği hazırlar, kullanıcı onaylar; Cl
 | `GITHUB_TOKEN` | Bu depoda Actions: Read and write izinli ince ayarlı (fine-grained) token |
 | `GITHUB_REPO` | İsteğe bağlı, varsayılan `onurcoskun616/egitimapi` |
 
-GitHub tarafında gizli değer gerekmez: render işi, tek kullanımlık jetonla uygulamadan paketi alır ve videoyu imzalı bağlantıyla yükler.
+## GitHub sırları
+
+| Sır | Açıklama |
+| --- | --- |
+| `CLAUDE_CODE_OAUTH_TOKEN` | `claude setup-token` ile üretilen abonelik jetonu. İçerik ve sahne kodu `generate.yml` iş akışında bu jetonla üretilir |
+
+Render ve generate işleri tek kullanımlık jetonla uygulamadan veriyi alır; videolar imzalı bağlantıyla yüklenir.
