@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<style>html,body{margin:0;background:#000}canvas{width:540px;height:960px}</style>
+</head><body>
+<canvas id="cv" width="1080" height="1920"></canvas>
+<script src="../public/engine.js"></script>
+<script>
+  window.setup = async (bundle) => {
+    await Promise.all([document.fonts.load('900 40px Archivo'), document.fonts.load('800 30px "JetBrains Mono"')]).catch(() => {});
+    await document.fonts.ready;
+    window.P = EVEngine.createPlayer(document.getElementById('cv'), bundle);
+    return window.P.total;
+  };
+  window.frameAt = (t) => { window.P.render(t); return document.getElementById('cv').toDataURL('image/jpeg', 0.93); };
+</script>
+</body></html>

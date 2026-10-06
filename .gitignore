@@ -1,0 +1,4 @@
+node_modules/
+render/out.mp4
+render/audio.mp3
+.env

@@ -1,0 +1,13 @@
+{
+  "name": "egitimapi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Konu yazılınca onaylı içerik, animasyonlu sahneler ve ElevenLabs seslendirmesiyle eğitim videosu üreten platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,38 @@
+name: render
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Render iş kimliği
+        required: true
+      api_base:
+        description: Uygulama adresi
+        required: true
+      token:
+        description: Tek kullanımlık iş jetonu
+        required: true
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: render-${{ inputs.job_id }}
+    steps:
+      - name: Jetonu gizle
+        env:
+          JOB_TOKEN: ${{ inputs.token }}
+        run: echo "::add-mask::$JOB_TOKEN"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: ffmpeg ve yazı tipleri
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg fonts-dejavu-core
+      - name: Playwright
+        run: npm install --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - name: Videoyu çiz
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          API_BASE: ${{ inputs.api_base }}
+          JOB_TOKEN: ${{ inputs.token }}
+        run: node render/render.mjs
