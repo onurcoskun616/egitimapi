@@ -29,15 +29,23 @@
         <label for="b">Ne anlatılsın?</label><textarea id="b" required placeholder="Parçaların görevleri, sık arızalar, belirtiler ve çözümler…"></textarea>
         <div class="grid two"><div><label for="a">Hedef kitle</label><input id="a" placeholder="Meslek lisesi 11. sınıf"></div>
         <div><label for="d">Süre</label><select id="d"><option value="60">60 saniye</option><option value="90" selected>90 saniye</option><option value="150">2,5 dakika</option><option value="240">4 dakika</option></select></div></div>
+        <label for="tn">Anlatım dili</label><select id="tn" required><option value="">Seçin…</option></select>
+        <p class="note" id="tnd">İçeriğin hangi üslupla anlatılacağını seçin.</p>
+        <div id="tnoWrap" hidden><label for="tno">Anlatım dilini tarif edin</label><input id="tno" maxlength="300" placeholder="Örn. esprili ama saygılı, kısa cümlelerle, futbol benzetmeleri kullanan"></div>
         <div class="btns"><button class="primary" type="submit" id="go">İçeriği hazırla</button></div><p class="note" id="msg"></p>
       </form>
       <h2>Projeler</h2><div class="list" id="list"><div class="empty">Yükleniyor…</div></div>`;
     document.getElementById('nf').onsubmit = async e => {
       e.preventDefault(); const btn = document.getElementById('go'); busy(btn, true);
-      try { const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value } }); location.hash = '#/p/' + p.id; }
+      try { const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value, tone: tn.value, tone_note: tno.value } }); location.hash = '#/p/' + p.id; }
       catch (err) { document.getElementById('msg').textContent = err.message; busy(btn, false); }
     };
     const t = document.getElementById('t'), b = document.getElementById('b'), a = document.getElementById('a'), d = document.getElementById('d');
+    const tn = document.getElementById('tn'), tno = document.getElementById('tno'), tnd = document.getElementById('tnd'), tnoWrap = document.getElementById('tnoWrap');
+    api('/api/tones').then(list => {
+      tn.insertAdjacentHTML('beforeend', list.map(x => `<option value="${esc(x.k)}">${esc(x.label)}</option>`).join('') + '<option value="ozel">Diğer (kendim tarif edeyim)</option>');
+      tn.onchange = () => { const x = list.find(y => y.k === tn.value); tnd.textContent = x ? x.desc : tn.value === 'ozel' ? 'Aşağıya istediğiniz üslubu kısaca yazın.' : 'İçeriğin hangi üslupla anlatılacağını seçin.'; tnoWrap.hidden = tn.value !== 'ozel'; tno.required = tn.value === 'ozel'; };
+    }).catch(() => {});
     try {
       const list = await api('/api/projects');
       document.getElementById('list').innerHTML = list.length ? list.map(p => `<a class="row" href="#/p/${p.id}"><span>${esc(p.title)}</span><span class="pill st-${p.status}">${STATUS[p.status] || p.status}</span></a>`).join('') : '<div class="empty">Henüz proje yok. Yukarıdan ilk konunu yaz.</div>';

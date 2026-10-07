@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { db, storage, q } = require('./lib/supa');
 const claude = require('./lib/claude');
+const { TONES } = require('./lib/tones');
 const eleven = require('./lib/eleven');
 
 const PORT = process.env.PORT || 3000;
@@ -175,12 +176,16 @@ on('POST', '/api/login', async (req, res) => {
   send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${SESSION()}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${publicBase().startsWith('https') ? '; Secure' : ''}` });
 }, true);
 on('GET', '/api/me', async (req, res) => send(res, 200, { ok: authed(req) }), true);
+on('GET', '/api/tones', async (req, res) => send(res, 200, Object.entries(TONES).map(([k, [label, desc]]) => ({ k, label, desc }))));
 
 on('GET', '/api/projects', async (req, res) => send(res, 200, await db.select('projects', 'select=id,title,status,updated_at,target_seconds&status=neq.archived&order=updated_at.desc')));
 on('POST', '/api/projects', async (req, res) => {
   const b = await readBody(req);
   if (!b.title || !b.brief) return send(res, 400, { error: 'Konu ve açıklama gerekli' });
-  const p = await db.insert('projects', { title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, status: 'content_generating' });
+  let tone = String(b.tone || '');
+  if (tone === 'ozel') tone = 'ozel:' + String(b.tone_note || '').trim().slice(0, 300);
+  if (!(TONES[tone] || (tone.startsWith('ozel:') && tone.length > 8))) return send(res, 400, { error: 'Anlatım dilini seçin (özelse kısaca tarif edin)' });
+  const p = await db.insert('projects', { title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, status: 'content_generating' });
   background(p.id, 'content', []);
   send(res, 201, p);
 });
