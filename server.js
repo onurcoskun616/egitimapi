@@ -177,7 +177,9 @@ on('GET', '/api/projects/:id', async (req, res, { id }) => {
   const content = await latest(id, 'content'); const visuals = await latest(id, 'visuals');
   const job = await db.one('render_jobs', `project_id=eq.${q(id)}&order=created_at.desc&select=id,status,progress,output_path,error,created_at,finished_at`);
   let videoUrl = null; if (job && job.status === 'done' && job.output_path) videoUrl = await storage.signedUrl(job.output_path, 24 * 3600);
-  send(res, 200, { project: p, content, visuals: visuals && { version: visuals.version, feedback: visuals.feedback, scenes: visuals.data.scenes.map(s => ({ k: s.k, title: s.title })) }, job, videoUrl });
+  let gen = null;
+  if (/_generating$/.test(p.status)) { const g = await db.one('gen_tasks', `project_id=eq.${q(id)}&consumed=is.false&order=created_at.desc&select=status,progress,created_at`); if (g) gen = g; }
+  send(res, 200, { project: p, gen, content, visuals: visuals && { version: visuals.version, feedback: visuals.feedback, scenes: visuals.data.scenes.map(s => ({ k: s.k, title: s.title })) }, job, videoUrl });
 });
 on('GET', '/api/projects/:id/bundle', async (req, res, { id }) => { const b = await bundleFor(id, new URL(req.url, 'http://x').searchParams.get('audio') === '1'); b ? send(res, 200, b) : send(res, 404, { error: 'Görsel yok' }); });
 
@@ -209,6 +211,12 @@ on('GET', '/api/task/:taskId', async (req, res, { taskId }) => {
   const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
   await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'running' });
   send(res, 200, { items: t.items, model: t.model });
+}, true);
+on('POST', '/api/task/:taskId/progress', async (req, res, { taskId }) => {
+  const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
+  const b = await readBody(req);
+  await db.update('gen_tasks', `id=eq.${q(taskId)}`, { progress: { done: +b.done || 0, total: +b.total || 0 } });
+  send(res, 200, { ok: true });
 }, true);
 on('POST', '/api/task/:taskId/result', async (req, res, { taskId }) => {
   const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });

@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const { TASK_ID, API_BASE, TASK_TOKEN } = process.env;
 const api = p => `${API_BASE.replace(/\/$/, '')}/api/task/${TASK_ID}${p}?token=${TASK_TOKEN}`;
-const CONCURRENCY = 3;
+const CONCURRENCY = 5;
 
 function runClaude(system, user, model, dir, i) {
   return new Promise(async (ok) => {
@@ -35,12 +35,14 @@ async function main() {
   const { items, model } = await r.json();
   console.log(`İstem sayısı: ${items.length}, model: ${model || 'varsayılan'}`);
   const dir = await mkdtemp(path.join(tmpdir(), 'gen-'));
-  const results = []; let next = 0;
+  const results = []; let next = 0, done = 0;
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
     while (next < items.length) {
       const k = next++; const t0 = Date.now();
       results[k] = await runClaude(items[k].system, items[k].user, model, dir, k);
       console.log(`#${k + 1}: ${results[k].error ? 'HATA ' + results[k].error : 'tamam'} (${Math.round((Date.now() - t0) / 1000)} sn)`);
+      done++;
+      fetch(api('/progress'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done, total: items.length }) }).catch(() => {});
     }
   }));
   if (results.every(x => x.error)) throw new Error('Tüm istemler başarısız: ' + results[0].error);

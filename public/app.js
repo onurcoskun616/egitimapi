@@ -51,9 +51,12 @@
     const steps = ['İçerik', 'Görseller', 'Ses', 'Video', 'Teslim'].map((s, i) => `<span class="${i < step ? 'done' : i === step ? 'on' : ''}">${i + 1} · ${s}</span>`).join('');
     let body = '';
     const head = `<p class="muted"><a href="#/">← Projeler</a></p><h1>${esc(p.title)}</h1><div class="steps">${steps}</div>`;
-    const waitMsg = { content_generating: 'Claude içeriği yazıyor. Bu 1–2 dakika sürebilir.', visuals_generating: 'Sahne çizimleri hazırlanıyor. Sahne sayısına göre 2–6 dakika sürebilir.', voicing: 'ElevenLabs seslendiriyor.', rendering: '' };
+    const waitMsg = { content_generating: 'Claude içeriği yazıyor. Bu 1–2 dakika sürebilir.', visuals_generating: 'Sahne çizimleri hazırlanıyor. 1 dakikalık video için 2–3, 4 dakikalık video için 6–9 dakika sürebilir.', voicing: 'ElevenLabs seslendiriyor.', rendering: '' };
     if (waitMsg[p.status] !== undefined && p.status !== 'rendering') {
-      body = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div><strong>${STATUS[p.status]}</strong><div class="note">${waitMsg[p.status]} Sayfa kendiliğinden yenilenir.</div></div></div>`;
+      const g = d.gen, gp = g && g.progress && g.progress.total ? g.progress : null;
+      const gline = g ? (g.status === 'queued' ? 'GitHub işi sırada, birazdan başlayacak.' : gp ? `${gp.done} / ${gp.total} ${p.status === 'visuals_generating' ? 'sahne çizildi' : 'tamamlandı'}` : 'Claude çalışıyor…') : '';
+      const gbar = gp ? `<div class="bar"><i style="width:${Math.round(gp.done / gp.total * 100)}%"></i></div>` : '';
+      body = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div style="flex:1"><strong>${STATUS[p.status]}</strong><div class="note">${waitMsg[p.status]} Sayfa kendiliğinden yenilenir.</div>${gline ? `<div class="note"><b>${gline}</b></div>` : ''}${gbar}</div></div>`;
       pollTimer = setTimeout(() => route(), 4000);
     } else if (p.status === 'rendering') {
       const pr = d.job ? d.job.progress : 0;
