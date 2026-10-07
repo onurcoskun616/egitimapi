@@ -23,10 +23,21 @@
   function withA(a, fn) { if (a <= 0) return; const g = c.globalAlpha; c.globalAlpha = g * a; fn(); c.globalAlpha = g; }
   function poly(p) { c.beginPath(); c.moveTo(...p[0]); for (let i = 1; i < p.length; i++) c.lineTo(...p[i]); c.closePath(); }
   function smooth(p) { c.beginPath(); const n = p.length, m = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; c.moveTo(...m(p[n - 1], p[0])); for (let i = 0; i < n; i++) c.quadraticCurveTo(p[i][0], p[i][1], ...m(p[i], p[(i + 1) % n])); c.closePath(); }
-  function lg(x0, y0, x1, y1, stops) { const g = c.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, col]) => g.addColorStop(o, col)); return g; }
-  function rg(x, y, r0, r1, stops) { const g = c.createRadialGradient(x, y, r0, x, y, r1); stops.forEach(([o, col]) => g.addColorStop(o, col)); return g; }
+  // Hatalı renk yazımlarını onar: 'rgb(1,2,3)66' → rgba, '#abc' + '80' → #aabbcc80
+  function fixColor(col) {
+    if (typeof col !== 'string') return 'rgba(0,0,0,0)';
+    let m = col.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)([0-9a-f]{2})$/i);
+    if (m) return `rgba(${m[1]},${m[2]},${m[3]},${(parseInt(m[4], 16) / 255).toFixed(3)})`;
+    m = col.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])([0-9a-f]{2})$/i);
+    if (m) return `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}${m[4]}`;
+    return col;
+  }
+  function addStops(g, stops) { (stops || []).forEach(([o, col]) => { o = Math.min(1, Math.max(0, +o || 0)); try { g.addColorStop(o, fixColor(col)); } catch { try { g.addColorStop(o, 'rgba(0,0,0,0)'); } catch { } } }); return g; }
+  function lg(x0, y0, x1, y1, stops) { return addStops(c.createLinearGradient(x0, y0, x1, y1), stops); }
+  function rg(x, y, r0, r1, stops) { return addStops(c.createRadialGradient(x, y, Math.max(0, r0), x, y, Math.max(0, r1)), stops); }
   function glow(col, b, fn) { c.save(); c.shadowColor = col; c.shadowBlur = b; fn(); c.restore(); }
-  function shadeHex(h, a) { if (typeof h !== 'string' || h[0] !== '#') return h; const n = parseInt(h.slice(1), 16); const r = n >> 16, g = (n >> 8) & 255, b = n & 255; const f = v => Math.round(a < 0 ? v * (1 + a) : v + (255 - v) * a); return `rgb(${f(r)},${f(g)},${f(b)})`; }
+  // #rrggbb döndürür; böylece shadeHex(c) + '66' gibi saydamlık eklemeleri de geçerli renk olur
+  function shadeHex(h, a) { if (typeof h !== 'string' || h[0] !== '#') return h; let x = h.slice(1); if (x.length === 3 || x.length === 4) x = x.split('').map(ch => ch + ch).join(''); const al = x.length === 8 ? x.slice(6) : ''; const n = parseInt(x.slice(0, 6), 16); if (isNaN(n)) return h; const r = n >> 16, g = (n >> 8) & 255, b = n & 255; a = +a || 0; const f = v => Math.max(0, Math.min(255, Math.round(a < 0 ? v * (1 + a) : v + (255 - v) * a))); return '#' + [f(r), f(g), f(b)].map(v => v.toString(16).padStart(2, '0')).join('') + al; }
   function line(pts, col, w = 4) { c.beginPath(); c.moveTo(...pts[0]); pts.slice(1).forEach(p => c.lineTo(...p)); c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
   function circle(x, y, r, fill, stroke, w = 3) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.lineWidth = w; c.stroke(); } }
   function arrow(x1, y1, x2, y2, col, w = 6, head = 24) { const a = Math.atan2(y2 - y1, x2 - x1); c.strokeStyle = col; c.fillStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2 - Math.cos(a) * head * .5, y2 - Math.sin(a) * head * .5); c.stroke(); c.beginPath(); c.moveTo(x2, y2); c.lineTo(x2 - Math.cos(a - .45) * head, y2 - Math.sin(a - .45) * head); c.lineTo(x2 - Math.cos(a + .45) * head, y2 - Math.sin(a + .45) * head); c.closePath(); c.fill(); }
@@ -160,7 +171,7 @@
     c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(56, 1530, 788, 3); c.fillStyle = C.yel; c.fillRect(56, 1530, 788 * (t / total), 3); c.fillRect(56 + 788 * (t / total) - 2, 1524, 4, 15);
     txt((sc.ch || '').toUpperCase(), 56, 1566, `800 15px ${FM}`, C.muted); txt('1080×1920 · 60 FPS', 844, 1566, `800 15px ${FM}`, C.muted, 'right');
   }
-  function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { c.setTransform(1.2, 0, 0, 1.2, 0, 0); txt('Çizim hatası: ' + String(e.message).slice(0, 40), 450, 800, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(1.2, 0, 0, 1.2, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
+  function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(1.2, 0, 0, 1.2, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), 450, 800, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(1.2, 0, 0, 1.2, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
   function createPlayer(canvas, bundle) {
     canvas.width = 1080; canvas.height = 1920; c = canvas.getContext('2d'); c.setTransform(1.2, 0, 0, 1.2, 0, 0);
@@ -176,5 +187,5 @@
     return { render, total: L.total, scenes: L.scenes };
   }
 
-  root.EVEngine = { createPlayer, layout, LIB_NAMES, W, H };
+  root.EVEngine = { createPlayer, layout, LIB_NAMES, W, H, errors: {} };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -82,7 +82,7 @@
     return `<div class="player"><div><div class="canvasWrap"><canvas id="cv" width="1080" height="1920" aria-label="Video önizlemesi"></canvas></div>
       <input type="range" class="scrub" id="scrub" min="0" max="1000" value="0" aria-label="Zaman">
       <div class="btns"><button id="pp">Oynat</button></div><div class="chips" id="chips"></div></div>
-      <div><div class="card"><p class="note">Sürüm ${d.visuals.version}. Önizlemede ses yok, süreler tahmini; seslendirmeden sonra sahneler sese göre ayarlanır.</p>
+      <div><div id="scene-warn"></div><div class="card"><p class="note">Sürüm ${d.visuals.version}. Önizlemede ses yok, süreler tahmini; seslendirmeden sonra sahneler sese göre ayarlanır.</p>
       <label for="sk">Hangi sahne?</label><select id="sk"><option value="">Tüm sahneler</option>${d.visuals.scenes.map(s => `<option value="${esc(s.k)}">${esc(s.k)} · ${esc(s.title)}</option>`).join('')}</select>
       <label for="fb">Düzeltme isteği</label><textarea id="fb" placeholder="Örn. motoru daha büyük çiz, etiketler üst üste biniyor"></textarea>
       <div class="btns"><button data-act="visuals-revise">Yeniden çiz</button></div></div>
@@ -97,6 +97,15 @@
   async function startPreview(id) {
     const cv = document.getElementById('cv'); if (!cv) return;
     const bundle = await api('/api/projects/' + id + '/bundle');
+    window.__EV_PREVIEW = true; window.EVEngine.errors = {};
+    // Ön kontrol: her sahneyi ekran dışında birkaç anda çizip hata veren sahneleri bul
+    try {
+      const off = document.createElement('canvas'), Q = window.EVEngine.createPlayer(off, bundle);
+      Q.scenes.forEach(s => { for (let j = 1; j <= 8; j++) Q.render(s.s + s.dur * j / 9); });
+    } catch (e) { console.error(e); }
+    const bad = Object.keys(window.EVEngine.errors);
+    const warnEl = document.getElementById('scene-warn');
+    if (warnEl) warnEl.innerHTML = bad.length ? `<div class="card err" style="margin:10px 0">Çizim hatası olan sahne: <b>${bad.map(esc).join(', ')}</b>. Onaylamadan önce bu sahneyi seçip “Yeniden çiz” ile düzelttir (ör. not: “çizim hatasını düzelt”).</div>` : '';
     const P = window.EVEngine.createPlayer(cv, bundle); let t = 0, playing = false, last = null, raf = 0;
     const scrub = document.getElementById('scrub'), pp = document.getElementById('pp');
     const chips = document.getElementById('chips'); chips.innerHTML = P.scenes.map((s, i) => `<button data-i="${i}">${esc(s.k)}</button>`).join('');
@@ -117,7 +126,7 @@
       if (act === 'revoice' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Güncel sesle yeniden üretilsin mi? Tekrar bas'; return; }
       if (act === 'cancel' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Emin misin? Tekrar bas'; return; }
       busy(btn, true); app.querySelectorAll('[data-act]').forEach(b => b.disabled = true);
-      const map = { 'content-approve': ['content/approve'], 'content-revise': ['content/revise', { feedback: fb && fb.value }], 'visuals-approve': ['visuals/approve'], 'visuals-revise': ['visuals/revise', { feedback: fb && fb.value, k: (document.getElementById('sk') || {}).value || null }], cancel: ['cancel'], retry: ['retry'], reopen: ['reopen'], revoice: ['visuals/approve'] }[act];
+      const map = { 'content-approve': ['content/approve'], 'content-revise': ['content/revise', { feedback: fb && fb.value }], 'visuals-approve': ['visuals/approve'], 'visuals-revise': ['visuals/revise', (() => { const k = (document.getElementById('sk') || {}).value || null, er = window.EVEngine && window.EVEngine.errors || {}; let f = fb && fb.value; if (k && er[k]) f += ` (Tarayıcıdaki çizim hatası: ${er[k]})`; return { feedback: f, k }; })()], cancel: ['cancel'], retry: ['retry'], reopen: ['reopen'], revoice: ['visuals/approve'] }[act];
       try { await api(`/api/projects/${id}/${map[0]}`, { method: 'POST', body: map[1] || {} }); route(); } catch (e) { alertBox(e.message); busy(btn, false); app.querySelectorAll('[data-act]').forEach(b => b.disabled = false); }
     });
   }
