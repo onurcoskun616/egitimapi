@@ -1,7 +1,7 @@
 // GitHub Actions render işçisi: kareleri çizer, sesi ekler, MP4'ü Supabase'e yükler.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { writeFile, readFile } from 'node:fs/promises';
+import { writeFile, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -28,8 +28,11 @@ async function main() {
 
   const out = path.join(here, 'out.mp4');
   const args = ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-i', '-'];
-  if (bundle.audioUrl) args.push('-i', audioFile, '-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-b:a', '192k', '-af', 'apad');
-  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-t', (n / FPS).toFixed(3), '-movflags', '+faststart', out);
+  if (bundle.audioUrl) args.push('-i', audioFile, '-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-b:a', '128k', '-af', 'apad');
+  // Supabase ücretsiz planında dosya sınırı 50 MB: uzun videolarda bit hızını süreye göre sınırla
+  const vKbps = videoKbps(n / FPS);
+  console.log(`Video bit hızı tavanı: ${vKbps} kbps`);
+  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-maxrate', vKbps + 'k', '-bufsize', vKbps * 2 + 'k', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-t', (n / FPS).toFixed(3), '-movflags', '+faststart', out);
   const ff = spawn('ffmpeg', args, { stdio: ['pipe', 'inherit', 'inherit'] });
   const ffDone = new Promise((ok, no) => ff.on('close', code => code === 0 ? ok() : no(new Error('ffmpeg çıkış kodu ' + code))));
 
@@ -44,11 +47,24 @@ async function main() {
   ff.stdin.end(); await ffDone; await browser.close();
   if (errors.length) console.log('Sayfa uyarıları:', errors.slice(0, 5));
 
+  let file = out, size = (await stat(out)).size;
+  console.log(`Dosya: ${(size / 1048576).toFixed(1)} MB`);
+  if (size > MAX_BYTES) {
+    // Güvenlik ağı: hâlâ büyükse sabit bit hızıyla yeniden sıkıştır
+    const kb = Math.floor(videoKbps(n / FPS) * MAX_BYTES / size * 0.92);
+    file = path.join(here, 'out_small.mp4');
+    console.log(`Yeniden sıkıştırılıyor: ${kb} kbps`);
+    await new Promise((ok, no) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', out, '-c:v', 'libx264', '-preset', 'medium', '-b:v', kb + 'k', '-maxrate', kb + 'k', '-bufsize', kb * 2 + 'k', '-c:a', 'copy', '-movflags', '+faststart', file], { stdio: 'inherit' }).on('close', c => c === 0 ? ok() : no(new Error('ffmpeg yeniden sıkıştırma ' + c))));
+    size = (await stat(file)).size; console.log(`Yeni boyut: ${(size / 1048576).toFixed(1)} MB`);
+  }
   const { url, path: storePath } = await post('upload-url');
-  const up = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'x-upsert': 'true' }, body: await readFile(out) });
+  const up = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'x-upsert': 'true' }, body: await readFile(file) });
   if (!up.ok) throw new Error('Yükleme başarısız: ' + up.status + ' ' + await up.text());
   await post('status', { status: 'done', path: storePath });
   console.log('Tamamlandı:', storePath);
 }
+
+const MAX_BYTES = 46 * 1048576;
+function videoKbps(sec) { return Math.max(600, Math.min(8000, Math.floor(MAX_BYTES * 8 / 1000 / Math.max(sec, 1) - 140))); }
 
 main().catch(async e => { console.error(e); try { await post('status', { status: 'failed', error: e.message }); } catch { } process.exit(1); });
