@@ -26,18 +26,30 @@ function authed(req) { const m = (req.headers.cookie || '').match(/(?:^|;\s*)sid
 function safeEq(a, b) { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); }
 const now = () => new Date().toISOString();
 async function setStatus(id, status, extra = {}) { return db.update('projects', `id=eq.${q(id)}`, { status, updated_at: now(), ...extra }); }
+async function nextVersion(id, stage) { const v = await latest(id, stage); return (v ? v.version : 0) + 1; }
 async function latest(id, stage) { return db.one('versions', `project_id=eq.${q(id)}&stage=eq.${stage}&order=version.desc`); }
 async function logUsage(project_id, provider, units, note) { try { await db.insert('usage', { project_id, provider, units, note }); } catch (e) { console.error('usage', e.message); } }
 
 // Arka plan işi: hata olursa proje "failed" olur, hangi adımda kaldığı saklanır
 // Adımlar projects.pending'e yazılır; sunucu yeniden başlarsa kaldığı yerden sürdürülür
 const STEPS = { content: (id, fb) => runContent(id, fb), visuals: (id, k, fb) => runVisuals(id, k, fb), voice: id => runVoiceAndRender(id), render: id => startRender(id) };
+const RUNNING = new Set();
 function background(id, stage, args = []) {
+  RUNNING.add(id);
   (async () => {
     await db.update('projects', `id=eq.${q(id)}`, { pending: { stage, args } });
     await STEPS[stage](id, ...args);
     await db.update('projects', `id=eq.${q(id)}`, { pending: null });
-  })().catch(async e => { console.error(stage, e); await setStatus(id, 'failed', { error: `${stage}|${e.message}`.slice(0, 900), pending: null }).catch(() => {}); });
+  })().catch(async e => { console.error(stage, e); await setStatus(id, 'failed', { error: `${stage}|${e.message}`.slice(0, 900), pending: null }).catch(() => {}); })
+    .finally(() => RUNNING.delete(id));
+}
+// Aynı projede ikinci bir adımın başlamasını ve yanlış aşamada onay/düzeltmeyi engeller
+async function guard(res, id, allowed, lock = true) {
+  const p = await db.one('projects', `id=eq.${q(id)}&select=status`);
+  if (!p) { send(res, 404, { error: 'Bulunamadı' }); return false; }
+  if (RUNNING.has(id) || !allowed.includes(p.status)) { send(res, 409, { error: 'Bu proje şu an başka bir adımı işliyor. Sayfayı yenileyip bekleyin.' }); return false; }
+  if (lock) RUNNING.add(id); // background() başlayana kadar ikinci isteği engelle
+  return true;
 }
 async function resumePending() {
   const rows = await db.select('projects', 'select=id,status,pending&pending=not.is.null&status=in.(content_generating,visuals_generating,voicing)');
@@ -89,7 +101,7 @@ async function runContent(id, feedback) {
   await setStatus(id, 'content_generating', { error: null });
   const { data, usage } = await claude.generateContent(p, prev && prev.data, feedback, ctxFor(id, 'content'));
   await logUsage(id, 'claude', tokensOf(usage), 'content');
-  await db.insert('versions', { project_id: id, stage: 'content', version: (prev ? prev.version : 0) + 1, data, feedback: feedback || null });
+  await db.insert('versions', { project_id: id, stage: 'content', version: await nextVersion(id, 'content'), data, feedback: feedback || null });
   await setStatus(id, 'content_review');
 }
 
@@ -111,7 +123,7 @@ async function runVisuals(id, onlyK, feedback) {
     await logUsage(id, 'claude', res.reduce((n, r) => n + tokensOf(r.usage), 0), 'scenes');
     scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
-  await db.insert('versions', { project_id: id, stage: 'visuals', version: (prevV ? prevV.version : 0) + 1, data: { topic, scenes }, feedback: feedback ? (onlyK ? `[${onlyK}] ` : '') + feedback : null });
+  await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes }, feedback: feedback ? (onlyK ? `[${onlyK}] ` : '') + feedback : null });
   await setStatus(id, 'visuals_review');
 }
 const strip = s => { const { code, ...rest } = s; return rest; };
@@ -183,19 +195,22 @@ on('GET', '/api/projects/:id', async (req, res, { id }) => {
 });
 on('GET', '/api/projects/:id/bundle', async (req, res, { id }) => { const b = await bundleFor(id, new URL(req.url, 'http://x').searchParams.get('audio') === '1'); b ? send(res, 200, b) : send(res, 404, { error: 'Görsel yok' }); });
 
-on('POST', '/api/projects/:id/content/revise', async (req, res, { id }) => { const { feedback } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); background(id, 'content', [feedback]); send(res, 202, { ok: true }); });
+on('POST', '/api/projects/:id/content/revise', async (req, res, { id }) => { const { feedback } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); if (!await guard(res, id, ['content_review'])) return; background(id, 'content', [feedback]); send(res, 202, { ok: true }); });
 on('POST', '/api/projects/:id/content/approve', async (req, res, { id }) => {
+  if (!await guard(res, id, ['content_review'])) return;
   const v = await latest(id, 'content'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
   background(id, 'visuals', []); send(res, 202, { ok: true });
 });
-on('POST', '/api/projects/:id/visuals/revise', async (req, res, { id }) => { const { feedback, k } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); background(id, 'visuals', [k || null, feedback]); send(res, 202, { ok: true }); });
+on('POST', '/api/projects/:id/visuals/revise', async (req, res, { id }) => { const { feedback, k } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); if (!await guard(res, id, ['visuals_review'])) return; background(id, 'visuals', [k || null, feedback]); send(res, 202, { ok: true }); });
 on('POST', '/api/projects/:id/visuals/approve', async (req, res, { id }) => {
+  if (!await guard(res, id, ['visuals_review'])) return;
   const v = await latest(id, 'visuals'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
   background(id, 'voice', []); send(res, 202, { ok: true });
 });
 on('POST', '/api/projects/:id/cancel', async (req, res, { id }) => { await setStatus(id, 'archived'); send(res, 200, { ok: true }); });
-on('POST', '/api/projects/:id/reopen', async (req, res, { id }) => { await setStatus(id, 'visuals_review'); send(res, 200, { ok: true }); });
+on('POST', '/api/projects/:id/reopen', async (req, res, { id }) => { if (!await guard(res, id, ['delivered'], false)) return; await setStatus(id, 'visuals_review'); send(res, 200, { ok: true }); });
 on('POST', '/api/projects/:id/retry', async (req, res, { id }) => {
+  if (!await guard(res, id, ['failed'])) return;
   const p = await db.one('projects', `id=eq.${q(id)}`); const stage = (p.error || '').split('|')[0];
   background(id, STEPS[stage] ? stage : 'content', []); send(res, 202, { ok: true });
 });
