@@ -91,7 +91,7 @@
   function delivered(d) {
     return `<div class="player"><div><div class="canvasWrap"><video controls playsinline src="${esc(d.videoUrl)}"></video></div></div>
       <div><div class="card"><strong>Video hazır</strong><p class="note">1080×1920, 60 FPS, seslendirme gömülü. İndirme bağlantısı 24 saat geçerlidir; sayfayı yenileyince yenisi oluşur.</p>
-      <div class="btns"><a class="btn" href="${esc(d.videoUrl)}" download>MP4 indir</a><button data-act="reopen">Bir sahneyi düzelt</button></div></div></div></div>`;
+      <div class="btns"><a class="btn" href="${esc(d.videoUrl)}" download>MP4 indir</a><button data-act="reopen">Bir sahneyi düzelt</button><button data-act="revoice">Yeniden seslendir</button></div></div></div></div>`;
   }
 
   async function startPreview(id) {
@@ -114,9 +114,10 @@
     app.querySelectorAll('[data-act]').forEach(btn => btn.onclick = async () => {
       const act = btn.dataset.act, fb = document.getElementById('fb');
       if ((act === 'content-revise' || act === 'visuals-revise') && !(fb && fb.value.trim())) { fb.focus(); fb.placeholder = 'Önce ne değişsin, onu yaz'; return; }
+      if (act === 'revoice' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Güncel sesle yeniden üretilsin mi? Tekrar bas'; return; }
       if (act === 'cancel' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Emin misin? Tekrar bas'; return; }
       busy(btn, true); app.querySelectorAll('[data-act]').forEach(b => b.disabled = true);
-      const map = { 'content-approve': ['content/approve'], 'content-revise': ['content/revise', { feedback: fb && fb.value }], 'visuals-approve': ['visuals/approve'], 'visuals-revise': ['visuals/revise', { feedback: fb && fb.value, k: (document.getElementById('sk') || {}).value || null }], cancel: ['cancel'], retry: ['retry'], reopen: ['reopen'] }[act];
+      const map = { 'content-approve': ['content/approve'], 'content-revise': ['content/revise', { feedback: fb && fb.value }], 'visuals-approve': ['visuals/approve'], 'visuals-revise': ['visuals/revise', { feedback: fb && fb.value, k: (document.getElementById('sk') || {}).value || null }], cancel: ['cancel'], retry: ['retry'], reopen: ['reopen'], revoice: ['visuals/approve'] }[act];
       try { await api(`/api/projects/${id}/${map[0]}`, { method: 'POST', body: map[1] || {} }); route(); } catch (e) { alertBox(e.message); busy(btn, false); app.querySelectorAll('[data-act]').forEach(b => b.disabled = false); }
     });
   }

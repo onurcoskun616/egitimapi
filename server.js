@@ -203,7 +203,7 @@ on('POST', '/api/projects/:id/content/approve', async (req, res, { id }) => {
 });
 on('POST', '/api/projects/:id/visuals/revise', async (req, res, { id }) => { const { feedback, k } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); if (!await guard(res, id, ['visuals_review'])) return; background(id, 'visuals', [k || null, feedback]); send(res, 202, { ok: true }); });
 on('POST', '/api/projects/:id/visuals/approve', async (req, res, { id }) => {
-  if (!await guard(res, id, ['visuals_review'])) return;
+  if (!await guard(res, id, ['visuals_review', 'delivered'])) return; // teslimden sonra: aynı görsellerle yeni sesle yeniden üret
   const v = await latest(id, 'visuals'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
   background(id, 'voice', []); send(res, 202, { ok: true });
 });
