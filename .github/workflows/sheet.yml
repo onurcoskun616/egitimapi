@@ -1,0 +1,21 @@
+name: sheet
+on:
+  push:
+    branches: [qa]
+    paths: [qa/req.json]
+permissions:
+  contents: write
+jobs:
+  sheet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - run: npm i --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - run: node render/sheet.mjs
+      - run: |
+          git config user.name qa-bot && git config user.email qa@users.noreply.github.com
+          git add qa/out && git commit -m "qa: kontak sayfası" && git push
