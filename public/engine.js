@@ -127,14 +127,14 @@
   function gear(x, y, r, u = 0, col = '#8d97ab', teeth = 12) { c.save(); c.translate(x, y); c.rotate(u); c.beginPath(); for (let i = 0; i < teeth * 2; i++) { const a = i * Math.PI / teeth, rad = i % 2 ? r : r * 1.15; c.lineTo(Math.cos(a) * rad, Math.sin(a) * rad); } c.closePath(); c.fillStyle = lg(-r, -r, r, r, [[0, shadeHex(col, .3)], [1, shadeHex(col, -.4)]]); c.fill(); c.beginPath(); c.arc(0, 0, r * .3, 0, Math.PI * 2); c.fillStyle = '#0b0f1b'; c.fill(); c.restore(); }
   function flame(x, y, s = 1, u = 0) { const fl = i => 1 + .09 * Math.sin(u * 13 + i * 2.1); const f = (dx, w, h, col) => { c.beginPath(); c.moveTo(x + dx - w / 2, y); c.bezierCurveTo(x + dx - w * .62, y - h * .45, x + dx - w * .12, y - h * .6, x + dx, y - h); c.bezierCurveTo(x + dx + w * .12, y - h * .6, x + dx + w * .62, y - h * .45, x + dx + w / 2, y); c.closePath(); c.fillStyle = col; c.fill(); };
     glow('rgba(255,110,20,.8)', 40, () => { f(-50 * s, 140 * s, 240 * s * fl(1), '#ff5a1f'); f(50 * s, 140 * s, 220 * s * fl(2), '#ff5a1f'); f(0, 170 * s, 300 * s * fl(3), '#ff5a1f'); }); f(0, 110 * s, 200 * s * fl(4), '#ff9b2e'); f(0, 70 * s, 130 * s * fl(5), '#ffd45a'); }
-  function hero(fn, u, sc = 1, dy = 0, cy = 800) { const k = 1.04 - .04 * e3(cl(u / 6)); c.save(); c.translate(450 + Math.sin(u * .3) * 6, cy + dy + Math.cos(u * .25) * 4); c.scale(sc * k, sc * k); fn(); c.restore(); }
+  function hero(fn, u, sc = 1, dy = 0, cy = 800) { const k = 1.04 - .04 * e3(cl(u / 6)); c.save(); c.translate(F.hx + Math.sin(u * .3) * 6, F.hy + (cy - 800 + dy) * F.hs + Math.cos(u * .25) * 4); c.scale(sc * k * F.hs, sc * k * F.hs); fn(); c.restore(); }
 
   const LIB = { C, W, H, FD, FM, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, ctx: () => c };
   const LIB_NAMES = Object.keys(LIB);
 
   function compileScene(code) {
     try { const f = new Function(...LIB_NAMES, 'u', 'T', 'S', '"use strict";\n' + code); const vals = LIB_NAMES.map(n => LIB[n]); return (u, T, S) => f(...vals, u, T, S); }
-    catch (e) { return () => { txt('Sahne kodu hatası', 450, 780, `900 46px ${FD}`, C.red, 'center'); txt(String(e.message).slice(0, 60), 450, 840, `700 22px ${FM}`, C.muted, 'center'); }; }
+    catch (e) { return () => { txt('Sahne kodu hatası', F.hx, F.hy - 20, `900 46px ${FD}`, C.red, 'center'); txt(String(e.message).slice(0, 60), F.hx, F.hy + 40, `700 22px ${FM}`, C.muted, 'center'); }; }
   }
 
   /* ---------- zamanlama ---------- */
@@ -148,44 +148,71 @@
     return { scenes, total: acc };
   }
 
+  /* ---------- biçimler ----------
+     Sahne kodu her zaman 900×1600 düzenindeki hero alanına (merkez 0,0; x ±400, y −330…+340) çizer.
+     Biçim; tuval boyutunu, hero alanının yerini/ölçeğini ve çerçeve öğelerinin yerleşimini belirler. */
+  const FORMATS = {
+    dikey: { label: '9:16', W: 900, H: 1600, S: 1.2, hx: 450, hy: 800, hs: 1,
+      brandY: 66, chipY: 232, titleX: 56, titleY: 300, titleW: 790, titleMax: 84, titleMin: 40,
+      big: { x: 56, y: 1270, size: 64 }, cap: { x: 56, y: 1352, w: 770, font: 27, lh: 42, lines: 3 }, barY: 1530, footY: 1566 },
+    yatay: { label: '16:9', W: 1600, H: 900, S: 1.2, hx: 1115, hy: 470, hs: 1,
+      brandY: 56, chipY: 150, titleX: 56, titleY: 210, titleW: 560, titleMax: 64, titleMin: 34,
+      big: { x: 56, y: 520, size: 52 }, cap: { x: 56, y: 600, w: 540, font: 25, lh: 38, lines: 4 }, barY: 830, footY: 866 },
+    kare: { label: '1:1', W: 900, H: 900, S: 1.2, hx: 450, hy: 462, hs: .72,
+      brandY: 50, chipY: 82, titleX: 56, titleY: 134, titleW: 790, titleMax: 58, titleMin: 30,
+      big: { x: 56, y: 752, size: 42 }, cap: { x: 56, y: 776, w: 780, font: 22, lh: 32, lines: 2 }, barY: 862, footY: 888, noFoot: true },
+    dikey45: { label: '4:5', W: 900, H: 1125, S: 1.2, hx: 450, hy: 540, hs: .8,
+      brandY: 56, chipY: 100, titleX: 56, titleY: 156, titleW: 790, titleMax: 66, titleMin: 34,
+      big: { x: 56, y: 878, size: 52 }, cap: { x: 56, y: 910, w: 770, font: 25, lh: 37, lines: 3 }, barY: 1060, footY: 1094 },
+  };
+  let F = FORMATS.dikey;
+  function setFormat(name) { F = FORMATS[name] || FORMATS.dikey; return F; }
+
   /* ---------- çerçeve ---------- */
-  function bgGrid() { c.fillStyle = 'rgba(120,150,210,.12)'; for (let x = 38; x < W; x += 76) for (let y = 38; y < H; y += 76) { c.fillRect(x - 6, y - 1, 12, 2); c.fillRect(x - 1, y - 6, 2, 12); } }
-  function background() { c.fillStyle = C.bg; c.fillRect(0, 0, W, H); c.fillStyle = rg(450, 760, 40, 760, [[0, 'rgba(30,50,100,.38)'], [1, 'rgba(5,7,14,0)']]); c.fillRect(0, 0, W, H); bgGrid(); }
+  function bgGrid() { c.fillStyle = 'rgba(120,150,210,.12)'; for (let x = 38; x < F.W; x += 76) for (let y = 38; y < F.H; y += 76) { c.fillRect(x - 6, y - 1, 12, 2); c.fillRect(x - 1, y - 6, 2, 12); } }
+  function background() { c.fillStyle = C.bg; c.fillRect(0, 0, F.W, F.H); c.fillStyle = rg(F.hx, F.hy - 40, 40, 760, [[0, 'rgba(30,50,100,.38)'], [1, 'rgba(5,7,14,0)']]); c.fillRect(0, 0, F.W, F.H); bgGrid(); }
   function header(P, sc, si, u, t) {
-    c.fillStyle = C.yel; c.fillRect(40, 56, 10, 10); txt((P.brand || 'NASIL ÇALIŞIR') + '  ·  ' + (P.topic || '').toUpperCase(), 58, 66, `800 17px ${FM}`, C.muted);
-    const s = Math.floor(t); txt(`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}:${String(Math.floor((t % 1) * 100)).padStart(2, '0')}   F${String(Math.floor(t * 60)).padStart(5, '0')}`, 860, 66, `800 17px ${FM}`, C.muted, 'right');
+    const R = F.W - 40;
+    c.fillStyle = C.yel; c.fillRect(40, F.brandY - 10, 10, 10);
+    c.font = `800 17px ${FM}`; let brand = (P.brand || 'NASIL ÇALIŞIR') + '  ·  ' + (P.topic || '').toUpperCase(); while (c.measureText(brand).width > F.W - 330 && brand.length > 10) brand = brand.slice(0, -2);
+    txt(brand, 58, F.brandY, `800 17px ${FM}`, C.muted);
+    const s = Math.floor(t); txt(`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}:${String(Math.floor((t % 1) * 100)).padStart(2, '0')}   F${String(Math.floor(t * 60)).padStart(5, '0')}`, R, F.brandY, `800 17px ${FM}`, C.muted, 'right');
     const k = fade(u, .15, .5); withA(k, () => {
       const col = sc.warn ? C.red : C.lv; c.font = `800 20px ${FM}`; const lb = `${si + 1} · ${(sc.ch || '').toUpperCase()}`; const w = c.measureText(lb).width + 34;
-      rr(56, 232, w, 40, 20); c.fillStyle = 'rgba(8,11,20,.9)'; c.fill(); c.strokeStyle = col; c.lineWidth = 2.5; c.stroke(); txt(lb, 56 + w / 2, 259, `800 20px ${FM}`, col, 'center');
-      if (sc.tag) pill(sc.tag.text, 56 + w + 14, 252, sc.tag.color || C.yel, { al: 'left', fill: true, size: 18 });
-      const title = (sc.title || '').toUpperCase(); let size = title.length > 15 ? 66 : 84; c.font = `900 ${size}px ${FD}`; while (c.measureText(title).width > 790 && size > 40) { size -= 4; c.font = `900 ${size}px ${FD}`; }
-      c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 20; c.fillStyle = sc.tcol ? sc.tcol : lg(0, 300, 0, 300 + size, [[0, '#ffffff'], [1, '#b9c2d6']]); c.textAlign = 'left'; c.textBaseline = 'alphabetic'; c.fillText(title, 56 - 24 * (1 - k), 300 + size * .92); c.restore();
+      rr(F.titleX, F.chipY, w, 40, 20); c.fillStyle = 'rgba(8,11,20,.9)'; c.fill(); c.strokeStyle = col; c.lineWidth = 2.5; c.stroke(); txt(lb, F.titleX + w / 2, F.chipY + 27, `800 20px ${FM}`, col, 'center');
+      if (sc.tag) pill(sc.tag.text, F.titleX + w + 14, F.chipY + 20, sc.tag.color || C.yel, { al: 'left', fill: true, size: 18 });
+      const title = (sc.title || '').toUpperCase(); let size = title.length > 15 ? Math.round(F.titleMax * .79) : F.titleMax; c.font = `900 ${size}px ${FD}`; while (c.measureText(title).width > F.titleW && size > F.titleMin) { size -= 2; c.font = `900 ${size}px ${FD}`; }
+      c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 20; c.fillStyle = sc.tcol ? sc.tcol : lg(0, F.titleY, 0, F.titleY + size, [[0, '#ffffff'], [1, '#b9c2d6']]); c.textAlign = 'left'; c.textBaseline = 'alphabetic'; c.fillText(title, F.titleX - 24 * (1 - k), F.titleY + size * .92); c.restore();
     });
   }
-  function bigNum(sc, u) { const b = sc.big; if (!b || !b.text) return; const at = sc.capT[Math.min(sc.capT.length - 1, b.at || 0)] + (b.at ? 0 : 1.2); if (u < at) return; withA(fade(u, at, .4), () => { c.save(); c.shadowColor = b.color || C.yel; c.shadowBlur = 26; c.font = `900 ${b.text.length > 16 ? 50 : 64}px ${FD}`; c.fillStyle = b.color || C.yel; c.textAlign = 'left'; c.fillText(b.text, 56, 1270); c.restore(); }); }
+  function bigNum(sc, u) { const b = sc.big; if (!b || !b.text) return; const at = sc.capT[Math.min(sc.capT.length - 1, b.at || 0)] + (b.at ? 0 : 1.2); if (u < at) return;
+    withA(fade(u, at, .4), () => { c.save(); c.shadowColor = b.color || C.yel; c.shadowBlur = 26; let size = b.text.length > 16 ? Math.round(F.big.size * .78) : F.big.size; c.font = `900 ${size}px ${FD}`; while (c.measureText(b.text).width > F.cap.w + 20 && size > 24) { size -= 2; c.font = `900 ${size}px ${FD}`; } c.fillStyle = b.color || C.yel; c.textAlign = 'left'; c.fillText(b.text, F.big.x, F.big.y); c.restore(); }); }
   function caption(P, sc, u, t, total) {
-    let idx = 0; sc.capT.forEach((x, i) => { if (u >= x) idx = i; }); const st = sc.capT[idx], y0 = 1352;
-    c.fillStyle = C.yel; c.fillRect(56, y0 - 6, 6, 96); c.font = `800 27px ${FM}`; let shown = Math.floor((u - st) * (sc.capR ? sc.capR[idx] : CPS));
-    wrap(sc.cap[idx] || '', 770).slice(0, 3).forEach((ln, i) => { const part = ln.slice(0, Math.max(0, shown)); shown -= ln.length + 1; c.font = `800 27px ${FM}`; const pw = c.measureText(part).width;
-      txt(part, 84, y0 + 30 + i * 42, `800 27px ${FM}`, C.fg); if (part.length < ln.length) txt(ln.slice(part.length), 84 + pw, y0 + 30 + i * 42, `800 27px ${FM}`, 'rgba(238,241,247,.2)'); });
-    c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(56, 1530, 788, 3); c.fillStyle = C.yel; c.fillRect(56, 1530, 788 * (t / total), 3); c.fillRect(56 + 788 * (t / total) - 2, 1524, 4, 15);
-    txt((sc.ch || '').toUpperCase(), 56, 1566, `800 15px ${FM}`, C.muted); txt('1080×1920 · 60 FPS', 844, 1566, `800 15px ${FM}`, C.muted, 'right');
+    const K = F.cap; let idx = 0; sc.capT.forEach((x, i) => { if (u >= x) idx = i; }); const st = sc.capT[idx], y0 = K.y, fnt = `800 ${K.font}px ${FM}`;
+    c.font = fnt; const lines = wrap(sc.cap[idx] || '', K.w).slice(0, K.lines);
+    c.fillStyle = C.yel; c.fillRect(K.x, y0 - 6, 6, Math.max(2, lines.length) * K.lh + 12); let shown = Math.floor((u - st) * (sc.capR ? sc.capR[idx] : CPS));
+    lines.forEach((ln, i) => { const part = ln.slice(0, Math.max(0, shown)); shown -= ln.length + 1; c.font = fnt; const pw = c.measureText(part).width;
+      txt(part, K.x + 28, y0 + K.lh * .72 + i * K.lh, fnt, C.fg); if (part.length < ln.length) txt(ln.slice(part.length), K.x + 28 + pw, y0 + K.lh * .72 + i * K.lh, fnt, 'rgba(238,241,247,.2)'); });
+    const bw = F.W - 112; c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(56, F.barY, bw, 3); c.fillStyle = C.yel; c.fillRect(56, F.barY, bw * (t / total), 3); c.fillRect(56 + bw * (t / total) - 2, F.barY - 6, 4, 15);
+    if (!F.noFoot) { txt((sc.ch || '').toUpperCase(), 56, F.footY, `800 15px ${FM}`, C.muted); txt(`${Math.round(F.W * F.S)}×${Math.round(F.H * F.S)} · 60 FPS`, F.W - 56, F.footY, `800 15px ${FM}`, C.muted, 'right'); }
   }
-  function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(1.2, 0, 0, 1.2, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), 450, 800, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(1.2, 0, 0, 1.2, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
+  function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
   function createPlayer(canvas, bundle) {
-    canvas.width = 1080; canvas.height = 1920; c = canvas.getContext('2d'); c.setTransform(1.2, 0, 0, 1.2, 0, 0);
+    setFormat(bundle.format); const FF = F;
+    canvas.width = Math.round(FF.W * FF.S); canvas.height = Math.round(FF.H * FF.S); c = canvas.getContext('2d'); c.setTransform(FF.S, 0, 0, FF.S, 0, 0);
     const L = layout(bundle);
     function render(t) {
-      c = canvas.getContext('2d'); c.setTransform(1.2, 0, 0, 1.2, 0, 0); t = cl(t, 0, L.total - .001);
+      F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
       let si = L.scenes.findIndex(s => t >= s.s && t < s.e); if (si < 0) si = L.scenes.length - 1; const u = t - L.scenes[si].s, TR = .6;
-      if (u < TR && si > 0) { drawScene(bundle, L, si - 1, L.scenes[si - 1].dur - .001, t); const r = e3(u / TR) * 1150; c.save(); c.beginPath(); c.arc(450, 800, r, 0, Math.PI * 2); c.clip(); drawScene(bundle, L, si, u, t); c.restore();
-        glow(C.hv, 40, () => { c.beginPath(); c.arc(450, 800, r, 0, Math.PI * 2); c.strokeStyle = `rgba(255,138,42,${1 - u / TR})`; c.lineWidth = 18; c.stroke(); }); }
+      const ox = F.W / 2, oy = F.H / 2, RM = Math.hypot(F.W, F.H) * .62;
+      if (u < TR && si > 0) { drawScene(bundle, L, si - 1, L.scenes[si - 1].dur - .001, t); const r = e3(u / TR) * RM; c.save(); c.beginPath(); c.arc(ox, oy, r, 0, Math.PI * 2); c.clip(); drawScene(bundle, L, si, u, t); c.restore();
+        glow(C.hv, 40, () => { c.beginPath(); c.arc(ox, oy, r, 0, Math.PI * 2); c.strokeStyle = `rgba(255,138,42,${1 - u / TR})`; c.lineWidth = 18; c.stroke(); }); }
       else drawScene(bundle, L, si, u, t);
       return si;
     }
-    return { render, total: L.total, scenes: L.scenes };
+    return { render, total: L.total, scenes: L.scenes, format: FF, width: canvas.width, height: canvas.height };
   }
 
-  root.EVEngine = { createPlayer, layout, LIB_NAMES, W, H, errors: {} };
+  root.EVEngine = { createPlayer, layout, LIB_NAMES, W, H, FORMATS, errors: {} };
 })(typeof window !== 'undefined' ? window : globalThis);

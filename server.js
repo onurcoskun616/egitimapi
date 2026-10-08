@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { db, storage, q } = require('./lib/supa');
 const claude = require('./lib/claude');
-const { TONES } = require('./lib/tones');
+const { TONES, voiceForTone } = require('./lib/tones');
 const eleven = require('./lib/eleven');
 
 const PORT = process.env.PORT || 3000;
@@ -33,7 +33,7 @@ async function logUsage(project_id, provider, units, note) { try { await db.inse
 
 // Arka plan işi: hata olursa proje "failed" olur, hangi adımda kaldığı saklanır
 // Adımlar projects.pending'e yazılır; sunucu yeniden başlarsa kaldığı yerden sürdürülür
-const STEPS = { content: (id, fb) => runContent(id, fb), visuals: (id, k, fb) => runVisuals(id, k, fb), voice: id => runVoiceAndRender(id), render: id => startRender(id) };
+const STEPS = { content: (id, fb) => runContent(id, fb), visuals: (id, k, fb) => runVisuals(id, k, fb), voice: id => runVoiceAndRender(id), render: (id, fmt) => startRender(id, fmt) };
 const RUNNING = new Set();
 function background(id, stage, args = []) {
   RUNNING.add(id);
@@ -134,7 +134,7 @@ async function runVoiceAndRender(id) {
   const vis = await latest(id, 'visuals');
   await setStatus(id, 'voicing', { error: null });
   const { text, marks } = eleven.buildScript(vis.data.scenes);
-  const voice = p.voice_id || process.env.ELEVENLABS_VOICE_ID;
+  const voice = p.voice_id || voiceForTone(p.tone) || process.env.ELEVENLABS_VOICE_ID;
   if (!voice) throw new Error('ElevenLabs ses kimliği (ELEVENLABS_VOICE_ID) tanımlı değil');
   const { audio, alignment } = await eleven.tts(text, voice);
   await logUsage(id, 'elevenlabs', text.length, 'tts');
@@ -146,19 +146,21 @@ async function runVoiceAndRender(id) {
   await startRender(id);
 }
 
-async function startRender(id) {
+const FORMATS = { dikey: 'Dikey 9:16 (1080×1920)', yatay: 'Yatay 16:9 (1920×1080)', kare: 'Kare 1:1 (1080×1080)', dikey45: 'Dikey 4:5 (1080×1350)' };
+async function startRender(id, format) {
   const token = crypto.randomBytes(24).toString('hex');
-  const job = await db.insert('render_jobs', { project_id: id, token, status: 'queued' });
+  if (!FORMATS[format]) { const p = await db.one('projects', `id=eq.${q(id)}&select=format`); format = (p && FORMATS[p.format]) ? p.format : 'dikey'; }
+  const job = await db.insert('render_jobs', { project_id: id, token, status: 'queued', format });
   await setStatus(id, 'rendering', { error: null });
   await dispatch('render.yml', { job_id: job.id, token });
 }
 
-async function bundleFor(id, withAudio) {
+async function bundleFor(id, withAudio, format) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
   const vis = await latest(id, 'visuals');
   if (!vis) return null;
   const scenes = vis.data.scenes.map(s => ({ k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, code: s.code }));
-  const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', scenes };
+  const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', scenes };
   if (withAudio) {
     const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc`);
     if (a) { a.alignment.timings.forEach((t, i) => Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; }
@@ -185,7 +187,7 @@ on('POST', '/api/projects', async (req, res) => {
   let tone = String(b.tone || '');
   if (tone === 'ozel') tone = 'ozel:' + String(b.tone_note || '').trim().slice(0, 300);
   if (!(TONES[tone] || (tone.startsWith('ozel:') && tone.length > 8))) return send(res, 400, { error: 'Anlatım dilini seçin (özelse kısaca tarif edin)' });
-  const p = await db.insert('projects', { title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, status: 'content_generating' });
+  const p = await db.insert('projects', { title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', status: 'content_generating' });
   background(p.id, 'content', []);
   send(res, 201, p);
 });
@@ -193,10 +195,16 @@ on('GET', '/api/projects/:id', async (req, res, { id }) => {
   const p = await db.one('projects', `id=eq.${q(id)}`); if (!p) return send(res, 404, { error: 'Bulunamadı' });
   const content = await latest(id, 'content'); const visuals = await latest(id, 'visuals');
   const job = await db.one('render_jobs', `project_id=eq.${q(id)}&order=created_at.desc&select=id,status,progress,output_path,error,created_at,finished_at`);
-  let videoUrl = null; if (job && job.status === 'done' && job.output_path) videoUrl = await storage.signedUrl(job.output_path, 24 * 3600);
+  // Son seslendirmeden sonra üretilmiş, her biçimin en yeni videosu
+  const at = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc&select=created_at`);
+  const done = await db.select('render_jobs', `project_id=eq.${q(id)}&status=eq.done&order=created_at.desc&select=format,output_path,created_at`);
+  const videos = []; const seen = new Set();
+  for (const j of done) { const f = j.format || 'dikey'; if (seen.has(f) || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; seen.add(f); videos.push({ format: f, label: FORMATS[f] || f, url: await storage.signedUrl(j.output_path, 24 * 3600) }); }
+  const main = videos.find(v => v.format === (p.format || 'dikey')) || videos[0];
+  const videoUrl = main ? main.url : null;
   let gen = null;
   if (/_generating$/.test(p.status)) { const g = await db.one('gen_tasks', `project_id=eq.${q(id)}&consumed=is.false&order=created_at.desc&select=status,progress,created_at`); if (g) gen = g; }
-  send(res, 200, { project: p, gen, content, visuals: visuals && { version: visuals.version, feedback: visuals.feedback, scenes: visuals.data.scenes.map(s => ({ k: s.k, title: s.title })) }, job, videoUrl });
+  send(res, 200, { project: p, gen, content, visuals: visuals && { version: visuals.version, feedback: visuals.feedback, scenes: visuals.data.scenes.map(s => ({ k: s.k, title: s.title })) }, job, videoUrl, videos, mainFormat: main ? main.format : (p.format || 'dikey'), formats: FORMATS });
 });
 on('GET', '/api/projects/:id/bundle', async (req, res, { id }) => { const b = await bundleFor(id, new URL(req.url, 'http://x').searchParams.get('audio') === '1'); b ? send(res, 200, b) : send(res, 404, { error: 'Görsel yok' }); });
 
@@ -212,12 +220,20 @@ on('POST', '/api/projects/:id/visuals/approve', async (req, res, { id }) => {
   const v = await latest(id, 'visuals'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
   background(id, 'voice', []); send(res, 202, { ok: true });
 });
+on('POST', '/api/projects/:id/render', async (req, res, { id }) => {
+  const { format } = await readBody(req); if (!FORMATS[format]) return send(res, 400, { error: 'Geçersiz biçim' });
+  if (!await guard(res, id, ['delivered'])) return;
+  background(id, 'render', [format]); send(res, 202, { ok: true });
+});
+on('GET', '/api/formats', async (req, res) => send(res, 200, FORMATS));
 on('POST', '/api/projects/:id/cancel', async (req, res, { id }) => { await setStatus(id, 'archived'); send(res, 200, { ok: true }); });
 on('POST', '/api/projects/:id/reopen', async (req, res, { id }) => { if (!await guard(res, id, ['delivered'], false)) return; await setStatus(id, 'visuals_review'); send(res, 200, { ok: true }); });
 on('POST', '/api/projects/:id/retry', async (req, res, { id }) => {
   if (!await guard(res, id, ['failed'])) return;
   const p = await db.one('projects', `id=eq.${q(id)}`); const stage = (p.error || '').split('|')[0];
-  background(id, STEPS[stage] ? stage : 'content', []); send(res, 202, { ok: true });
+  let args = [];
+  if (stage === 'render') { const lj = await db.one('render_jobs', `project_id=eq.${q(id)}&order=created_at.desc&select=format`); if (lj && lj.format) args = [lj.format]; }
+  background(id, STEPS[stage] ? stage : 'content', args); send(res, 202, { ok: true });
 });
 
 /* Claude üretim işçisi (generate.yml) uç noktaları — görev jetonuyla korunur */
@@ -256,7 +272,7 @@ async function jobAuth(req, jobId) {
 on('GET', '/api/render/:jobId/bundle', async (req, res, { jobId }) => {
   const job = await jobAuth(req, jobId); if (!job) return send(res, 403, { error: 'Geçersiz iş' });
   await db.update('render_jobs', `id=eq.${q(jobId)}`, { status: 'running', started_at: now() });
-  send(res, 200, await bundleFor(job.project_id, true));
+  send(res, 200, await bundleFor(job.project_id, true, job.format));
 }, true);
 on('POST', '/api/render/:jobId/upload-url', async (req, res, { jobId }) => {
   const job = await jobAuth(req, jobId); if (!job) return send(res, 403, { error: 'Geçersiz iş' });

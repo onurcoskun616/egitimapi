@@ -1,7 +1,7 @@
 (() => {
   const app = document.getElementById('app');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-  const STATUS = { draft: 'Taslak', content_generating: 'İçerik yazılıyor', content_review: 'İçerik onayı bekliyor', visuals_generating: 'Görseller çiziliyor', visuals_review: 'Görsel onayı bekliyor', voicing: 'Seslendiriliyor', rendering: 'Video üretiliyor', delivered: 'Teslim edildi', failed: 'Hata', archived: 'İptal edildi' };
+  const STATUS = { draft: 'Taslak', content_generating: 'İçerik hazırlanıyor', content_review: 'İçerik onayı bekliyor', visuals_generating: 'Görseller hazırlanıyor', visuals_review: 'Görsel onayı bekliyor', voicing: 'Seslendiriliyor', rendering: 'Video üretiliyor', delivered: 'Teslim edildi', failed: 'Hata', archived: 'İptal edildi' };
   const STEP_OF = { content_generating: 0, content_review: 0, visuals_generating: 1, visuals_review: 1, voicing: 2, rendering: 3, delivered: 4 };
   let pollTimer = null, player = null;
 
@@ -29,6 +29,7 @@
         <label for="b">Ne anlatılsın?</label><textarea id="b" required placeholder="Parçaların görevleri, sık arızalar, belirtiler ve çözümler…"></textarea>
         <div class="grid two"><div><label for="a">Hedef kitle</label><input id="a" placeholder="Meslek lisesi 11. sınıf"></div>
         <div><label for="d">Süre</label><select id="d"><option value="60">60 saniye</option><option value="90" selected>90 saniye</option><option value="150">2,5 dakika</option><option value="240">4 dakika</option></select></div></div>
+        <label for="fm">Video biçimi</label><select id="fm"><option value="dikey">Dikey 9:16 · Instagram Reels, TikTok, YouTube Shorts</option><option value="yatay">Yatay 16:9 · YouTube, sunum, akıllı tahta</option><option value="kare">Kare 1:1 · Instagram ve Facebook gönderisi</option><option value="dikey45">Dikey 4:5 · Instagram ve Facebook akışı</option></select>
         <label for="tn">Anlatım dili</label><select id="tn" required><option value="">Seçin…</option></select>
         <p class="note" id="tnd">İçeriğin hangi üslupla anlatılacağını seçin.</p>
         <div id="tnoWrap" hidden><label for="tno">Anlatım dilini tarif edin</label><input id="tno" maxlength="300" placeholder="Örn. esprili ama saygılı, kısa cümlelerle, futbol benzetmeleri kullanan"></div>
@@ -37,7 +38,7 @@
       <h2>Projeler</h2><div class="list" id="list"><div class="empty">Yükleniyor…</div></div>`;
     document.getElementById('nf').onsubmit = async e => {
       e.preventDefault(); const btn = document.getElementById('go'); busy(btn, true);
-      try { const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value, tone: tn.value, tone_note: tno.value } }); location.hash = '#/p/' + p.id; }
+      try { const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value, tone: tn.value, tone_note: tno.value, format: document.getElementById('fm').value } }); location.hash = '#/p/' + p.id; }
       catch (err) { document.getElementById('msg').textContent = err.message; busy(btn, false); }
     };
     const t = document.getElementById('t'), b = document.getElementById('b'), a = document.getElementById('a'), d = document.getElementById('d');
@@ -59,21 +60,21 @@
     const steps = ['İçerik', 'Görseller', 'Ses', 'Video', 'Teslim'].map((s, i) => `<span class="${i < step ? 'done' : i === step ? 'on' : ''}">${i + 1} · ${s}</span>`).join('');
     let body = '';
     const head = `<p class="muted"><a href="#/">← Projeler</a></p><h1>${esc(p.title)}</h1><div class="steps">${steps}</div>`;
-    const waitMsg = { content_generating: 'Claude içeriği yazıyor. Bu 1–2 dakika sürebilir.', visuals_generating: 'Sahne çizimleri hazırlanıyor. 1 dakikalık video için 2–3, 4 dakikalık video için 6–9 dakika sürebilir.', voicing: 'ElevenLabs seslendiriyor.', rendering: '' };
+    const waitMsg = { content_generating: 'Eğitim içeriği hazırlanıyor, lütfen bekleyiniz. Bu işlem 1–2 dakika sürebilir.', visuals_generating: 'Sahne görselleri hazırlanıyor, lütfen bekleyiniz. 1 dakikalık video için 2–3, 4 dakikalık video için 5–8 dakika sürebilir.', voicing: 'Seslendirme yapılıyor, lütfen bekleyiniz.', rendering: '' };
     if (waitMsg[p.status] !== undefined && p.status !== 'rendering') {
       const g = d.gen, gp = g && g.progress && g.progress.total ? g.progress : null;
-      const gline = g ? (g.status === 'queued' ? 'GitHub işi sırada, birazdan başlayacak.' : gp ? `${gp.done} / ${gp.total} ${p.status === 'visuals_generating' ? 'sahne çizildi' : 'tamamlandı'}` : 'Claude çalışıyor…') : '';
+      const gline = g ? (g.status === 'queued' ? 'Çalışma başlatılıyor…' : gp ? `${gp.done} / ${gp.total} ${p.status === 'visuals_generating' ? 'sahne hazır' : 'tamamlandı'}` : 'Çalışma sürüyor…') : '';
       const gbar = gp ? `<div class="bar"><i style="width:${Math.round(gp.done / gp.total * 100)}%"></i></div>` : '';
       body = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div style="flex:1"><strong>${STATUS[p.status]}</strong><div class="note">${waitMsg[p.status]} Sayfa kendiliğinden yenilenir.</div>${gline ? `<div class="note"><b>${gline}</b></div>` : ''}${gbar}</div></div>`;
       pollTimer = setTimeout(() => route(), 4000);
     } else if (p.status === 'rendering') {
       const pr = d.job ? d.job.progress : 0;
-      body = `<div class="card"><strong>Video üretiliyor</strong><p class="note">Kareler GitHub Actions'ta çiziliyor. 80 saniyelik video yaklaşık 7–10 dakika sürer; sayfayı kapatabilirsin.</p><div class="bar"><i style="width:${pr}%"></i></div><p class="note">%${pr} · ${d.job ? (d.job.status === 'queued' ? 'sırada' : 'çiziliyor') : ''}</p></div>`;
+      body = `<div class="card"><strong>Video üretiliyor</strong><p class="note">Video hazırlanıyor, lütfen bekleyiniz. 1 dakikalık video yaklaşık 4–5, 4 dakikalık video 12–15 dakika sürer; sayfayı kapatabilirsiniz.</p><div class="bar"><i style="width:${pr}%"></i></div><p class="note">%${pr} · ${d.job && d.job.status === 'queued' ? 'başlatılıyor' : 'hazırlanıyor'}</p></div>`;
       pollTimer = setTimeout(() => route(), 6000);
     } else if (p.status === 'content_review') body = contentReview(d);
     else if (p.status === 'visuals_review') body = visualsReview(d);
     else if (p.status === 'delivered') body = delivered(d);
-    else if (p.status === 'failed') { const [stage, ...m] = (p.error || '').split('|'); body = `<div class="card err"><strong>Bir adım başarısız oldu (${esc(stage)})</strong>\n${esc(m.join('|'))}</div><div class="btns"><button class="primary" data-act="retry">Tekrar dene</button><button class="danger" data-act="cancel">Projeyi iptal et</button></div>`; }
+    else if (p.status === 'failed') { const [stage, ...m] = (p.error || '').split('|'); const SN = { content: 'İçerik hazırlama', visuals: 'Görsel hazırlama', voice: 'Seslendirme', render: 'Video üretimi' }; body = `<div class="card err"><strong>${esc(SN[stage] || 'Bir adım')} tamamlanamadı.</strong>\nTekrar deneyebilirsiniz; sorun sürerse yöneticinize bildirin.<details style="margin-top:8px"><summary>Teknik ayrıntı</summary>${esc(m.join('|'))}</details></div><div class="btns"><button class="primary" data-act="retry">Tekrar dene</button><button class="danger" data-act="cancel">Projeyi iptal et</button></div>`; }
     else if (p.status === 'archived') body = `<div class="card">Bu proje iptal edildi.</div>`;
     app.innerHTML = head + body;
     wire(id, d);
@@ -96,10 +97,16 @@
       <div class="btns"><button data-act="visuals-revise">Yeniden çiz</button></div></div>
       <div class="btns"><button class="primary" data-act="visuals-approve">Onayla: seslendir ve videoyu üret</button><button class="danger" data-act="cancel">İptal</button></div></div></div>`;
   }
+  const ASPECT = { dikey: '9/16', yatay: '16/9', kare: '1/1', dikey45: '4/5' };
   function delivered(d) {
-    return `<div class="player"><div><div class="canvasWrap"><video controls playsinline src="${esc(d.videoUrl)}"></video></div></div>
-      <div><div class="card"><strong>Video hazır</strong><p class="note">1080×1920, 60 FPS, seslendirme gömülü. İndirme bağlantısı 24 saat geçerlidir; sayfayı yenileyince yenisi oluşur.</p>
-      <div class="btns"><a class="btn" href="${esc(d.videoUrl)}" download>MP4 indir</a><button data-act="reopen">Bir sahneyi düzelt</button><button data-act="revoice">Yeniden seslendir</button></div></div></div></div>`;
+    const vids = d.videos || [], F = d.formats || {};
+    const others = Object.keys(F).filter(k => !vids.some(v => v.format === k));
+    const links = vids.map(v => `<a class="btn" href="${esc(v.url)}" download>${esc(v.label)} indir</a>`).join('');
+    const more = others.length ? `<label for="nf2">Başka biçimde de üret</label><select id="nf2">${others.map(k => `<option value="${esc(k)}">${esc(F[k])}</option>`).join('')}</select><div class="btns"><button data-act="render-format">Bu biçimde üret</button></div><p class="note">İçerik, görseller ve ses aynı kalır; yalnızca video yeni ölçüde hazırlanır.</p>` : '';
+    return `<div class="player"><div><div class="canvasWrap" style="aspect-ratio:${ASPECT[d.mainFormat] || '9/16'}"><video controls playsinline src="${esc(d.videoUrl)}"></video></div></div>
+      <div><div class="card"><strong>Video hazır</strong><p class="note">60 FPS, seslendirme gömülü. İndirme bağlantıları 24 saat geçerlidir; sayfayı yenileyince yenisi oluşur.</p>
+      <div class="btns">${links}</div>${more}
+      <div class="btns"><button data-act="reopen">Bir sahneyi düzelt</button><button data-act="revoice">Yeniden seslendir</button></div></div></div></div>`;
   }
 
   async function startPreview(id) {
@@ -114,7 +121,7 @@
     const bad = Object.keys(window.EVEngine.errors);
     const warnEl = document.getElementById('scene-warn');
     if (warnEl) warnEl.innerHTML = bad.length ? `<div class="card err" style="margin:10px 0">Çizim hatası olan sahne: <b>${bad.map(esc).join(', ')}</b>. Onaylamadan önce bu sahneyi seçip “Yeniden çiz” ile düzelttir (ör. not: “çizim hatasını düzelt”).</div>` : '';
-    const P = window.EVEngine.createPlayer(cv, bundle); let t = 0, playing = false, last = null, raf = 0;
+    const P = window.EVEngine.createPlayer(cv, bundle); if (cv.parentElement) cv.parentElement.style.aspectRatio = `${P.width}/${P.height}`; let t = 0, playing = false, last = null, raf = 0;
     const scrub = document.getElementById('scrub'), pp = document.getElementById('pp');
     const chips = document.getElementById('chips'); chips.innerHTML = P.scenes.map((s, i) => `<button data-i="${i}">${esc(s.k)}</button>`).join('');
     const sk = document.getElementById('sk');
@@ -134,7 +141,7 @@
       if (act === 'revoice' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Güncel sesle yeniden üretilsin mi? Tekrar bas'; return; }
       if (act === 'cancel' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Emin misin? Tekrar bas'; return; }
       busy(btn, true); app.querySelectorAll('[data-act]').forEach(b => b.disabled = true);
-      const map = { 'content-approve': ['content/approve'], 'content-revise': ['content/revise', { feedback: fb && fb.value }], 'visuals-approve': ['visuals/approve'], 'visuals-revise': ['visuals/revise', (() => { const k = (document.getElementById('sk') || {}).value || null, er = window.EVEngine && window.EVEngine.errors || {}; let f = fb && fb.value; if (k && er[k]) f += ` (Tarayıcıdaki çizim hatası: ${er[k]})`; return { feedback: f, k }; })()], cancel: ['cancel'], retry: ['retry'], reopen: ['reopen'], revoice: ['visuals/approve'] }[act];
+      const map = { 'content-approve': ['content/approve'], 'content-revise': ['content/revise', { feedback: fb && fb.value }], 'visuals-approve': ['visuals/approve'], 'visuals-revise': ['visuals/revise', (() => { const k = (document.getElementById('sk') || {}).value || null, er = window.EVEngine && window.EVEngine.errors || {}; let f = fb && fb.value; if (k && er[k]) f += ` (Tarayıcıdaki çizim hatası: ${er[k]})`; return { feedback: f, k }; })()], cancel: ['cancel'], retry: ['retry'], reopen: ['reopen'], revoice: ['visuals/approve'], 'render-format': ['render', { format: (document.getElementById('nf2') || {}).value }] }[act];
       try { await api(`/api/projects/${id}/${map[0]}`, { method: 'POST', body: map[1] || {} }); route(); } catch (e) { alertBox(e.message); busy(btn, false); app.querySelectorAll('[data-act]').forEach(b => b.disabled = false); }
     });
   }
