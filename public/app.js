@@ -1,7 +1,7 @@
 (() => {
   const app = document.getElementById('app');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-  const STATUS = { draft: 'Taslak', content_generating: 'İçerik yazılıyor', content_review: 'İçerik onayı bekliyor', visuals_generating: 'Görseller çiziliyor', visuals_review: 'Görsel onayı bekliyor', voicing: 'Seslendiriliyor', rendering: 'Video üretiliyor', delivered: 'Teslim edildi', failed: 'Hata', archived: 'İptal edildi' };
+  const STATUS = { draft: 'Taslak', content_generating: 'İçerik hazırlanıyor', content_review: 'İçerik onayı bekliyor', visuals_generating: 'Görseller hazırlanıyor', visuals_review: 'Görsel onayı bekliyor', voicing: 'Seslendiriliyor', rendering: 'Video üretiliyor', delivered: 'Teslim edildi', failed: 'Hata', archived: 'İptal edildi' };
   const STEP_OF = { content_generating: 0, content_review: 0, visuals_generating: 1, visuals_review: 1, voicing: 2, rendering: 3, delivered: 4 };
   let pollTimer = null, player = null;
 
@@ -59,21 +59,21 @@
     const steps = ['İçerik', 'Görseller', 'Ses', 'Video', 'Teslim'].map((s, i) => `<span class="${i < step ? 'done' : i === step ? 'on' : ''}">${i + 1} · ${s}</span>`).join('');
     let body = '';
     const head = `<p class="muted"><a href="#/">← Projeler</a></p><h1>${esc(p.title)}</h1><div class="steps">${steps}</div>`;
-    const waitMsg = { content_generating: 'Claude içeriği yazıyor. Bu 1–2 dakika sürebilir.', visuals_generating: 'Sahne çizimleri hazırlanıyor. 1 dakikalık video için 2–3, 4 dakikalık video için 6–9 dakika sürebilir.', voicing: 'ElevenLabs seslendiriyor.', rendering: '' };
+    const waitMsg = { content_generating: 'Eğitim içeriği hazırlanıyor, lütfen bekleyiniz. Bu işlem 1–2 dakika sürebilir.', visuals_generating: 'Sahne görselleri hazırlanıyor, lütfen bekleyiniz. 1 dakikalık video için 2–3, 4 dakikalık video için 5–8 dakika sürebilir.', voicing: 'Seslendirme yapılıyor, lütfen bekleyiniz.', rendering: '' };
     if (waitMsg[p.status] !== undefined && p.status !== 'rendering') {
       const g = d.gen, gp = g && g.progress && g.progress.total ? g.progress : null;
-      const gline = g ? (g.status === 'queued' ? 'GitHub işi sırada, birazdan başlayacak.' : gp ? `${gp.done} / ${gp.total} ${p.status === 'visuals_generating' ? 'sahne çizildi' : 'tamamlandı'}` : 'Claude çalışıyor…') : '';
+      const gline = g ? (g.status === 'queued' ? 'Çalışma başlatılıyor…' : gp ? `${gp.done} / ${gp.total} ${p.status === 'visuals_generating' ? 'sahne hazır' : 'tamamlandı'}` : 'Çalışma sürüyor…') : '';
       const gbar = gp ? `<div class="bar"><i style="width:${Math.round(gp.done / gp.total * 100)}%"></i></div>` : '';
       body = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div style="flex:1"><strong>${STATUS[p.status]}</strong><div class="note">${waitMsg[p.status]} Sayfa kendiliğinden yenilenir.</div>${gline ? `<div class="note"><b>${gline}</b></div>` : ''}${gbar}</div></div>`;
       pollTimer = setTimeout(() => route(), 4000);
     } else if (p.status === 'rendering') {
       const pr = d.job ? d.job.progress : 0;
-      body = `<div class="card"><strong>Video üretiliyor</strong><p class="note">Kareler GitHub Actions'ta çiziliyor. 80 saniyelik video yaklaşık 7–10 dakika sürer; sayfayı kapatabilirsin.</p><div class="bar"><i style="width:${pr}%"></i></div><p class="note">%${pr} · ${d.job ? (d.job.status === 'queued' ? 'sırada' : 'çiziliyor') : ''}</p></div>`;
+      body = `<div class="card"><strong>Video üretiliyor</strong><p class="note">Video hazırlanıyor, lütfen bekleyiniz. 1 dakikalık video yaklaşık 4–5, 4 dakikalık video 12–15 dakika sürer; sayfayı kapatabilirsiniz.</p><div class="bar"><i style="width:${pr}%"></i></div><p class="note">%${pr} · ${d.job && d.job.status === 'queued' ? 'başlatılıyor' : 'hazırlanıyor'}</p></div>`;
       pollTimer = setTimeout(() => route(), 6000);
     } else if (p.status === 'content_review') body = contentReview(d);
     else if (p.status === 'visuals_review') body = visualsReview(d);
     else if (p.status === 'delivered') body = delivered(d);
-    else if (p.status === 'failed') { const [stage, ...m] = (p.error || '').split('|'); body = `<div class="card err"><strong>Bir adım başarısız oldu (${esc(stage)})</strong>\n${esc(m.join('|'))}</div><div class="btns"><button class="primary" data-act="retry">Tekrar dene</button><button class="danger" data-act="cancel">Projeyi iptal et</button></div>`; }
+    else if (p.status === 'failed') { const [stage, ...m] = (p.error || '').split('|'); const SN = { content: 'İçerik hazırlama', visuals: 'Görsel hazırlama', voice: 'Seslendirme', render: 'Video üretimi' }; body = `<div class="card err"><strong>${esc(SN[stage] || 'Bir adım')} tamamlanamadı.</strong>\nTekrar deneyebilirsiniz; sorun sürerse yöneticinize bildirin.<details style="margin-top:8px"><summary>Teknik ayrıntı</summary>${esc(m.join('|'))}</details></div><div class="btns"><button class="primary" data-act="retry">Tekrar dene</button><button class="danger" data-act="cancel">Projeyi iptal et</button></div>`; }
     else if (p.status === 'archived') body = `<div class="card">Bu proje iptal edildi.</div>`;
     app.innerHTML = head + body;
     wire(id, d);

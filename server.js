@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { db, storage, q } = require('./lib/supa');
 const claude = require('./lib/claude');
-const { TONES } = require('./lib/tones');
+const { TONES, voiceForTone } = require('./lib/tones');
 const eleven = require('./lib/eleven');
 
 const PORT = process.env.PORT || 3000;
@@ -134,7 +134,7 @@ async function runVoiceAndRender(id) {
   const vis = await latest(id, 'visuals');
   await setStatus(id, 'voicing', { error: null });
   const { text, marks } = eleven.buildScript(vis.data.scenes);
-  const voice = p.voice_id || process.env.ELEVENLABS_VOICE_ID;
+  const voice = p.voice_id || voiceForTone(p.tone) || process.env.ELEVENLABS_VOICE_ID;
   if (!voice) throw new Error('ElevenLabs ses kimliği (ELEVENLABS_VOICE_ID) tanımlı değil');
   const { audio, alignment } = await eleven.tts(text, voice);
   await logUsage(id, 'elevenlabs', text.length, 'tts');
