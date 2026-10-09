@@ -73,3 +73,10 @@ button:disabled{opacity:.5;cursor:wait}
 .aud-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .sev{border:1.5px solid;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:800;white-space:nowrap}
 @media (max-width:520px){.aud-grid{grid-template-columns:1fr}}
+
+.qcard{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+.qcard ol{margin:6px 0;padding-left:22px}
+.thumbs{display:flex;gap:10px;flex-wrap:wrap}.thumbs figure{margin:0}.thumbs canvas{width:200px;border-radius:8px;background:#000;display:block}.thumbs figcaption{font-size:12px;margin-top:4px}
+.kz{list-style:none;padding:0;margin:6px 0}.kz li{padding:8px 0;border-top:1px solid var(--line)}.kz b{color:var(--yel);margin-right:6px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}.tbl th,.tbl td{padding:8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.tbl th{color:var(--muted)}
+a.btn.primary{background:var(--yel);color:#111}

@@ -7,7 +7,8 @@ const { db, storage, q } = require('./lib/supa');
 const claude = require('./lib/claude');
 const { TONES, voiceForTone } = require('./lib/tones');
 const eleven = require('./lib/eleven');
-const { pagesFor } = require('./lib/sources');
+const { pagesFor, sourcesBlock } = require('./lib/sources');
+const quiz = require('./lib/quiz');
 const audit = require('./lib/audit');
 
 const PORT = process.env.PORT || 3000;
@@ -53,6 +54,10 @@ async function guard(res, id, allowed, lock = true) {
   if (RUNNING.has(id) || !allowed.includes(p.status)) { send(res, 409, { error: 'Bu proje şu an başka bir adımı işliyor. Sayfayı yenileyip bekleyin.' }); return false; }
   if (lock) RUNNING.add(id); // background() başlayana kadar ikinci isteği engelle
   return true;
+}
+async function resumeQuiz() {
+  const rows = await db.select('projects', 'select=id,quiz_feedback&quiz_status=eq.generating');
+  rows.forEach(r => { console.log('Sorular sürdürülüyor:', r.id); runQuizBg(r.id, r.quiz_feedback || null); });
 }
 async function resumePending() {
   const rows = await db.select('projects', 'select=id,status,pending&pending=not.is.null&status=in.(content_generating,visuals_generating,voicing)');
@@ -192,6 +197,28 @@ async function startRender(id, format) {
   await dispatch('render.yml', { job_id: job.id, token });
 }
 
+/* ---------- etkileşimli ders soruları ---------- */
+const QUIZ_RUNNING = new Set();
+function runQuizBg(id, feedback) {
+  if (QUIZ_RUNNING.has(id)) return; QUIZ_RUNNING.add(id);
+  runQuiz(id, feedback).catch(async e => { console.error('quiz', e); await db.update('projects', `id=eq.${q(id)}`, { quiz_status: 'failed', quiz_error: e.message.slice(0, 600) }).catch(() => {}); }).finally(() => QUIZ_RUNNING.delete(id));
+}
+async function runQuiz(id, feedback) {
+  const p = await db.one('projects', `id=eq.${q(id)}`);
+  const content = await latest(id, 'content'); if (!content) throw new Error('İçerik yok');
+  const prev = feedback ? await latest(id, 'quiz') : null;
+  await db.update('projects', `id=eq.${q(id)}`, { quiz_status: 'generating', quiz_error: null, quiz_feedback: feedback || null });
+  const scenes = content.data.scenes;
+  const user = quiz.quizPrompt(p, scenes, sourcesBlock(await loadSources(id)).slice(0, 60000), prev && prev.data, feedback);
+  const [r] = await claude.complete([{ system: quiz.QUIZ_SYSTEM, user, max: 12000 }], ctxFor(id, 'quiz'));
+  if (!r || r.error) throw new Error((r && r.error) || 'yanıt yok');
+  const data = quiz.validate(claude.extractJson(r.text), scenes);
+  await logUsage(id, 'claude', tokensOf(r.usage), 'quiz');
+  await db.insert('versions', { project_id: id, stage: 'quiz', version: await nextVersion(id, 'quiz'), data, feedback: feedback || null });
+  await db.update('projects', `id=eq.${q(id)}`, { quiz_status: 'ready', quiz_feedback: null });
+}
+const shortId = () => crypto.randomBytes(6).toString('base64url').replace(/[-_]/g, 'x').slice(0, 8);
+
 async function bundleFor(id, withAudio, format, versionId) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
   const vis = versionId ? await db.one('versions', `id=eq.${q(versionId)}`) : await latest(id, 'visuals');
@@ -253,7 +280,7 @@ on('GET', '/api/projects/:id', async (req, res, { id }) => {
   const sources = await db.select('project_sources', `project_id=eq.${q(id)}&select=name,chars,created_at&order=created_at.asc`);
   let gen = null;
   if (/_generating$/.test(p.status)) { const g = await db.one('gen_tasks', `project_id=eq.${q(id)}&consumed=is.false&kind=neq.audit&order=created_at.desc&select=status,progress,created_at`); if (g) gen = g; }
-  send(res, 200, { project: p, gen, content, visuals: visuals && { version: visuals.version, feedback: visuals.feedback, scenes: visuals.data.scenes.map(s => ({ k: s.k, title: s.title })) }, job, videoUrl, videos, mainFormat: main ? main.format : (p.format || 'dikey'), formats: FORMATS, sources });
+  send(res, 200, { project: p, gen, content, visuals: visuals && { version: visuals.version, feedback: visuals.feedback, scenes: visuals.data.scenes.map(s => ({ k: s.k, title: s.title })) }, job, videoUrl, videos, mainFormat: main ? main.format : (p.format || 'dikey'), formats: FORMATS, sources, quizStatus: p.quiz_status || null });
 });
 on('POST', '/api/projects/:id/sources', async (req, res, { id }) => {
   const b = await readBody(req, 12e6); const saved = await saveSources(id, b.sources);
@@ -292,12 +319,81 @@ on('POST', '/api/projects/:id/visuals/approve', async (req, res, { id }) => {
   if (!await guard(res, id, ['visuals_review', 'delivered'])) return; // teslimden sonra: aynı görsellerle yeni sesle yeniden üret
   const v = await latest(id, 'visuals'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
   background(id, 'voice', []); send(res, 202, { ok: true });
+  const pq = await db.one('projects', `id=eq.${q(id)}&select=quiz_status`);
+  if (!pq.quiz_status && !(await latest(id, 'quiz'))) runQuizBg(id, null); // sorular seslendirme/videoyla paralel hazırlanır
 });
 on('POST', '/api/projects/:id/render', async (req, res, { id }) => {
   const { format } = await readBody(req); if (!FORMATS[format]) return send(res, 400, { error: 'Geçersiz biçim' });
   if (!await guard(res, id, ['delivered'])) return;
   background(id, 'render', [format]); send(res, 202, { ok: true });
 });
+on('GET', '/api/projects/:id/quiz', async (req, res, { id }) => {
+  const p = await db.one('projects', `id=eq.${q(id)}&select=id,title,status,share_id,quiz_status,quiz_error,quiz_published`); if (!p) return send(res, 404, { error: 'Bulunamadı' });
+  const v = await latest(id, 'quiz');
+  const attempts = await db.select('lesson_attempts', `project_id=eq.${q(id)}&select=id,student_name,student_class,started_at,finished_at,summary,quiz_version&order=started_at.desc&limit=500`);
+  send(res, 200, { project: p, version: v && v.version, quiz: v && v.data, attempts });
+});
+on('POST', '/api/projects/:id/quiz/generate', async (req, res, { id }) => {
+  const { feedback } = await readBody(req);
+  if (QUIZ_RUNNING.has(id)) return send(res, 409, { error: 'Sorular zaten hazırlanıyor' });
+  runQuizBg(id, feedback ? String(feedback).slice(0, 2000) : null); send(res, 202, { ok: true });
+});
+on('POST', '/api/projects/:id/quiz/delete', async (req, res, { id }) => {
+  const { cp, qi } = await readBody(req); const v = await latest(id, 'quiz'); if (!v) return send(res, 404, { error: 'Soru yok' });
+  const d = v.data; if (!d.checkpoints[cp] || !d.checkpoints[cp].questions[qi]) return send(res, 400, { error: 'Soru bulunamadı' });
+  d.checkpoints[cp].questions.splice(qi, 1); d.checkpoints = d.checkpoints.filter(c => c.questions.length);
+  await db.update('versions', `id=eq.${v.id}`, { data: d }); send(res, 200, { ok: true });
+});
+on('POST', '/api/projects/:id/quiz/publish', async (req, res, { id }) => {
+  const { on: pub } = await readBody(req); const p = await db.one('projects', `id=eq.${q(id)}&select=share_id`);
+  const patch = { quiz_published: !!pub }; if (!p.share_id) patch.share_id = shortId();
+  const r = await db.update('projects', `id=eq.${q(id)}`, patch); send(res, 200, { share_id: r.share_id, published: r.quiz_published });
+});
+
+/* ---------- öğrenci (herkese açık) ders uç noktaları ---------- */
+async function lessonBy(sid) {
+  const p = await db.one('projects', `share_id=eq.${q(sid)}&quiz_published=is.true&select=id,title,format,status`);
+  if (!p) return null; const v = await latest(p.id, 'quiz'); return v ? { p, v } : null;
+}
+on('GET', '/api/l/:sid', async (req, res, { sid }) => {
+  const L = await lessonBy(sid); if (!L) return send(res, 404, { error: 'Ders bulunamadı ya da yayında değil' });
+  const { p, v } = L;
+  const at = await db.one('audio_tracks', `project_id=eq.${q(p.id)}&order=created_at.desc&select=created_at`);
+  const done = await db.select('render_jobs', `project_id=eq.${q(p.id)}&status=eq.done&order=created_at.desc&select=format,output_path,created_at`);
+  const videos = {}; for (const j of done) { const f = j.format || 'dikey'; if (videos[f] || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; videos[f] = await storage.signedUrl(j.output_path, 6 * 3600); }
+  if (!Object.keys(videos).length) return send(res, 404, { error: 'Dersin videosu henüz hazır değil' });
+  const bundle = await bundleFor(p.id, true, p.format || 'dikey'); delete bundle.audioUrl;
+  send(res, 200, { title: p.title, format: p.format || 'dikey', videos, bundle, quiz: quiz.publicQuiz(v.data, v.version * 7919 + 13), version: v.version });
+}, true);
+async function attemptAuth(sid, b) {
+  const L = await lessonBy(sid); if (!L) return null;
+  const a = await db.one('lesson_attempts', `id=eq.${q(b.attempt)}&project_id=eq.${q(L.p.id)}`);
+  if (!a || !b.token || !safeEq(b.token, a.token)) return null;
+  const v = a.quiz_version === L.v.version ? L.v : await db.one('versions', `project_id=eq.${q(L.p.id)}&stage=eq.quiz&version=eq.${a.quiz_version}`);
+  return { ...L, a, v };
+}
+on('POST', '/api/l/:sid/start', async (req, res, { sid }) => {
+  const b = await readBody(req, 4000); const L = await lessonBy(sid); if (!L) return send(res, 404, { error: 'Ders bulunamadı' });
+  const name = String(b.name || '').trim().slice(0, 80); if (name.length < 2) return send(res, 400, { error: 'Adınızı yazın' });
+  const token = crypto.randomBytes(16).toString('hex');
+  const a = await db.insert('lesson_attempts', { project_id: L.p.id, quiz_version: L.v.version, token, student_name: name, student_class: String(b.cls || '').trim().slice(0, 40) || null });
+  send(res, 200, { attempt: a.id, token });
+}, true);
+on('POST', '/api/l/:sid/answer', async (req, res, { sid }) => {
+  const b = await readBody(req, 8000); const A = await attemptAuth(sid, b); if (!A) return send(res, 403, { error: 'Oturum geçersiz' });
+  const x = A.v.data.checkpoints[+b.cp] && A.v.data.checkpoints[+b.cp].questions[+b.qi]; if (!x) return send(res, 400, { error: 'Soru yok' });
+  const correct = quiz.check(x, b.response);
+  const answers = (A.a.answers || []).concat([{ cp: +b.cp, qi: +b.qi, pass: +b.pass || 1, response: b.response, correct, at: now() }]).slice(-400);
+  await db.update('lesson_attempts', `id=eq.${q(A.a.id)}`, { answers });
+  send(res, 200, { correct, explain: x.explain, correct_text: quiz.correctText(x), answer: (x.type === 'mcq' || x.type === 'image') ? x.answer : undefined });
+}, true);
+on('POST', '/api/l/:sid/finish', async (req, res, { sid }) => {
+  const b = await readBody(req, 4000); const A = await attemptAuth(sid, b); if (!A) return send(res, 403, { error: 'Oturum geçersiz' });
+  const summary = quiz.summarize(A.v.data, A.a.answers);
+  await db.update('lesson_attempts', `id=eq.${q(A.a.id)}`, { summary, finished_at: now() });
+  send(res, 200, summary);
+}, true);
+
 on('GET', '/api/formats', async (req, res) => send(res, 200, FORMATS));
 on('POST', '/api/projects/:id/cancel', async (req, res, { id }) => { await setStatus(id, 'archived'); send(res, 200, { ok: true }); });
 on('POST', '/api/projects/:id/reopen', async (req, res, { id }) => { if (!await guard(res, id, ['delivered'], false)) return; await setStatus(id, 'visuals_review'); send(res, 200, { ok: true }); });
@@ -405,8 +501,9 @@ http.createServer(async (req, res) => {
     }
     if (url.pathname === '/healthz') return send(res, 200, 'ok');
     let file = path.normalize(path.join(PUBLIC, url.pathname === '/' ? 'index.html' : url.pathname));
+    if (/^\/izle\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'izle.html');
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     fs.createReadStream(file).pipe(res);
   } catch (e) { console.error(e); if (!res.headersSent) send(res, 500, { error: e.message }); }
-}).listen(PORT, () => { console.log('Sunucu hazır: ' + PORT); resumePending().catch(e => console.error('resume', e)); });
+}).listen(PORT, () => { console.log('Sunucu hazır: ' + PORT); resumePending().catch(e => console.error('resume', e)); resumeQuiz().catch(e => console.error('resumeQuiz', e)); });

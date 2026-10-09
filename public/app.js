@@ -139,6 +139,77 @@
       <div id="audit" class="audit"></div>`;
   }
 
+  /* ---------- etkileşimli ders (öğretmen) ---------- */
+  const QT = { mcq: 'Çoktan seçmeli', image: 'Görsel seçme', blank: 'Boşluk doldurma', tf: 'Doğru / yanlış', order: 'Sıralama' };
+  async function viewLesson(id) {
+    let d; try { d = await api(`/api/projects/${id}/quiz`); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
+    const p = d.project, Q = d.quiz;
+    let html = `<p class="muted"><a href="#/p/${esc(id)}">← ${esc(p.title)}</a></p><h1>Etkileşimli ders</h1>`;
+    if (p.quiz_status === 'generating') { html += `<div class="card wait"><div class="spin" aria-hidden="true"></div><div><strong>Sorular hazırlanıyor</strong><div class="note">Kazanımlar ve bölüm sonu soruları hazırlanıyor, lütfen bekleyiniz. Sayfa kendiliğinden yenilenir.</div></div></div>`; pollTimer = setTimeout(route, 5000); }
+    else if (p.quiz_status === 'failed') html += `<div class="card err"><strong>Sorular hazırlanamadı.</strong><details><summary>Teknik ayrıntı</summary>${esc(p.quiz_error || '')}</details><div class="btns"><button class="primary" data-q="gen">Tekrar dene</button></div></div>`;
+    if (!Q && p.quiz_status !== 'generating') html += `<div class="card"><p>Bu video için henüz soru hazırlanmadı.</p><div class="btns"><button class="primary" data-q="gen">Soruları hazırla</button></div></div>`;
+    if (Q) {
+      const link = p.share_id ? `${location.origin}/izle/${p.share_id}` : '';
+      html += `<div class="card"><strong>Paylaşım</strong>${p.quiz_published && link ? `<p class="note">Öğrenciler bu bağlantıdan dersi açar; şifre gerekmez.</p><div class="grid two" style="align-items:center"><div><input readonly value="${esc(link)}" id="lnk" onclick="this.select()"><div class="btns"><button data-q="copy">Bağlantıyı kopyala</button><a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Öğrenci gözüyle aç</a><button class="danger" data-q="unpub">Yayından kaldır</button></div></div><div id="qr" style="background:#fff;padding:10px;border-radius:12px;width:max-content"></div></div>` : `<p class="note">Soruları inceleyin; hazır olduğunda yayınlayıp bağlantıyı ya da QR kodu öğrencilerle paylaşın.</p><div class="btns"><button class="primary" data-q="pub">Yayınla ve bağlantı oluştur</button></div>`}</div>`;
+      html += `<h2>Kazanımlar</h2><div class="card"><ul class="kz">${Q.kazanimlar.map(k => `<li><b>${esc(k.id)}</b> ${esc(k.text)}</li>`).join('')}</ul></div>`;
+      html += `<h2>Bölüm sonu soruları <span class="muted" style="font-size:14px">· sürüm ${d.version}</span></h2>`;
+      html += Q.checkpoints.map((c, ci) => `<div class="card" style="margin-bottom:12px"><strong>${ci + 1}. durak · ${esc(c.title || '')}</strong> <span class="muted">(${esc(c.after_k)}. sahneden sonra)</span>${c.questions.map((x, qi) => qCard(x, ci, qi)).join('')}</div>`).join('');
+      html += `<div class="card"><label for="qfb">Sorularda değişiklik isteği</label><textarea id="qfb" placeholder="Örn. 2. duraktaki soruyu daha zor yap, daha fazla görsel seçme sorusu ekle"></textarea><div class="btns"><button data-q="regen">Soruları yeniden hazırla</button></div></div>`;
+      html += resultsHtml(d);
+    }
+    app.innerHTML = html;
+    if (Q) drawThumbs(id, Q);
+    if (p.quiz_published && p.share_id) loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js').then(() => { const el = document.getElementById('qr'); if (el && window.QRCode) new window.QRCode(el, { text: `${location.origin}/izle/${p.share_id}`, width: 150, height: 150 }); }).catch(() => {});
+    app.querySelectorAll('[data-q]').forEach(b => b.onclick = async () => {
+      const a = b.dataset.q; b.disabled = true;
+      try {
+        if (a === 'gen') await api(`/api/projects/${id}/quiz/generate`, { method: 'POST', body: {} });
+        else if (a === 'regen') { const f = document.getElementById('qfb').value.trim(); if (!f) { b.disabled = false; document.getElementById('qfb').focus(); return; } await api(`/api/projects/${id}/quiz/generate`, { method: 'POST', body: { feedback: f } }); }
+        else if (a === 'pub') await api(`/api/projects/${id}/quiz/publish`, { method: 'POST', body: { on: true } });
+        else if (a === 'unpub') await api(`/api/projects/${id}/quiz/publish`, { method: 'POST', body: { on: false } });
+        else if (a === 'copy') { await navigator.clipboard.writeText(document.getElementById('lnk').value).catch(() => {}); b.textContent = 'Kopyalandı'; setTimeout(() => { b.textContent = 'Bağlantıyı kopyala'; b.disabled = false; }, 1500); return; }
+        else if (a === 'del') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Emin misiniz?'; b.disabled = false; return; } await api(`/api/projects/${id}/quiz/delete`, { method: 'POST', body: { cp: +b.dataset.cp, qi: +b.dataset.qi } }); }
+        else if (a === 'csv') { csv(d); b.disabled = false; return; }
+        route();
+      } catch (e) { alertBox(e.message); b.disabled = false; }
+    });
+  }
+  const loadScriptOnce = src => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  function qCard(x, ci, qi) {
+    const okS = 'style="color:var(--green);font-weight:800"';
+    let body = '';
+    if (x.type === 'mcq') body = `<p>${esc(x.q)}</p><ol type="A">${x.options.map((o, i) => `<li ${i === x.answer ? okS : ''}>${esc(o)}${i === x.answer ? ' ✓' : ''}</li>`).join('')}</ol>`;
+    if (x.type === 'tf') body = `<p>${esc(x.q)}</p><p ${okS}>Cevap: ${x.answer ? 'Doğru' : 'Yanlış'}</p>`;
+    if (x.type === 'image') body = `<p>${esc(x.q)}</p><div class="thumbs">${x.options.map((o, i) => `<figure><canvas width="246" height="207" data-k="${esc(o.k)}" data-at="${o.at}"></canvas><figcaption ${i === x.answer ? okS : ''}>${i + 1}. sahne ${esc(o.k)}${i === x.answer ? ' ✓' : ''}</figcaption></figure>`).join('')}</div>`;
+    if (x.type === 'blank') { let n = 0; body = `<p>${esc(x.text).replace(/___/g, () => `<b ${okS}>[${esc(x.answer[n++])}]</b>`)}</p><p class="note">Kelime bankası: ${x.bank.map(esc).join(' · ')}</p>`; }
+    if (x.type === 'order') body = `<p>${esc(x.q)}</p><ol>${x.items.map(t => `<li>${esc(t)}</li>`).join('')}</ol><p class="note">Öğrenciye karışık sırada gösterilir.</p>`;
+    return `<div class="qcard"><div class="aud-head"><span class="pill">${QT[x.type] || x.type}</span><span class="muted">${esc(x.kazanim || '')}</span></div>${body}${x.explain ? `<p class="note">Açıklama: ${esc(x.explain)}</p>` : ''}<div class="btns"><button class="danger" data-q="del" data-cp="${ci}" data-qi="${qi}">Soruyu sil</button></div></div>`;
+  }
+  async function drawThumbs(id, Q) {
+    const cvs = [...app.querySelectorAll('canvas[data-k]')]; if (!cvs.length) return;
+    try {
+      const bundle = await api(`/api/projects/${id}/bundle?audio=1`); delete bundle.audioUrl;
+      const off = document.createElement('canvas'), P = window.EVEngine.createPlayer(off, bundle);
+      cvs.forEach(cv => { const r = P.still(cv.dataset.k, +cv.dataset.at); if (r) cv.getContext('2d').drawImage(off, r.x, r.y, r.w, r.h, 0, 0, cv.width, cv.height); });
+    } catch (e) { console.warn(e); }
+  }
+  function resultsHtml(d) {
+    const A = d.attempts || [], fin = A.filter(a => a.summary);
+    const kz = (d.quiz && d.quiz.kazanimlar) || [];
+    const rate = k => { const xs = fin.map(a => (a.summary.kazanimlar || []).find(z => z.id === k.id)).filter(Boolean); return xs.length ? Math.round(xs.filter(z => z.learned).length / xs.length * 100) : null; };
+    let h = `<h2>Öğrenci sonuçları <span class="muted" style="font-size:14px">· ${A.length} başlayan, ${fin.length} tamamlayan</span></h2>`;
+    if (!A.length) return h + `<div class="card"><p class="muted">Henüz kimse dersi açmadı.</p></div>`;
+    h += `<div class="card"><strong>Kazanım bazında sınıf durumu</strong><ul class="kz">${kz.map(k => { const r = rate(k); return `<li><b>${esc(k.id)}</b> ${esc(k.text)} <span class="pill" style="color:${r == null ? 'var(--muted)' : r >= 70 ? 'var(--green)' : r >= 40 ? 'var(--yel)' : 'var(--red)'}">${r == null ? '—' : '%' + r + ' öğrendi'}</span></li>`; }).join('')}</ul></div>`;
+    h += `<div class="card" style="margin-top:12px;overflow:auto"><table class="tbl"><thead><tr><th>Öğrenci</th><th>Sınıf/No</th><th>Tarih</th><th>Puan</th>${kz.map(k => `<th title="${esc(k.text)}">${esc(k.id)}</th>`).join('')}</tr></thead><tbody>${A.map(a => { const s = a.summary; return `<tr><td>${esc(a.student_name)}</td><td>${esc(a.student_class || '')}</td><td>${new Date(a.started_at).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}</td><td>${s ? '%' + s.pct : '<span class="muted">sürüyor</span>'}</td>${kz.map(k => { const z = s && (s.kazanimlar || []).find(y => y.id === k.id); return `<td>${z ? (z.learned ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--yel)">↻</span>') : ''}</td>`; }).join('')}</tr>`; }).join('')}</tbody></table><div class="btns"><button data-q="csv">CSV indir</button></div><p class="note">✓ öğrendi · ↻ tekrar etmeli (o kazanımın sorularının en az üçte ikisi doğru sayılır).</p></div>`;
+    return h;
+  }
+  function csv(d) {
+    const kz = d.quiz.kazanimlar, rows = [['Öğrenci', 'Sınıf/No', 'Başlangıç', 'Bitiş', 'Doğru', 'Soru', 'Puan %', ...kz.map(k => k.id + ' ' + k.text)]];
+    for (const a of d.attempts) { const s = a.summary || {}; rows.push([a.student_name, a.student_class || '', a.started_at, a.finished_at || '', s.correct ?? '', s.total ?? '', s.pct ?? '', ...kz.map(k => { const z = (s.kazanimlar || []).find(y => y.id === k.id); return z ? (z.learned ? 'öğrendi' : 'tekrar') : ''; })]); }
+    const text = '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' })); a.download = 'ders-sonuclari.csv'; a.click();
+  }
+
   /* ---------- teknik denetim paneli ---------- */
   const SEVC = { 'yok': 'var(--green)', 'düşük': 'var(--lv)', 'orta': 'var(--yel)', 'yüksek': 'var(--red)', 'bilinmiyor': 'var(--muted)' };
   const SEVL = { 'yok': 'Sorun yok', 'düşük': 'Küçük', 'orta': 'Orta', 'yüksek': 'Ciddi', 'bilinmiyor': 'Denetlenemedi' };
@@ -186,7 +257,8 @@
     return `<div class="player"><div><div class="canvasWrap" style="aspect-ratio:${ASPECT[d.mainFormat] || '9/16'}"><video controls playsinline src="${esc(d.videoUrl)}"></video></div></div>
       <div><div class="card"><strong>Video hazır</strong><p class="note">60 FPS, seslendirme gömülü. İndirme bağlantıları 24 saat geçerlidir; sayfayı yenileyince yenisi oluşur.</p>
       <div class="btns">${links}</div>${more}
-      <div class="btns"><button data-act="reopen">Bir sahneyi düzelt</button><button data-act="revoice">Yeniden seslendir</button></div></div></div></div>`;
+      <div class="btns"><button data-act="reopen">Bir sahneyi düzelt</button><button data-act="revoice">Yeniden seslendir</button></div></div>
+      <div class="card" style="margin-top:12px"><strong>Etkileşimli ders</strong><p class="note">Video bölüm sonlarında durup öğrenciye soru sorar; sonuçlar kazanım bazında size raporlanır.${d.quizStatus === 'generating' ? ' Sorular hazırlanıyor…' : d.quizStatus === 'ready' ? ' Sorular hazır.' : ''}</p><div class="btns"><a class="btn primary" href="#/p/${esc(d.project.id)}/ders">Soruları ve sonuçları aç</a></div></div></div></div>`;
   }
 
   async function startPreview(id) {
@@ -240,8 +312,8 @@
     if (h === '#/login') return viewLogin();
     const me = await api('/api/me').catch(() => ({ ok: false }));
     if (!me.ok) { location.hash = '#/login'; return viewLogin(); }
-    const m = h.match(/^#\/p\/([\w-]+)/);
-    return m ? viewProject(m[1]) : viewList();
+    const m = h.match(/^#\/p\/([\w-]+)(\/ders)?/);
+    return m ? (m[2] ? viewLesson(m[1]) : viewProject(m[1])) : viewList();
   }
   window.addEventListener('hashchange', route);
   route();

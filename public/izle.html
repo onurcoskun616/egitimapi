@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="tr" translate="no">
+<head>
+<meta name="google" content="notranslate">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Etkileşimli Ders</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<style>
+:root{--bg:#05070e;--panel:#0c1222;--panel2:#111a2e;--line:#1d2742;--fg:#eef1f7;--muted:#8a94ad;--yel:#ffc93c;--hv:#ff8a2a;--lv:#3fb0ff;--green:#3ee0a1;--red:#ff4f4f;--d:'Archivo',system-ui,sans-serif;--m:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font:500 15px/1.5 var(--m)}
+body{min-height:100vh;min-height:100dvh}
+button{font:800 15px var(--m);color:var(--fg);background:var(--panel2);border:1.5px solid var(--line);border-radius:12px;padding:12px 16px;cursor:pointer;touch-action:manipulation}
+button:hover:not(:disabled){border-color:var(--lv)}button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--yel);color:#111;border-color:var(--yel)}
+input{width:100%;font:500 16px var(--m);color:var(--fg);background:#070b16;border:1.5px solid var(--line);border-radius:10px;padding:12px}
+label{display:block;font:800 12px var(--m);letter-spacing:.12em;color:var(--muted);margin:14px 0 6px;text-transform:uppercase}
+h1{font:900 clamp(28px,6vw,44px)/1.05 var(--d);margin:0 0 10px;letter-spacing:-.01em}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 40px}
+.brand{display:flex;gap:10px;align-items:center;font:900 15px var(--d);letter-spacing:.06em;margin-bottom:18px}.brand i{width:12px;height:12px;background:var(--yel);display:inline-block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.muted{color:var(--muted)}.note{color:var(--muted);font-size:13px}
+.kaz{list-style:none;padding:0;margin:10px 0 0}.kaz li{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.kaz b{color:var(--yel);min-width:28px}
+.stage{position:relative;background:#000;border-radius:14px;overflow:hidden;margin:0 auto;max-height:78vh;max-height:78dvh}
+.stage video{display:block;width:100%;height:100%;background:#000}
+.stage:fullscreen{max-height:none;border-radius:0;display:flex;align-items:center;justify-content:center}.stage:fullscreen video{height:100%;width:auto;max-width:100%}
+.fsbtn{position:absolute;top:10px;right:10px;padding:6px 10px;font-size:12px;background:rgba(5,7,14,.7);z-index:3}
+.cps{display:flex;gap:6px;align-items:center;margin:12px 0 4px;flex-wrap:wrap}.cps span{flex:1;min-width:18px;height:6px;border-radius:3px;background:var(--line)}.cps span.ok{background:var(--green)}.cps span.bad{background:var(--yel)}.cps span.now{background:var(--lv)}
+.ov{position:absolute;inset:0;background:rgba(5,7,14,.94);z-index:5;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:16px}
+.q{width:100%;max-width:640px;margin:auto 0}
+.qh{display:flex;justify-content:space-between;gap:8px;font:800 12px var(--m);letter-spacing:.1em;text-transform:uppercase;color:var(--lv);margin-bottom:10px}
+.qt{font:800 clamp(18px,3.6vw,24px)/1.3 var(--d);margin:0 0 16px}
+.opts{display:grid;gap:10px}.opts button{text-align:left;font-weight:700;line-height:1.35}
+.opts button.ok{border-color:var(--green);background:rgba(62,224,161,.14)}.opts button.no{border-color:var(--red);background:rgba(255,79,79,.12)}
+.imgs{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.imgs button{padding:6px;position:relative}.imgs canvas{width:100%;display:block;border-radius:8px;background:#05070e}.imgs em{position:absolute;top:10px;left:12px;font:900 14px var(--d);background:var(--yel);color:#111;border-radius:6px;padding:0 7px;font-style:normal}
+.imgs button.ok{border-color:var(--green);box-shadow:0 0 0 2px var(--green)}.imgs button.no{border-color:var(--red);box-shadow:0 0 0 2px var(--red)}
+.sent{font:700 clamp(17px,3.4vw,21px)/2.1 var(--d)}.slot{display:inline-block;min-width:110px;border-bottom:2.5px solid var(--yel);margin:0 4px;padding:0 6px;text-align:center;color:var(--yel);cursor:pointer;line-height:1.5}
+.bank{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.bank button{padding:8px 14px}.bank button.used{opacity:.25}
+.ord{display:grid;gap:8px}.ord button{text-align:left;display:flex;gap:12px;align-items:center}.ord b{min-width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:13px}.ord button.sel b{background:var(--yel);color:#111;border-color:var(--yel)}
+.fb{margin-top:16px;border-radius:12px;padding:14px;border:1.5px solid}.fb.ok{border-color:var(--green);background:rgba(62,224,161,.08)}.fb.no{border-color:var(--red);background:rgba(255,79,79,.07)}
+.fb strong{font:900 18px var(--d)}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.res{list-style:none;padding:0;margin:12px 0}.res li{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.chip{font:800 12px var(--m);border:1.5px solid;border-radius:999px;padding:2px 10px;white-space:nowrap;align-self:flex-start}
+.big{font:900 56px var(--d);color:var(--yel)}
+.err{color:#ffb3b3}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"><div class="brand"><i></i>EĞİTİM STÜDYOSU</div><p class="muted">Ders yükleniyor…</p></main>
+<script src="/engine.js?v=8"></script>
+<script src="/izle.js?v=8"></script>
+</body>
+</html>

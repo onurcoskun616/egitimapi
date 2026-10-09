@@ -196,7 +196,7 @@
     const bw = F.W - 112; c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(56, F.barY, bw, 3); c.fillStyle = C.yel; c.fillRect(56, F.barY, bw * (t / total), 3); c.fillRect(56 + bw * (t / total) - 2, F.barY - 6, 4, 15);
     if (!F.noFoot) { txt((sc.ch || '').toUpperCase(), 56, F.footY, `800 15px ${FM}`, C.muted); txt(`${Math.round(F.W * F.S)}×${Math.round(F.H * F.S)} · 60 FPS`, F.W - 56, F.footY, `800 15px ${FM}`, C.muted, 'right'); }
   }
-  function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
+  function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); if (P.__bare) return; header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
   function createPlayer(canvas, bundle) {
     setFormat(bundle.format); const FF = F;
@@ -211,7 +211,14 @@
       else drawScene(bundle, L, si, u, t);
       return si;
     }
-    return { render, total: L.total, scenes: L.scenes, format: FF, width: canvas.width, height: canvas.height };
+    // Yalnızca illüstrasyon (başlık/altyazı yok): soru seçenekleri için sahne karesi
+    function still(k, frac) {
+      F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0);
+      const i = L.scenes.findIndex(s => s.k === String(k)); if (i < 0) return null;
+      const sc = L.scenes[i]; bundle.__bare = true; try { drawScene(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s); } finally { bundle.__bare = false; }
+      return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S };
+    }
+    return { render, still, total: L.total, scenes: L.scenes, format: FF, width: canvas.width, height: canvas.height };
   }
 
   root.EVEngine = { createPlayer, layout, LIB_NAMES, W, H, FORMATS, errors: {} };
