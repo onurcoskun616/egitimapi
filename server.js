@@ -9,6 +9,7 @@ const { TONES, voiceForTone } = require('./lib/tones');
 const eleven = require('./lib/eleven');
 const { pagesFor, sourcesBlock } = require('./lib/sources');
 const quiz = require('./lib/quiz');
+const pub = require('./lib/publish');
 const audit = require('./lib/audit');
 
 const PORT = process.env.PORT || 3000;
@@ -219,6 +220,29 @@ async function runQuiz(id, feedback) {
 }
 // Öğrencinin elle yazacağı ders kodu: 6 karakter, karışmayan harf/rakamlar (0/O, 1/I yok)
 const CODE_ABC = 'ABCDEFGHJKLMNPRSTUVYZ23456789';
+/* ---------- yayına hazırlık ---------- */
+async function timelineFor(id) {
+  const vis = await latest(id, 'visuals'); if (!vis) return null;
+  const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc&select=alignment`);
+  return pub.timeline(vis.data.scenes, a && a.alignment && a.alignment.timings);
+}
+const PUB_RUNNING = new Set();
+function runPublishBg(id, feedback) {
+  if (PUB_RUNNING.has(id)) return; PUB_RUNNING.add(id);
+  (async () => {
+    const p = await db.one('projects', `id=eq.${q(id)}`);
+    await db.update('projects', `id=eq.${q(id)}`, { publish_status: 'generating', publish_error: null });
+    const vis = await latest(id, 'visuals'); const tl = await timelineFor(id); const qv = await latest(id, 'quiz');
+    let user = pub.publishPrompt(p, vis.data.scenes, qv && qv.data.kazanimlar, pub.chapters(tl));
+    if (feedback && p.publish_meta) user += `\nÖnceki metinler:\n${JSON.stringify(p.publish_meta)}\nDüzeltme isteği: ${feedback}\nİsteği uygula, tam JSON'u yeniden ver.`;
+    const [r] = await claude.complete([{ system: pub.PUBLISH_SYSTEM, user, max: 4000 }], ctxFor(id, 'publish'));
+    if (!r || r.error) throw new Error((r && r.error) || 'yanıt yok');
+    const m = claude.extractJson(r.text); const arr = v => (Array.isArray(v) ? v : []).map(x => String(x).slice(0, 60)).slice(0, 20);
+    const meta = { youtube_title: String(m.youtube_title || p.title).slice(0, 100), youtube_description: String(m.youtube_description || '').slice(0, 3000), tags: arr(m.tags), hashtags: arr(m.hashtags).map(h => h.startsWith('#') ? h : '#' + h), social_caption: String(m.social_caption || '').slice(0, 1500), cover_title: String(m.cover_title || p.title).slice(0, 40), cover_sub: String(m.cover_sub || '').slice(0, 50) };
+    await db.update('projects', `id=eq.${q(id)}`, { publish_status: 'ready', publish_meta: meta });
+  })().catch(async e => { console.error('publish', e); await db.update('projects', `id=eq.${q(id)}`, { publish_status: 'failed', publish_error: e.message.slice(0, 600) }).catch(() => {}); }).finally(() => PUB_RUNNING.delete(id));
+}
+
 const shortId = () => Array.from(crypto.randomBytes(6), b => CODE_ABC[b % CODE_ABC.length]).join('');
 
 async function bundleFor(id, withAudio, format, versionId) {
@@ -408,6 +432,30 @@ on('GET', '/api/lessons', async (req, res) => {
   const at = ps.length ? await db.select('lesson_attempts', `project_id=in.(${ps.map(p => p.id).join(',')})&select=project_id,finished_at,summary&limit=5000`) : [];
   send(res, 200, ps.map(p => { const mine = at.filter(a => a.project_id === p.id), fin = mine.filter(a => a.summary); return { ...p, started: mine.length, finished: fin.length, avg: fin.length ? Math.round(fin.reduce((n, a) => n + (a.summary.pct || 0), 0) / fin.length) : null }; }));
 });
+on('GET', '/api/projects/:id/subtitles.:ext', async (req, res, { id, ext }) => {
+  if (!['srt', 'vtt'].includes(ext)) return send(res, 404, { error: 'Yok' });
+  const tl = await timelineFor(id); if (!tl) return send(res, 404, { error: 'Görsel yok' });
+  const p = await db.one('projects', `id=eq.${q(id)}&select=title`);
+  const name = (p.title || 'altyazi').toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'altyazi';
+  res.writeHead(200, { 'Content-Type': (ext === 'vtt' ? 'text/vtt' : 'application/x-subrip') + '; charset=utf-8', 'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}.${ext}"; filename*=UTF-8''${encodeURIComponent(name)}.${ext}` });
+  res.end((ext === 'srt' ? '\ufeff' : '') + (ext === 'vtt' ? pub.vtt(tl) : pub.srt(tl)));
+});
+on('GET', '/api/projects/:id/publish', async (req, res, { id }) => {
+  const p = await db.one('projects', `id=eq.${q(id)}&select=id,title,status,share_id,quiz_published,publish_status,publish_meta,publish_error,format`); if (!p) return send(res, 404, { error: 'Bulunamadı' });
+  const tl = await timelineFor(id); const chs = tl ? pub.chapters(tl) : [];
+  const m = p.publish_meta; let full = null;
+  if (m) {
+    full = m.youtube_description.trim();
+    if (chs.length >= 3) full += '\n\nBölümler:\n' + chs.map(c => `${c.label} ${c.name}`).join('\n');
+    if (p.quiz_published && p.share_id) full += `\n\nEtkileşimli ders: ${publicBase()}/izle/${p.share_id} (ders kodu ${p.share_id})`;
+    if (m.hashtags.length) full += '\n\n' + m.hashtags.join(' ');
+  }
+  send(res, 200, { project: p, chapters: chs, total: tl && tl.total, scenes: tl ? tl.scenes.map(s => ({ k: s.k, title: s.title, ch: s.ch })) : [], full_description: full, lessonUrl: p.quiz_published && p.share_id ? `${publicBase()}/izle/${p.share_id}` : null });
+});
+on('POST', '/api/projects/:id/publish/generate', async (req, res, { id }) => {
+  const { feedback } = await readBody(req); if (PUB_RUNNING.has(id)) return send(res, 409, { error: 'Metinler zaten hazırlanıyor' });
+  runPublishBg(id, feedback ? String(feedback).slice(0, 1000) : null); send(res, 202, { ok: true });
+});
 on('GET', '/api/formats', async (req, res) => send(res, 200, FORMATS));
 on('POST', '/api/projects/:id/cancel', async (req, res, { id }) => { await setStatus(id, 'archived'); send(res, 200, { ok: true }); });
 on('POST', '/api/projects/:id/reopen', async (req, res, { id }) => { if (!await guard(res, id, ['delivered'], false)) return; await setStatus(id, 'visuals_review'); send(res, 200, { ok: true }); });
@@ -493,6 +541,7 @@ on('POST', '/api/render/:jobId/status', async (req, res, { jobId }) => {
   if (b.status === 'done') {
     await db.update('render_jobs', `id=eq.${q(jobId)}`, { status: 'done', progress: 100, output_path: b.path, finished_at: now() });
     await setStatus(job.project_id, 'delivered');
+    db.one('projects', `id=eq.${q(job.project_id)}&select=publish_status`).then(pp => { if (pp && !pp.publish_status) runPublishBg(job.project_id, null); }).catch(() => {});
   } else if (b.status === 'failed') {
     await db.update('render_jobs', `id=eq.${q(jobId)}`, { status: 'failed', error: String(b.error || '').slice(0, 900), finished_at: now() });
     await setStatus(job.project_id, 'failed', { error: 'render|' + String(b.error || 'Render başarısız').slice(0, 800) });

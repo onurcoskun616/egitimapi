@@ -240,6 +240,90 @@
   }
   function wrap2(t) { if (t.length <= 42) return t; const w = t.split(' '); let a = '', i = 0; while (i < w.length && (a + ' ' + w[i]).trim().length <= Math.ceil(t.length / 2) + 6) a = (a + ' ' + w[i++]).trim(); return a + '\n' + w.slice(i).join(' '); }
 
+  /* ---------- yayına hazırlık ---------- */
+  const COVERS = { yt: { w: 1280, h: 720, label: 'YouTube kapağı 16:9 (1280×720)' }, reel: { w: 1080, h: 1920, label: 'Reels / Shorts / TikTok kapağı 9:16' }, sq: { w: 1080, h: 1080, label: 'Instagram gönderi 1:1' } };
+  async function viewPublish(id) {
+    let d; try { d = await api(`/api/projects/${id}/publish`); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
+    const p = d.project, m = p.publish_meta;
+    const copyBtn = (key, label) => `<button data-copy="${key}">${label || 'Kopyala'}</button>`;
+    let html = `<p class="muted"><a href="#/p/${esc(id)}">← ${esc(p.title)}</a></p><h1>Yayına hazırlık</h1>`;
+    // altyazı
+    html += `<div class="card"><strong>1 · Altyazı dosyası</strong><p class="note">Videodaki seslendirmeyle saniyesi saniyesine eşleşir. YouTube'da <i>Altyazılar → Dosya yükle → Zamanlamalı</i> ile yükleyin; işitme engelli öğrenciler ve otomatik çeviri için kullanılır.</p>
+      <div class="btns"><a class="btn primary" href="/api/projects/${esc(id)}/subtitles.srt" download>SRT indir</a><a class="btn" href="/api/projects/${esc(id)}/subtitles.vtt" download>VTT indir</a></div>
+      ${d.chapters.length >= 3 ? `<p class="note" style="margin-top:12px">YouTube bölümleri (açıklamaya otomatik eklenir):</p><pre class="chap">${d.chapters.map(c => `${esc(c.label)} ${esc(c.name)}`).join('\n')}</pre>` : ''}</div>`;
+    // metinler
+    html += `<div class="card" style="margin-top:14px"><strong>2 · Başlık, açıklama ve etiketler</strong>`;
+    if (p.publish_status === 'generating') { html += `<div class="wait" style="margin-top:10px"><div class="spin" aria-hidden="true"></div><div class="note">Yayın metinleri hazırlanıyor, lütfen bekleyiniz…</div></div>`; pollTimer = setTimeout(route, 5000); }
+    else if (!m) html += `${p.publish_status === 'failed' ? `<p class="err">Metinler hazırlanamadı.</p><details><summary>Teknik ayrıntı</summary>${esc(p.publish_error || '')}</details>` : '<p class="note">Videoya uygun YouTube başlığı, açıklaması, etiketleri ve sosyal medya metni hazırlanır.</p>'}<div class="btns"><button class="primary" data-p="gen">Metinleri hazırla</button></div>`;
+    else html += `
+      <label>YouTube başlığı</label><div class="cp"><input readonly id="t_title" value="${esc(m.youtube_title)}">${copyBtn('t_title')}</div>
+      <label>YouTube açıklaması</label><div class="cp"><textarea readonly id="t_desc" rows="10">${esc(d.full_description || '')}</textarea>${copyBtn('t_desc')}</div>
+      <label>YouTube etiketleri</label><div class="cp"><input readonly id="t_tags" value="${esc(m.tags.join(', '))}">${copyBtn('t_tags')}</div>
+      <label>Reels / TikTok / Shorts metni</label><div class="cp"><textarea readonly id="t_soc" rows="5">${esc(m.social_caption + (m.hashtags.length ? '\n\n' + m.hashtags.join(' ') : '') + (d.lessonUrl ? '\n\nEtkileşimli ders kodu: ' + p.share_id : ''))}</textarea>${copyBtn('t_soc')}</div>
+      <label for="pfb">Değişiklik isteği</label><textarea id="pfb" rows="2" placeholder="Örn. başlık daha merak uyandırıcı olsun, etiketlere 'elektrik' ekle"></textarea><div class="btns"><button data-p="regen">Metinleri yeniden hazırla</button></div>`;
+    html += `</div>`;
+    // kapak
+    html += `<div class="card" style="margin-top:14px"><strong>3 · Kapak görseli</strong><p class="note">Videodaki sahne çiziminden kapak oluşturulur. Ölçüyü ve sahneyi seçin, yazıları düzenleyin, PNG olarak indirin.</p>
+      <div class="grid two"><div><label for="cv_f">Ölçü</label><select id="cv_f">${Object.entries(COVERS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('')}</select>
+      <label for="cv_k">Görsel (sahne)</label><select id="cv_k">${d.scenes.map(s => `<option value="${esc(s.k)}">${esc(s.k)} · ${esc(s.title)}</option>`).join('')}</select>
+      <label for="cv_t">Kapak başlığı</label><input id="cv_t" maxlength="40" value="${esc((m && m.cover_title) || p.title.toLocaleUpperCase('tr'))}">
+      <label for="cv_s">Alt yazı</label><input id="cv_s" maxlength="50" value="${esc((m && m.cover_sub) || '')}">
+      <label class="chk"><input type="checkbox" id="cv_b" ${d.lessonUrl ? 'checked' : ''}> “Etkileşimli ders” rozeti${d.lessonUrl ? ` ve ders kodu (${esc(p.share_id)})` : ''}</label>
+      <div class="btns"><button class="primary" id="cv_dl">PNG indir</button></div></div>
+      <div><canvas id="cover" class="coverprev"></canvas></div></div></div>`;
+    // QR
+    if (d.lessonUrl) html += `<div class="card" style="margin-top:14px"><strong>4 · QR kod</strong><p class="note">Etkileşimli dersin QR kodu. Afişe, çalışma kâğıdına ya da video açıklamasına koyabilirsiniz.</p><div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div id="qr2" style="background:#fff;padding:12px;border-radius:12px"></div><div><div class="lcode">Ders kodu: <b>${esc(p.share_id)}</b></div><p class="note">${esc(d.lessonUrl)}</p><div class="btns"><button id="qr_dl">QR kodu PNG indir</button></div></div></div></div>`;
+    app.innerHTML = html;
+    app.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => { const el = document.getElementById(b.dataset.copy); try { await navigator.clipboard.writeText(el.value); } catch { el.select(); document.execCommand('copy'); } const t = b.textContent; b.textContent = 'Kopyalandı'; setTimeout(() => b.textContent = t, 1400); });
+    app.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => { b.disabled = true; try { const fb = b.dataset.p === 'regen' ? document.getElementById('pfb').value.trim() : null; if (b.dataset.p === 'regen' && !fb) { b.disabled = false; document.getElementById('pfb').focus(); return; } await api(`/api/projects/${id}/publish/generate`, { method: 'POST', body: { feedback: fb } }); route(); } catch (e) { alertBox(e.message); b.disabled = false; } });
+    if (d.lessonUrl) loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js').then(() => { const el = document.getElementById('qr2'); if (el && window.QRCode) new window.QRCode(el, { text: d.lessonUrl, width: 220, height: 220, correctLevel: window.QRCode.CorrectLevel.M }); }).catch(() => {});
+    const qd = document.getElementById('qr_dl'); if (qd) qd.onclick = () => { const c = document.querySelector('#qr2 canvas'); if (c) { const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `ders-${p.share_id}-qr.png`; a.click(); } };
+    // kapak çizimi
+    let bundle = null, still = null;
+    try { bundle = await api(`/api/projects/${id}/bundle?audio=1`); delete bundle.audioUrl; } catch { }
+    const cover = document.getElementById('cover'); if (!cover || !bundle) return;
+    const draw = async () => {
+      const f = COVERS[document.getElementById('cv_f').value], k = document.getElementById('cv_k').value;
+      if (!still || still.k !== k) { const off = document.createElement('canvas'); const P = window.EVEngine.createPlayer(off, { ...bundle, format: 'dikey' }); const r = P.still(k, 0.92); still = { k, img: off, r }; }
+      await document.fonts.ready;
+      drawCover(cover, f, still, { title: document.getElementById('cv_t').value, sub: document.getElementById('cv_s').value, badge: document.getElementById('cv_b').checked, code: d.lessonUrl ? p.share_id : null });
+    };
+    ['cv_f', 'cv_k', 'cv_t', 'cv_s', 'cv_b'].forEach(x => document.getElementById(x).addEventListener('input', draw));
+    document.getElementById('cv_dl').onclick = () => cover.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `kapak-${document.getElementById('cv_f').value}.png`; a.click(); }, 'image/png');
+    draw();
+  }
+  // Kapak: koyu zemin + ızgara, sahne çizimi, büyük başlık, marka ve rozet
+  function drawCover(cv, f, st, o) {
+    cv.width = f.w; cv.height = f.h; const c = cv.getContext('2d'), W = f.w, H = f.h, land = W > H * 1.2, S = Math.min(W, H) / 1080;
+    const bg = c.createRadialGradient(W * (land ? .68 : .5), H * (land ? .5 : .42), 10, W * .5, H * .5, Math.max(W, H) * .8); bg.addColorStop(0, '#16264a'); bg.addColorStop(1, '#05070e'); c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(120,150,210,.10)'; const g = 80 * S; for (let x = g / 2; x < W; x += g) for (let y = g / 2; y < H; y += g) { c.fillRect(x - 7 * S, y - 1, 14 * S, 2); c.fillRect(x - 1, y - 7 * S, 2, 14 * S); }
+    // görsel
+    const r = st.r, ar = r.w / r.h; let iw, ih, ix, iy;
+    if (land) { ih = H * .86; iw = ih * ar; ix = W - iw - W * .02; iy = (H - ih) / 2; }
+    else if (H > W * 1.3) { iw = W * .98; ih = iw / ar; ix = (W - iw) / 2; iy = H * .36; }
+    else { iw = W * .78; ih = iw / ar; ix = (W - iw) / 2; iy = H * .30; }
+    c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 40 * S; c.drawImage(st.img, r.x, r.y, r.w, r.h, ix, iy, iw, ih); c.restore();
+    if (land) { const fade = c.createLinearGradient(ix, 0, ix + iw * .35, 0); fade.addColorStop(0, 'rgba(5,7,14,.95)'); fade.addColorStop(1, 'rgba(5,7,14,0)'); c.fillStyle = fade; c.fillRect(ix - 2, 0, iw * .35, H); }
+    // marka
+    const pad = 64 * S; c.fillStyle = '#ffc93c'; c.fillRect(pad, pad, 18 * S, 18 * S); c.font = `900 ${30 * S}px Archivo, sans-serif`; c.fillStyle = '#eef1f7'; c.textBaseline = 'top'; c.fillText('EĞİTİM STÜDYOSU', pad + 30 * S, pad - 6 * S);
+    // başlık
+    const tw = land ? W * .5 : W - pad * 2; let size = (land ? 104 : 118) * S; const words = (o.title || '').toLocaleUpperCase('tr').split(/\s+/).filter(Boolean);
+    const lines = () => { c.font = `900 ${size}px Archivo, sans-serif`; const L = []; let cur = ''; for (const w of words) { const t = (cur + ' ' + w).trim(); if (c.measureText(t).width > tw && cur) { L.push(cur); cur = w; } else cur = t; } if (cur) L.push(cur); return L; };
+    let L = lines(); while ((L.length > 3 || L.some(l => c.measureText(l).width > tw)) && size > 40 * S) { size -= 4 * S; L = lines(); }
+    const ty = land ? (H - L.length * size * 1.02) / 2 - 20 * S : pad + 90 * S;
+    c.save(); c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 24 * S; c.textBaseline = 'top';
+    L.forEach((l, i) => { const gr = c.createLinearGradient(0, ty + i * size, 0, ty + (i + 1) * size); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#c9d2e3'); c.fillStyle = gr; c.fillText(l, pad, ty + i * size * 1.02); });
+    c.restore();
+    let y = ty + L.length * size * 1.02 + 18 * S;
+    c.fillStyle = '#ffc93c'; c.fillRect(pad, y, 120 * S, 10 * S); y += 34 * S;
+    if (o.sub) { c.font = `800 ${34 * S}px "JetBrains Mono", monospace`; c.fillStyle = '#c9d2e3'; c.textBaseline = 'top'; c.fillText(o.sub, pad, y); y += 54 * S; }
+    if (o.badge) {
+      const txt = o.code ? `ETKİLEŞİMLİ DERS · KOD ${o.code}` : 'ETKİLEŞİMLİ DERS'; c.font = `900 ${30 * S}px "JetBrains Mono", monospace`; const bw = c.measureText(txt).width + 48 * S, bh = 62 * S;
+      const bx = pad, by = land ? H - pad - bh : H - pad - bh;
+      c.fillStyle = '#3fb0ff'; c.beginPath(); c.roundRect ? c.roundRect(bx, by, bw, bh, bh / 2) : c.rect(bx, by, bw, bh); c.fill(); c.fillStyle = '#05070e'; c.textBaseline = 'middle'; c.fillText(txt, bx + 24 * S, by + bh / 2 + 2 * S);
+    }
+  }
+
   /* ---------- tüm dersler ve sonuçlar ---------- */
   async function viewLessons() {
     let list; try { list = await api('/api/lessons'); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
@@ -372,7 +456,8 @@
         <label for="thsc">Kapak görseli</label><div class="grid two" style="align-items:end"><div><select id="thsc"></select></div><div><select id="thfm"><option value="yt">YouTube kapağı 1280×720</option><option value="v">Dikey kapak 1080×1920 (Reels, Shorts)</option><option value="sq">Kare kapak 1080×1080</option></select></div></div>
         <canvas id="thcv" class="thprev" width="1280" height="720"></canvas><div class="btns"><button data-pub="thumb">Kapağı indir (PNG)</button></div>
         <div id="pubout"></div></div>
-      <div class="card" style="margin-top:12px"><strong>Etkileşimli ders</strong><p class="note">Video bölüm sonlarında durup öğrenciye soru sorar; sonuçlar kazanım bazında size raporlanır.${d.quizStatus === 'generating' ? ' Sorular hazırlanıyor…' : d.quizStatus === 'ready' ? ' Sorular hazır.' : ''}</p><div class="btns"><a class="btn primary" href="#/p/${esc(d.project.id)}/ders">Soruları ve sonuçları aç</a></div></div></div></div>`;
+      <div class="card" style="margin-top:12px"><strong>Etkileşimli ders</strong><p class="note">Video bölüm sonlarında durup öğrenciye soru sorar; sonuçlar kazanım bazında size raporlanır.${d.quizStatus === 'generating' ? ' Sorular hazırlanıyor…' : d.quizStatus === 'ready' ? ' Sorular hazır.' : ''}</p><div class="btns"><a class="btn primary" href="#/p/${esc(d.project.id)}/ders">Soruları ve sonuçları aç</a></div></div>
+      <div class="card" style="margin-top:12px"><strong>Yayına hazırlık</strong><p class="note">YouTube ve sosyal medya için altyazı dosyası, kapak görseli, başlık, açıklama ve etiketler.</p><div class="btns"><a class="btn primary" href="#/p/${esc(d.project.id)}/yayin">Yayına hazırlık sayfasını aç</a></div></div></div></div>`;
   }
 
   async function startPreview(id) {
@@ -430,8 +515,8 @@
     if (!me.ok) { location.hash = '#/'; return; }
     setSub('Konu yaz · onayla · video al');
     if (h === '#/sonuclar') return viewLessons();
-    const m = h.match(/^#\/p\/([\w-]+)(\/ders)?/);
-    return m ? (m[2] ? viewLesson(m[1]) : viewProject(m[1])) : viewList();
+    const m = h.match(/^#\/p\/([\w-]+)(\/ders|\/yayin)?/);
+    return m ? (m[2] === '/ders' ? viewLesson(m[1]) : m[2] === '/yayin' ? viewPublish(m[1]) : viewProject(m[1])) : viewList();
   }
   window.addEventListener('hashchange', route);
   route();
