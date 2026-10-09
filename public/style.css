@@ -100,3 +100,28 @@ tr.clk{cursor:pointer}tr.clk:hover td{background:rgba(63,176,255,.06)}
 pre.chap{background:#070b16;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:600 13px var(--mono);white-space:pre-wrap;margin:6px 0 0}
 .coverprev{width:100%;max-height:520px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#000;display:block}
 label.chk{display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px}label.chk input{width:auto}
+
+/* hesaplar ve vitrin */
+.tbar{flex-wrap:wrap;gap:4px 14px}.tbar a{color:var(--fg);text-decoration:none}.tbar a:hover,.tbar a.on{color:var(--yel)}.tbar a.navcta{background:var(--yel);color:#111;border-radius:10px;padding:6px 12px}
+.badge{display:inline-block;background:var(--yel);color:#111;border-radius:99px;font:800 11px var(--mono);padding:1px 7px;margin-left:2px}
+.hero{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;align-items:end;margin-bottom:6px}@media (max-width:760px){.hero{grid-template-columns:1fr}}
+.codebox #code{font-size:20px;letter-spacing:.18em;text-transform:uppercase}.codebox #code::placeholder{letter-spacing:.04em;text-transform:none;font-size:15px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.tcard{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--fg);text-decoration:none}.tcard:hover{border-color:var(--yel)}.tcard>span:last-child{display:flex;flex-direction:column;min-width:0}
+.av{flex:none;width:48px;height:48px;border-radius:50%;background:var(--panel2);border:1.5px solid var(--yel);color:var(--yel);display:inline-flex;align-items:center;justify-content:center;font:900 17px var(--display)}.av.big{width:84px;height:84px;font-size:30px}
+.tprof{display:flex;gap:18px;align-items:center;margin:8px 0 16px}.tprof h1{margin:0}.tprof.sm{margin:0 0 6px;gap:12px}
+.cfilter{margin-bottom:12px}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.ccard{display:flex;flex-direction:column;gap:6px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--fg);text-decoration:none;min-height:150px}.ccard:hover{border-color:var(--lv)}.ccard b{font:800 18px/1.2 var(--display)}
+.ctag{font:800 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--lv)}
+.cmeta{margin-top:auto;display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted)}.acc-open{color:var(--green)}.acc-paid{color:var(--yel)}.acc-request{color:var(--lv)}
+.list .row.locked{display:flex;justify-content:space-between;gap:12px;padding:14px 16px;border:1px dashed var(--line);border-radius:14px;color:var(--muted)}
+.list div.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.auth{max-width:520px;margin:10px auto}.auth h1{margin-top:0}
+.seg{display:flex;gap:6px;background:#070b16;border:1px solid var(--line);border-radius:12px;padding:4px;margin:6px 0 10px}.seg button,.seg a{flex:1;text-align:center;justify-content:center;border:0;background:none;padding:10px;border-radius:9px;color:var(--muted);font:800 13px var(--mono);text-decoration:none}.seg [aria-selected="true"]{background:var(--panel2);color:var(--fg);outline:1px solid var(--line)}
+.seg.wide{flex-wrap:wrap;margin:18px 0 14px}.seg.wide a{flex:1 1 auto}
+.ibtn{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}.ibtn button{padding:7px 11px;font-size:12px}.ibtn select{width:auto;padding:7px;font-size:12px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}.stats div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column}.stats b{font:900 28px var(--display);color:var(--yel)}.stats span{font-size:12px;color:var(--muted)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}.plan b{font:800 18px var(--display)}.plan .price{font:900 24px var(--display);color:var(--yel);margin:6px 0}.plan ul{padding-left:18px;margin:8px 0 14px;font-size:13px}.plan.cur{border-color:var(--green)}
+.mcourse{margin-bottom:14px}
+@media (max-width:640px){.top{gap:8px}.tbar{margin-left:0;width:100%}}

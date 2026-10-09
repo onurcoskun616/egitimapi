@@ -7,6 +7,7 @@ const { db, storage, q } = require('./lib/supa');
 const claude = require('./lib/claude');
 const { TONES, voiceForTone } = require('./lib/tones');
 const eleven = require('./lib/eleven');
+const auth = require('./lib/auth');
 const { pagesFor, sourcesBlock } = require('./lib/sources');
 const quiz = require('./lib/quiz');
 const pub = require('./lib/publish');
@@ -15,7 +16,6 @@ const audit = require('./lib/audit');
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
-const SESSION = () => crypto.createHash('sha256').update('egitim:' + (process.env.APP_PASSWORD || '')).digest('hex');
 const publicBase = () => (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 
 /* ---------- yardımcılar ---------- */
@@ -27,7 +27,6 @@ function send(res, code, body, headers = {}) {
 function readBody(req, limit = 2e6) {
   return new Promise((ok, no) => { let b = ''; req.on('data', d => { b += d; if (b.length > limit) { no(new Error('İstek çok büyük')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch (e) { no(new Error('Geçersiz JSON')); } }); });
 }
-function authed(req) { const m = (req.headers.cookie || '').match(/(?:^|;\s*)sid=([a-f0-9]+)/); return !!(process.env.APP_PASSWORD && m && m[1] === SESSION()); }
 function safeEq(a, b) { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); }
 const now = () => new Date().toISOString();
 async function setStatus(id, status, extra = {}) { return db.update('projects', `id=eq.${q(id)}`, { status, updated_at: now(), ...extra }); }
@@ -55,6 +54,13 @@ async function guard(res, id, allowed, lock = true) {
   if (RUNNING.has(id) || !allowed.includes(p.status)) { send(res, 409, { error: 'Bu proje şu an başka bir adımı işliyor. Sayfayı yenileyip bekleyin.' }); return false; }
   if (lock) RUNNING.add(id); // background() başlayana kadar ikinci isteği engelle
   return true;
+}
+// İlk yönetici: kullanıcı adı "yonetici", şifre APP_PASSWORD (girişten sonra değiştirilmeli)
+async function seedAdmin() {
+  if (await db.one('users', 'role=eq.admin&select=id')) return;
+  if (!process.env.APP_PASSWORD) return console.log('Yönetici oluşturulamadı: APP_PASSWORD yok');
+  await db.insert('users', { email: 'yonetici', name: 'Yönetici', role: 'admin', status: 'active', slug: 'yonetici', pass_hash: auth.hashPassword(process.env.APP_PASSWORD) });
+  console.log('Yönetici hesabı oluşturuldu: yonetici');
 }
 async function resumeQuiz() {
   const rows = await db.select('projects', 'select=id,quiz_feedback&quiz_status=eq.generating');
@@ -260,18 +266,75 @@ async function bundleFor(id, withAudio, format, versionId) {
 
 /* ---------- yönlendirme ---------- */
 const routes = [];
-const on = (method, pattern, handler, open = false) => routes.push({ method, re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), handler, open });
+// erişim: 'public' | 'user' | 'student' | 'teacher' (öğretmen ya da yönetici) | 'admin'; true → public, varsayılan teacher
+const on = (method, pattern, handler, access = 'teacher') => routes.push({ method, re: new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), handler, access: access === true ? 'public' : access });
+const cookie = (token, maxAge) => `sid=${token}; HttpOnly; Path=/; Max-Age=${maxAge}; SameSite=Lax${publicBase().startsWith('https') ? '; Secure' : ''}`;
+const isAdmin = u => u && u.role === 'admin';
+const ipOf = req => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+async function activeLimits(user) {
+  if (isAdmin(user)) return { plan: 'yönetici', limits: { videos_per_month: 1e6, max_seconds: 300, students: 1e6, sell_courses: true } };
+  const sub = await db.one('subscriptions', `user_id=eq.${q(user.id)}&status=in.(active,trialing)&order=created_at.desc&select=id,status,current_period_end,plan_id`);
+  if (!sub || (sub.current_period_end && new Date(sub.current_period_end) < new Date())) return null;
+  const plan = await db.one('plans', `id=eq.${q(sub.plan_id)}`); return plan ? { plan: plan.name, code: plan.code, limits: plan.limits, until: sub.current_period_end } : null;
+}
+async function monthUsage(userId) {
+  const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
+  const rows = await db.select('projects', `owner_id=eq.${q(userId)}&created_at=gte.${start.toISOString()}&select=id`); return rows.length;
+}
 
-on('POST', '/api/login', async (req, res) => {
-  const { password } = await readBody(req);
-  if (!process.env.APP_PASSWORD || !safeEq(password || '', process.env.APP_PASSWORD)) return send(res, 401, { error: 'Şifre hatalı' });
-  send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${SESSION()}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${publicBase().startsWith('https') ? '; Secure' : ''}` });
-}, true);
-on('GET', '/api/me', async (req, res) => send(res, 200, { ok: authed(req) }), true);
-on('POST', '/api/logout', async (req, res) => send(res, 200, { ok: true }, { 'Set-Cookie': `sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${publicBase().startsWith('https') ? '; Secure' : ''}` }), true);
+require('./lib/market')({ on, db, q, send, readBody, isAdmin, activeLimits, auth, shortId: () => shortId(), now });
+/* ---------- hesaplar ---------- */
+on('POST', '/api/auth/register', async (req, res) => {
+  const b = await readBody(req, 8000); const ip = ipOf(req); if (auth.tooMany(ip)) return send(res, 429, { error: 'Çok fazla deneme, biraz sonra tekrar deneyin' });
+  const role = b.role === 'teacher' ? 'teacher' : 'student';
+  const email = String(b.email || '').trim().toLocaleLowerCase('tr'), name = String(b.name || '').trim().slice(0, 80), pw = String(b.password || '');
+  if (!auth.validEmail(email) || email === 'yonetici') return send(res, 400, { error: 'Geçerli bir e-posta adresi yazın' });
+  if (name.length < 3) return send(res, 400, { error: 'Adınızı ve soyadınızı yazın' });
+  if (pw.length < 8) return send(res, 400, { error: 'Şifre en az 8 karakter olmalı' });
+  if (await db.one('users', `email=eq.${q(email)}&select=id`)) { auth.failed(ip); return send(res, 409, { error: 'Bu e-posta ile zaten bir hesap var. Giriş yapın.' }); }
+  const row = { email, name, role, pass_hash: auth.hashPassword(pw), status: role === 'teacher' ? 'pending' : 'active', school: String(b.school || '').slice(0, 120) || null, subject: String(b.subject || '').slice(0, 80) || null };
+  if (role === 'teacher') { row.slug = await auth.uniqueSlug(name); row.bio = String(b.bio || '').slice(0, 1000) || null; }
+  const u = await db.insert('users', row);
+  const token = await auth.createSession(u.id);
+  send(res, 201, { user: { id: u.id, name: u.name, role: u.role, status: u.status } }, { 'Set-Cookie': cookie(token, auth.SESSION_DAYS * 86400) });
+}, 'public');
+on('POST', '/api/auth/login', async (req, res) => {
+  const b = await readBody(req, 4000); const ip = ipOf(req); if (auth.tooMany(ip)) return send(res, 429, { error: 'Çok fazla deneme, 10 dakika sonra tekrar deneyin' });
+  const email = String(b.email || '').trim().toLocaleLowerCase('tr');
+  const u = await db.one('users', `email=eq.${q(email)}&select=id,pass_hash,status,role,name`);
+  if (!u || !auth.verifyPassword(b.password || '', u.pass_hash)) { auth.failed(ip); return send(res, 401, { error: 'E-posta ya da şifre hatalı' }); }
+  if (u.status === 'rejected') return send(res, 403, { error: 'Öğretmen başvurunuz onaylanmadı' });
+  if (u.status === 'suspended') return send(res, 403, { error: 'Hesabınız askıya alınmış' });
+  const token = await auth.createSession(u.id); db.update('users', `id=eq.${q(u.id)}`, { last_login: now() }).catch(() => {});
+  send(res, 200, { user: { id: u.id, name: u.name, role: u.role, status: u.status } }, { 'Set-Cookie': cookie(token, auth.SESSION_DAYS * 86400) });
+}, 'public');
+on('POST', '/api/auth/logout', async (req, res) => { await auth.destroySession(auth.tokenOf(req)); send(res, 200, { ok: true }, { 'Set-Cookie': cookie('', 0) }); }, 'public');
+on('GET', '/api/me', async (req, res) => {
+  const u = req.user; if (!u) return send(res, 200, { user: null, ok: false });
+  const out = { user: u, ok: (u.role === 'teacher' && u.status === 'active') || isAdmin(u) };
+  if (out.ok) {
+    out.plan = await activeLimits(u); out.used = await monthUsage(u.id);
+    const cs = await db.select('courses', `teacher_id=eq.${q(u.id)}&select=id`);
+    out.pending = cs.length ? await db.count('enrollments', `course_id=in.(${cs.map(c => c.id).join(',')})&status=eq.pending&source=neq.purchase`) : 0;
+  }
+  send(res, 200, out);
+}, 'public');
+on('POST', '/api/me/profile', async (req, res) => {
+  const b = await readBody(req, 8000); const u = req.user; const patch = {};
+  if (b.name && String(b.name).trim().length >= 3) patch.name = String(b.name).trim().slice(0, 80);
+  for (const k of ['school', 'subject', 'bio']) if (k in b) patch[k] = String(b[k] || '').slice(0, k === 'bio' ? 1000 : 120) || null;
+  if (u.role !== 'student' && b.slug) patch.slug = await auth.uniqueSlug(b.slug, u.id);
+  if (b.new_password) { if (String(b.new_password).length < 8) return send(res, 400, { error: 'Yeni şifre en az 8 karakter olmalı' }); const full = await db.one('users', `id=eq.${q(u.id)}&select=pass_hash`); if (!auth.verifyPassword(b.password || '', full.pass_hash)) return send(res, 400, { error: 'Mevcut şifre hatalı' }); patch.pass_hash = auth.hashPassword(b.new_password); }
+  if (!Object.keys(patch).length) return send(res, 400, { error: 'Değişiklik yok' });
+  const r = await db.update('users', `id=eq.${q(u.id)}`, patch); auth.forgetUser(u.id);
+  send(res, 200, { user: { id: r.id, name: r.name, slug: r.slug } });
+}, 'user');
 on('GET', '/api/tones', async (req, res) => send(res, 200, Object.entries(TONES).map(([k, [label, desc]]) => ({ k, label, desc }))));
 
-on('GET', '/api/projects', async (req, res) => send(res, 200, await db.select('projects', 'select=id,title,status,updated_at,target_seconds&status=neq.archived&order=updated_at.desc')));
+on('GET', '/api/projects', async (req, res) => {
+  const own = isAdmin(req.user) ? '' : `&owner_id=eq.${q(req.user.id)}`;
+  send(res, 200, await db.select('projects', `select=id,title,status,updated_at,target_seconds,owner_id&status=neq.archived${own}&order=updated_at.desc`));
+});
 async function saveSources(id, list) {
   const out = [];
   for (const s of (Array.isArray(list) ? list : []).slice(0, 10)) {
@@ -288,7 +351,11 @@ on('POST', '/api/projects', async (req, res) => {
   let tone = String(b.tone || '');
   if (tone === 'ozel') tone = 'ozel:' + String(b.tone_note || '').trim().slice(0, 300);
   if (!(TONES[tone] || (tone.startsWith('ozel:') && tone.length > 8))) return send(res, 400, { error: 'Anlatım dilini seçin (özelse kısaca tarif edin)' });
-  const p = await db.insert('projects', { title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', status: 'content_generating' });
+  const lim = await activeLimits(req.user);
+  if (!lim) return send(res, 402, { error: 'Video üretmek için etkin bir paketiniz yok. Paketim sayfasından paket seçin.' });
+  if (await monthUsage(req.user.id) >= (lim.limits.videos_per_month || 0)) return send(res, 402, { error: `Bu ayki video hakkınız doldu (${lim.limits.videos_per_month} video). Paketinizi yükseltebilirsiniz.` });
+  if ((+b.target_seconds || 90) > (lim.limits.max_seconds || 300)) return send(res, 402, { error: `Paketiniz en fazla ${lim.limits.max_seconds} saniyelik videoya izin veriyor.` });
+  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', status: 'content_generating' });
   await saveSources(p.id, b.sources);
   background(p.id, 'content', []);
   send(res, 201, p);
@@ -378,42 +445,67 @@ on('POST', '/api/projects/:id/quiz/publish', async (req, res, { id }) => {
 });
 
 /* ---------- öğrenci (herkese açık) ders uç noktaları ---------- */
-async function lessonBy(sid) {
+// Ders erişimi: (1) kodla açık yayın, (2) sahibi/yönetici, (3) onaylı kaydı olan öğrenci
+async function enrolledCourse(userId, projectId) {
+  const items = await db.select('course_items', `project_id=eq.${q(projectId)}&select=course_id`); if (!items.length) return null;
+  const ids = items.map(i => i.course_id).join(',');
+  const e = await db.select('enrollments', `student_id=eq.${q(userId)}&course_id=in.(${ids})&status=eq.approved&select=course_id,expires_at`);
+  const ok = e.find(x => !x.expires_at || new Date(x.expires_at) > new Date()); if (!ok) return null;
+  return db.one('courses', `id=eq.${q(ok.course_id)}&status=eq.published&select=id,title`);
+}
+async function lessonBy(sid, user) {
   sid = String(sid || '').trim(); if (!sid || sid.length > 20) return null;
-  let p = await db.one('projects', `share_id=eq.${q(sid)}&quiz_published=is.true&select=id,title,format,status,share_id`);
-  if (!p && sid !== sid.toUpperCase()) p = await db.one('projects', `share_id=eq.${q(sid.toUpperCase())}&quiz_published=is.true&select=id,title,format,status,share_id`);
-  if (!p) return null; const v = await latest(p.id, 'quiz'); return v ? { p, v } : null;
+  const sel = 'select=id,title,format,status,share_id,quiz_published,owner_id';
+  let p = await db.one('projects', `share_id=eq.${q(sid)}&${sel}`);
+  if (!p && sid !== sid.toUpperCase()) p = await db.one('projects', `share_id=eq.${q(sid.toUpperCase())}&${sel}`);
+  if (!p) return null;
+  let via = null;
+  if (user && (isAdmin(user) || p.owner_id === user.id)) via = 'owner';
+  else if (user && await enrolledCourse(user.id, p.id)) via = 'course';
+  else if (p.quiz_published) via = 'code';
+  if (!via) return { denied: true, p };
+  const v = await latest(p.id, 'quiz');
+  if (via === 'code' && !v) return { denied: true, p };
+  return { p, v, via };
+}
+async function deniedInfo(p) {
+  const items = await db.select('course_items', `project_id=eq.${q(p.id)}&select=course_id`);
+  const courses = items.length ? await db.select('courses', `id=in.(${items.map(i => i.course_id).join(',')})&status=eq.published&select=id,title`) : [];
+  return { error: 'Bu derse erişim izniniz yok. Eğitime katılım talebi gönderin.', courses, title: p.title };
 }
 on('GET', '/api/l/:sid/check', async (req, res, { sid }) => {
-  const L = await lessonBy(sid); if (!L) return send(res, 404, { error: 'Ders bulunamadı ya da yayında değil' });
+  const L = await lessonBy(sid, req.user); if (!L) return send(res, 404, { error: 'Ders bulunamadı ya da yayında değil' });
+  if (L.denied) return send(res, req.user ? 403 : 401, await deniedInfo(L.p));
   send(res, 200, { code: L.p.share_id, title: L.p.title });
 }, true);
 on('GET', '/api/l/:sid', async (req, res, { sid }) => {
-  const L = await lessonBy(sid); if (!L) return send(res, 404, { error: 'Ders bulunamadı ya da yayında değil' });
+  const L = await lessonBy(sid, req.user); if (!L) return send(res, 404, { error: 'Ders bulunamadı ya da yayında değil' });
+  if (L.denied) return send(res, req.user ? 403 : 401, await deniedInfo(L.p));
   const { p, v } = L;
   const at = await db.one('audio_tracks', `project_id=eq.${q(p.id)}&order=created_at.desc&select=created_at`);
   const done = await db.select('render_jobs', `project_id=eq.${q(p.id)}&status=eq.done&order=created_at.desc&select=format,output_path,created_at`);
   const videos = {}; for (const j of done) { const f = j.format || 'dikey'; if (videos[f] || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; videos[f] = await storage.signedUrl(j.output_path, 6 * 3600); }
   if (!Object.keys(videos).length) return send(res, 404, { error: 'Dersin videosu henüz hazır değil' });
   const bundle = await bundleFor(p.id, true, p.format || 'dikey'); delete bundle.audioUrl;
-  send(res, 200, { title: p.title, format: p.format || 'dikey', videos, bundle, quiz: quiz.publicQuiz(v.data, v.version * 7919 + 13), version: v.version });
+  send(res, 200, { title: p.title, format: p.format || 'dikey', videos, bundle, quiz: v ? quiz.publicQuiz(v.data, v.version * 7919 + 13) : null, version: v ? v.version : null, me: req.user ? { name: req.user.name, role: req.user.role } : null });
 }, true);
-async function attemptAuth(sid, b) {
-  const L = await lessonBy(sid); if (!L) return null;
+async function attemptAuth(sid, b, user) {
+  const L = await lessonBy(sid, user); if (!L || L.denied || !L.v) return null;
   const a = await db.one('lesson_attempts', `id=eq.${q(b.attempt)}&project_id=eq.${q(L.p.id)}`);
   if (!a || !b.token || !safeEq(b.token, a.token)) return null;
   const v = a.quiz_version === L.v.version ? L.v : await db.one('versions', `project_id=eq.${q(L.p.id)}&stage=eq.quiz&version=eq.${a.quiz_version}`);
   return { ...L, a, v };
 }
 on('POST', '/api/l/:sid/start', async (req, res, { sid }) => {
-  const b = await readBody(req, 4000); const L = await lessonBy(sid); if (!L) return send(res, 404, { error: 'Ders bulunamadı' });
-  const name = String(b.name || '').trim().slice(0, 80); if (name.length < 2) return send(res, 400, { error: 'Adınızı yazın' });
+  const b = await readBody(req, 4000); const L = await lessonBy(sid, req.user); if (!L || L.denied) return send(res, 404, { error: 'Ders bulunamadı' });
+  if (!L.v) return send(res, 400, { error: 'Bu derste soru yok' });
+  const name = req.user ? req.user.name : String(b.name || '').trim().slice(0, 80); if (name.length < 2) return send(res, 400, { error: 'Adınızı yazın' });
   const token = crypto.randomBytes(16).toString('hex');
-  const a = await db.insert('lesson_attempts', { project_id: L.p.id, quiz_version: L.v.version, token, student_name: name, student_class: String(b.cls || '').trim().slice(0, 40) || null });
+  const a = await db.insert('lesson_attempts', { project_id: L.p.id, quiz_version: L.v.version, token, student_id: req.user ? req.user.id : null, student_name: name, student_class: String(b.cls || '').trim().slice(0, 40) || (req.user && req.user.school) || null });
   send(res, 200, { attempt: a.id, token });
 }, true);
 on('POST', '/api/l/:sid/answer', async (req, res, { sid }) => {
-  const b = await readBody(req, 8000); const A = await attemptAuth(sid, b); if (!A) return send(res, 403, { error: 'Oturum geçersiz' });
+  const b = await readBody(req, 8000); const A = await attemptAuth(sid, b, req.user); if (!A) return send(res, 403, { error: 'Oturum geçersiz' });
   const x = A.v.data.checkpoints[+b.cp] && A.v.data.checkpoints[+b.cp].questions[+b.qi]; if (!x) return send(res, 400, { error: 'Soru yok' });
   const correct = quiz.check(x, b.response);
   if ((A.a.answers || []).length >= 400) return send(res, 429, { error: 'Çok fazla deneme' });
@@ -421,14 +513,14 @@ on('POST', '/api/l/:sid/answer', async (req, res, { sid }) => {
   send(res, 200, { correct, explain: x.explain, correct_text: quiz.correctText(x), answer: (x.type === 'mcq' || x.type === 'image') ? x.answer : undefined });
 }, true);
 on('POST', '/api/l/:sid/finish', async (req, res, { sid }) => {
-  const b = await readBody(req, 4000); const A = await attemptAuth(sid, b); if (!A) return send(res, 403, { error: 'Oturum geçersiz' });
+  const b = await readBody(req, 4000); const A = await attemptAuth(sid, b, req.user); if (!A) return send(res, 403, { error: 'Oturum geçersiz' });
   const summary = quiz.summarize(A.v.data, A.a.answers);
   await db.update('lesson_attempts', `id=eq.${q(A.a.id)}`, { summary, finished_at: now() });
   send(res, 200, summary);
 }, true);
 
 on('GET', '/api/lessons', async (req, res) => {
-  const ps = await db.select('projects', 'select=id,title,share_id,quiz_status,quiz_published,updated_at&quiz_status=not.is.null&status=neq.archived&order=updated_at.desc');
+  const ps = await db.select('projects', `select=id,title,share_id,quiz_status,quiz_published,updated_at&quiz_status=not.is.null&status=neq.archived${isAdmin(req.user) ? '' : `&owner_id=eq.${q(req.user.id)}`}&order=updated_at.desc`);
   const at = ps.length ? await db.select('lesson_attempts', `project_id=in.(${ps.map(p => p.id).join(',')})&select=project_id,finished_at,summary&limit=5000`) : [];
   send(res, 200, ps.map(p => { const mine = at.filter(a => a.project_id === p.id), fin = mine.filter(a => a.summary); return { ...p, started: mine.length, finished: fin.length, avg: fin.length ? Math.round(fin.reduce((n, a) => n + (a.summary.pct || 0), 0) / fin.length) : null }; }));
 });
@@ -557,7 +649,19 @@ http.createServer(async (req, res) => {
       for (const r of routes) {
         const m = r.method === req.method && url.pathname.match(r.re);
         if (!m) continue;
-        if (!r.open && !authed(req)) return send(res, 401, { error: 'Giriş gerekli' });
+        req.user = await auth.userFromToken(auth.tokenOf(req));
+        const u = req.user, A = r.access;
+        if (A !== 'public') {
+          if (!u) return send(res, 401, { error: 'Giriş gerekli' });
+          if (A === 'admin' && !isAdmin(u)) return send(res, 403, { error: 'Yalnızca yönetici' });
+          if (A === 'student' && u.role !== 'student') return send(res, 403, { error: 'Bu sayfa öğrenciler içindir' });
+          if (A === 'teacher') {
+            if (u.role === 'student') return send(res, 403, { error: 'Bu sayfa öğretmenler içindir' });
+            if (u.role === 'teacher' && u.status !== 'active') return send(res, 403, { error: 'Öğretmen başvurunuz henüz onaylanmadı' });
+            const pm = url.pathname.match(/^\/api\/projects\/([0-9a-f-]{36})(\/|$)/);
+            if (pm && !isAdmin(u)) { const own = await db.one('projects', `id=eq.${q(pm[1])}&select=owner_id`); if (!own || own.owner_id !== u.id) return send(res, 404, { error: 'Bulunamadı' }); }
+          }
+        }
         return await r.handler(req, res, m.groups || {});
       }
       return send(res, 404, { error: 'Yok' });
@@ -569,4 +673,4 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     fs.createReadStream(file).pipe(res);
   } catch (e) { console.error(e); if (!res.headersSent) send(res, 500, { error: e.message }); }
-}).listen(PORT, () => { console.log('Sunucu hazır: ' + PORT); resumePending().catch(e => console.error('resume', e)); resumeQuiz().catch(e => console.error('resumeQuiz', e)); });
+}).listen(PORT, () => { console.log('Sunucu hazır: ' + PORT); seedAdmin().catch(e => console.error('seedAdmin', e)); resumePending().catch(e => console.error('resume', e)); resumeQuiz().catch(e => console.error('resumeQuiz', e)); });

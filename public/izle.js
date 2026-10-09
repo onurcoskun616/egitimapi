@@ -4,21 +4,22 @@
   const app = document.getElementById('app');
   const sid = (location.pathname.match(/\/izle\/([\w-]+)/) || [])[1];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-  const brand = '<div class="brand"><i></i>EĞİTİM STÜDYOSU</div>';
+  const brand = () => '<div class="brand"><a href="/#/" style="display:flex;gap:10px;align-items:center;color:inherit;text-decoration:none"><i></i>EĞİTİM STÜDYOSU</a><a href="/#/derslerim" id="mine" ' + (L && L.me ? '' : 'hidden') + ' style="margin-left:auto;font:700 13px var(--m);color:var(--lv)">Derslerim</a></div>';
   const KEY = 'ders-' + sid;
   let L, S = null, video, cps = [], stage, P = null;
 
   async function api(path, body) {
     const r = await fetch('/api/l/' + sid + path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
-    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Bağlantı sorunu, tekrar deneyin'); return j;
+    const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error(j.error || 'Bağlantı sorunu, tekrar deneyin'); e.status = r.status; e.data = j; throw e; } return j;
   }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ attempt: S.attempt, token: S.token, name: S.name, cps: cps.map(c => ({ done: c.done, result: c.result })), t: video ? video.currentTime : 0 })); } catch { } };
+  const save = () => { if (!S) return; try { localStorage.setItem(KEY, JSON.stringify({ attempt: S.attempt, token: S.token, name: S.name, cps: cps.map(c => ({ done: c.done, result: c.result })), t: video ? video.currentTime : 0 })); } catch { } };
 
   /* ---------- açılış ---------- */
   async function init() {
-    if (!sid) { app.innerHTML = brand + '<p class="err">Bağlantı hatalı.</p>'; return; }
-    try { L = await api(''); } catch (e) { app.innerHTML = brand + `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
-    document.title = L.title + ' · Etkileşimli Ders';
+    if (!sid) { app.innerHTML = brand() + '<p class="err">Bağlantı hatalı.</p>'; return; }
+    try { L = await api(''); } catch (e) { return denied(e); }
+    document.title = L.title + (L.quiz ? ' · Etkileşimli Ders' : ' · Ders');
+    if (!L.quiz) return player(0, false);
     // kontrol noktası zamanları videodaki sahne sınırlarından
     const lay = window.EVEngine.layout(L.bundle);
     const end = k => { const s = lay.scenes.find(x => x.k === k); return s ? s.e : lay.total; };
@@ -35,17 +36,24 @@
     welcome();
   }
 
+  function denied(e) {
+    const back = encodeURIComponent('/izle/' + sid), d = e.data || {};
+    const courses = (d.courses || []).map(c => `<a class="btnl" href="/#/e/${esc(c.id)}">${esc(c.title)} eğitimine git</a>`).join('');
+    if (e.status === 401) app.innerHTML = `${brand()}<h1>${esc(d.title || 'Ders')}</h1><div class="card"><p>Bu ders bir eğitimin parçası. İzlemek için giriş yapın; kayıtlı değilseniz eğitime katılım talebi gönderin.</p><div class="row"><a class="btnl pri" href="/#/giris?r=${back}">Giriş yap</a><a class="btnl" href="/#/kayit?r=${back}">Öğrenci kaydı</a>${courses}</div></div>`;
+    else if (e.status === 403) app.innerHTML = `${brand()}<h1>${esc(d.title || 'Ders')}</h1><div class="card"><p>${esc(e.message)}</p><div class="row">${courses || '<a class="btnl" href="/#/">Eğitimlere göz at</a>'}</div></div>`;
+    else app.innerHTML = brand() + `<div class="card"><p class="err">${esc(e.message)}</p><div class="row"><a class="btnl" href="/#/">Ana sayfa</a></div></div>`;
+  }
   function welcome() {
-    app.innerHTML = `${brand}<h1>${esc(L.title)}</h1>
+    app.innerHTML = `${brand()}<h1>${esc(L.title)}</h1>
       <div class="card"><b>Bu derste öğreneceklerin</b><ul class="kaz">${L.quiz.kazanimlar.map(k => `<li><b>${esc(k.id)}</b><span>${esc(k.text)}</span></li>`).join('')}</ul>
       <p class="note">Video ${cps.length} yerde duracak ve o bölümle ilgili kısa sorular soracak. Soruları cevaplamadan ileri saramazsın; yanlış yaparsan bölümü tekrar izleyebilirsin.</p></div>
-      <form class="card" id="f" style="margin-top:14px"><label for="n">Adın soyadın</label><input id="n" required minlength="2" maxlength="80" autocomplete="name">
-      <label for="c">Sınıf / numara <span style="text-transform:none;letter-spacing:0">(isteğe bağlı)</span></label><input id="c" maxlength="40" placeholder="11-B / 245">
+      <form class="card" id="f" style="margin-top:14px">${L.me ? `<p style="margin:0">Hoş geldin <b>${esc(L.me.name)}</b>. Sonuçların hesabına kaydedilecek.</p>` : `<label for="n">Adın soyadın</label><input id="n" required minlength="2" maxlength="80" autocomplete="name">
+      <label for="c">Sınıf / numara <span style="text-transform:none;letter-spacing:0">(isteğe bağlı)</span></label><input id="c" maxlength="40" placeholder="11-B / 245">`}
       <div class="row"><button class="primary" type="submit" id="go">Derse başla</button></div>
       <p class="note">Adın ve cevapların yalnızca öğretmeninin sonuçları görebilmesi için kaydedilir.</p><p class="err" id="m"></p></form>`;
     document.getElementById('f').onsubmit = async e => {
       e.preventDefault(); const b = document.getElementById('go'); b.disabled = true;
-      try { const name = document.getElementById('n').value.trim(); const r = await api('/start', { name, cls: document.getElementById('c').value }); S = { attempt: r.attempt, token: r.token, name }; save(); player(0); }
+      try { const name = L.me ? L.me.name : document.getElementById('n').value.trim(); const r = await api('/start', { name, cls: L.me ? '' : document.getElementById('c').value }); S = { attempt: r.attempt, token: r.token, name }; save(); player(0); }
       catch (err) { document.getElementById('m').textContent = err.message; b.disabled = false; }
     };
   }
@@ -61,9 +69,9 @@
   let guard = 0;
   function player(t0, resumed) {
     const pv = pickVideo();
-    app.innerHTML = `${brand}<h1 style="font-size:clamp(22px,4.5vw,32px)">${esc(L.title)}</h1>
+    app.innerHTML = `${brand()}<h1 style="font-size:clamp(22px,4.5vw,32px)">${esc(L.title)}</h1>
       <div class="stage" id="st" style="aspect-ratio:${AR[pv.f] || '9/16'}"><video id="v" playsinline preload="auto" controls controlslist="nofullscreen nodownload noplaybackrate" disablepictureinpicture src="${esc(pv.url)}"></video><button class="fsbtn" id="fs" type="button">Tam ekran</button></div>
-      <div class="cps" id="cps" aria-label="Bölüm kontrolleri"></div><p class="note" id="hint">${resumed ? 'Kaldığın yerden devam ediyorsun.' : 'Oynat düğmesine bas. Video bölüm sonlarında soru sormak için duracak.'}</p>`;
+      <div class="cps" id="cps" aria-label="Bölüm kontrolleri"></div><p class="note" id="hint">${resumed ? 'Kaldığın yerden devam ediyorsun.' : cps.length ? 'Oynat düğmesine bas. Video bölüm sonlarında soru sormak için duracak.' : 'Oynat düğmesine bas.'}</p>`;
     video = document.getElementById('v'); stage = document.getElementById('st');
     document.getElementById('fs').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => { }); };
     video.addEventListener('loadedmetadata', () => { const d = video.duration; cps.forEach(c => { c.tv = Math.min(c.t - 0.12, d - 0.2); }); if (t0) video.currentTime = Math.min(t0, nextLimit()); });
@@ -71,11 +79,11 @@
     let lastOk = 0;
     video.addEventListener('timeupdate', () => { if (video.currentTime <= nextLimit() + 0.05) lastOk = video.currentTime; });
     video.addEventListener('seeking', () => { if (video.currentTime > nextLimit() + 0.3) { video.currentTime = Math.min(lastOk, nextLimit()); flash('Önce bu bölümün sorularını cevaplamalısın.'); } });
-    video.addEventListener('ended', () => { const c = cps.find(x => !x.done); if (c) ask(c); else finish(); });
+    video.addEventListener('ended', () => { if (!L.quiz) return; const c = cps.find(x => !x.done); if (c) ask(c); else finish(); });
     drawCps();
     const loop = () => { if (!document.body.contains(video)) return; const c = cps.find(x => !x.done); if (c && c.tv != null && video.currentTime >= c.tv && !document.getElementById('ov')) { video.pause(); ask(c); } requestAnimationFrame(loop); };
     requestAnimationFrame(loop);
-    clearInterval(guard); guard = setInterval(save, 5000);
+    clearInterval(guard); if (S) guard = setInterval(save, 5000);
   }
   const nextLimit = () => { const c = cps.find(x => !x.done); return c ? (c.tv ?? c.t) : 1e9; };
   function flash(m) { const h = document.getElementById('hint'); if (h) { h.textContent = m; h.style.color = 'var(--yel)'; setTimeout(() => { h.style.color = ''; }, 2500); } }
@@ -165,7 +173,7 @@
     clearInterval(guard);
     let r; try { r = await api('/finish', { attempt: S.attempt, token: S.token }); } catch (e) { app.insertAdjacentHTML('beforeend', `<p class="err">${esc(e.message)}</p>`); return; }
     try { localStorage.removeItem(KEY); } catch { }
-    app.innerHTML = `${brand}<h1>Ders tamamlandı</h1><div class="card"><div class="big">%${r.pct}</div><p>${esc(S.name)}, ${r.total} sorudan ${r.correct} tanesini doğru cevapladın.</p>
+    app.innerHTML = `${brand()}<h1>Ders tamamlandı</h1><div class="card"><div class="big">%${r.pct}</div><p>${esc(S.name)}, ${r.total} sorudan ${r.correct} tanesini doğru cevapladın.</p>
       <ul class="res">${r.kazanimlar.map(k => `<li><span><b style="color:var(--yel)">${esc(k.id)}</b> ${esc(k.text)}</span><span class="chip" style="color:${k.learned ? 'var(--green)' : 'var(--yel)'}">${k.learned ? '✓ Öğrenildi' : '↻ Tekrar et'}</span></li>`).join('')}</ul>
       <p class="note">Sonuçların öğretmenine iletildi.</p><div class="row"><button id="again">Dersi baştan izle</button></div></div>`;
     document.getElementById('again').onclick = () => { cps.forEach(c => { c.done = false; c.result = null; c.pass++; }); player(0); };
