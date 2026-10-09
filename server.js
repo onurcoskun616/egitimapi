@@ -268,7 +268,7 @@ on('GET', '/api/projects/:id/audit', async (req, res, { id }) => {
   send(res, 200, { version: v.version, status: a ? a.status : 'none', error: a && a.error, total: a && a.total, progress, scenes, titles: v.data.scenes.map(s => ({ k: s.k, title: s.title })) });
 });
 on('POST', '/api/projects/:id/audit', async (req, res, { id }) => {
-  if (!await guard(res, id, ['visuals_review'], false)) return;
+  if (!await guard(res, id, ['visuals_review', 'delivered'], false)) return;
   const v = await latest(id, 'visuals'); await startAudit(id, v, null, null); send(res, 202, { ok: true });
 });
 on('POST', '/api/projects/:id/visuals/fix', async (req, res, { id }) => {
