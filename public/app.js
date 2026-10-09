@@ -1,7 +1,7 @@
 (() => {
   const app = document.getElementById('app');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-  const STATUS = { draft: 'Taslak', content_generating: 'İçerik hazırlanıyor', content_review: 'İçerik onayı bekliyor', visuals_generating: 'Görseller hazırlanıyor', visuals_review: 'Görsel onayı bekliyor', voicing: 'Seslendiriliyor', rendering: 'Video üretiliyor', delivered: 'Teslim edildi', failed: 'Hata', archived: 'İptal edildi' };
+  const STATUS = { queued: 'Sırada', draft: 'Taslak', content_generating: 'İçerik hazırlanıyor', content_review: 'İçerik onayı bekliyor', visuals_generating: 'Görseller hazırlanıyor', visuals_review: 'Görsel onayı bekliyor', voicing: 'Seslendiriliyor', rendering: 'Video üretiliyor', delivered: 'Teslim edildi', failed: 'Hata', archived: 'İptal edildi' };
   const STEP_OF = { content_generating: 0, content_review: 0, visuals_generating: 1, visuals_review: 1, voicing: 2, rendering: 3, delivered: 4 };
   let pollTimer = null, player = null;
 
@@ -102,6 +102,9 @@
       const gbar = gp ? `<div class="bar"><i style="width:${Math.round(gp.done / gp.total * 100)}%"></i></div>` : '';
       body = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div style="flex:1"><strong>${STATUS[p.status]}</strong><div class="note">${waitMsg[p.status]} Sayfa kendiliğinden yenilenir.</div>${gline ? `<div class="note"><b>${gline}</b></div>` : ''}${gbar}</div></div>`;
       pollTimer = setTimeout(() => route(), 4000);
+    } else if (p.status === 'queued') {
+      body = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div><strong>Sırada</strong><div class="note">Bu video bir serinin parçası. Önündeki içerikler hazırlanınca bunun içeriği de kendiliğinden hazırlanmaya başlar; lütfen bekleyiniz. Sayfa kendiliğinden yenilenir.</div></div></div>`;
+      pollTimer = setTimeout(() => route(), 8000);
     } else if (p.status === 'rendering') {
       const pr = d.job ? d.job.progress : 0;
       body = `<div class="card"><strong>Video üretiliyor</strong><p class="note">Video hazırlanıyor, lütfen bekleyiniz. 1 dakikalık video yaklaşık 4–5, 4 dakikalık video 12–15 dakika sürer; sayfayı kapatabilirsiniz.</p><div class="bar"><i style="width:${pr}%"></i></div><p class="note">%${pr} · ${d.job && d.job.status === 'queued' ? 'başlatılıyor' : 'hazırlanıyor'}</p></div>`;
@@ -665,7 +668,9 @@
         <h2 style="margin-top:22px">Dersler</h2><p class="note">Sıralamak için okları kullanın. Yalnızca teslim edilmiş videolar öğrencilere açılır.</p><div id="items" class="list"></div>
         <label for="add">Video ekle</label><div class="cp"><select id="add"></select><button type="button" id="addb">Ekle</button></div>
         <div class="btns"><button class="primary" type="submit" data-s="published">Kaydet ve yayınla</button><button type="submit" data-s="draft">Taslak olarak kaydet</button><a class="btn" href="#/e/${esc(c.id)}">Önizle</a><button type="button" class="danger" id="del">Eğitimi sil</button></div><p class="note" id="m"></p></form>
+      <div id="plan"></div>
       <h2>Öğrenci ekle</h2><form class="card" id="gf"><p class="note">Siteye kayıtlı bir öğrenciyi talep beklemeden bu eğitime ekleyin.</p><div class="cp"><input id="ge" type="email" required placeholder="ogrenci@ornek.com"><button type="submit">Ekle</button></div><p class="note" id="gm"></p></form>`;
+    if (c.plan && Array.isArray(c.plan.weeks)) drawPlan(c, pm);
     document.getElementById('ca').value = c.access; document.getElementById('cv').value = c.visibility;
     const pw = () => { document.getElementById('pw2').hidden = document.getElementById('ca').value !== 'paid'; }; document.getElementById('ca').onchange = pw; pw();
     const drawItems = () => {
@@ -802,6 +807,39 @@
       const rows = [['Video', 'Öğretmen', 'Durum', 'Süre (sn)', 'Claude TL', 'Ses TL', 'Actions TL', 'Toplam TL', 'Dakika başı TL', 'Token', 'Karakter', 'Düzeltme']].concat(d.projects.map(x => [x.title, un[x.owner_id || '-'] || '', STATUS[x.status] || x.status, x.seconds, (x.usd.claude * C.usd_try).toFixed(2), (x.usd.eleven * C.usd_try).toFixed(2), (x.usd.actions * C.usd_try).toFixed(2), x.try_total.toFixed(2), x.try_per_min == null ? '' : x.try_per_min.toFixed(2), x.tokens, x.chars, x.revisions]));
       const csv = '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = `maliyet-${per}.csv`; a.click();
+    };
+  }
+
+  /* ---------- yıllık plan (seri) ---------- */
+  const TONE_L = { akademik: 'Akademik ve resmi', samimi: 'Sıcak ve samimi', akran: 'Akran anlatımı', usta: 'Usta-çırak', hikaye: 'Hikâye', merak: 'Soru-cevap', belgesel: 'Belgesel', sinav: 'Sınav odaklı' };
+  const FMT_L = { yatay: 'Yatay 16:9', dikey: 'Dikey 9:16', kare: 'Kare 1:1', dikey45: 'Dikey 4:5' };
+  function drawPlan(c, pm) {
+    const P = c.plan, el = document.getElementById('plan'), D = P.defaults || {};
+    const units = Object.fromEntries((P.units || []).map(u => [u.n, u]));
+    const made = P.weeks.filter(w => w.project_id).length, ready = P.weeks.filter(w => w.project_id && pm[w.project_id] && pm[w.project_id].status === 'delivered').length;
+    let lastU = null;
+    const rows = P.weeks.map(w => {
+      const p = w.project_id && pm[w.project_id];
+      const head = w.unit !== lastU ? `<tr class="urow"><td colspan="5"><b>${w.unit}. Öğrenme birimi · ${esc((units[w.unit] || {}).title || '')}</b> <span class="note">· ${(units[w.unit] || {}).hours || ''} ders saati · ${esc((units[w.unit] || {}).outcome || '')}</span></td></tr>` : ''; lastU = w.unit;
+      const st = !w.project_id ? `<label class="chk"><input type="checkbox" data-w="${w.week}"> Üret</label>` : p ? `<a href="#/p/${esc(w.project_id)}"><span class="pill st-${esc(p.status)}">${esc(STATUS[p.status] || p.status)}</span></a>` : '<span class="note">oluşturuldu</span>';
+      return head + `<tr><td><b>${w.week}</b></td><td style="white-space:normal;min-width:220px"><b>${esc(w.title)}</b>${w.unit_end ? ' <span class="pill" style="color:var(--yel)">Değerlendirme</span>' : ''}<details><summary class="note">İçerik ve uygulama</summary><p class="note" style="white-space:normal">${esc(w.content)}</p><p class="note" style="white-space:normal"><b>Uygulama:</b> ${esc(w.uygulama || '')}</p></details></td><td style="white-space:normal;min-width:220px"><ul class="kzl">${(w.kazanimlar || []).map(k => `<li>${esc(k)}</li>`).join('')}</ul></td><td style="white-space:normal;min-width:200px" class="note">${esc(w.olcme || '')}</td><td>${st}</td></tr>`;
+    }).join('');
+    el.innerHTML = `<h2>Yıllık plan <span class="muted" style="font-size:14px">· ${P.weeks.length} hafta · ${made} video oluşturuldu · ${ready} teslim edildi</span></h2>
+      <div class="card"><p class="note" style="margin-top:0">Her hafta: bir anlatımlı video + video içinde bölüm sonu soruları (kazanım takibi, sonuçlar “Sonuçlar” sayfasında) + atölye uygulaması ve rubrik. Videolar ${esc(FMT_L[D.format] || D.format || '')}, ${esc(TONE_L[D.tone] || D.tone || '')} anlatımla, yaklaşık ${Math.round((D.target_seconds || 180) / 60 * 10) / 10} dakika.</p>
+      <div class="btns" style="margin-top:0"><button class="primary" id="prod">Seçili haftaların videolarını üret</button><button id="selnext">Sıradaki 5 haftayı seç</button><button id="prt">Planı yazdır / PDF</button></div><p class="note" id="pm"></p></div>
+      <div class="card" style="overflow:auto;margin-top:12px" id="plantbl"><table class="tbl plan"><thead><tr><th>Hafta</th><th>Konu</th><th>Kazanımlar</th><th>Ölçme ve değerlendirme</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    document.getElementById('selnext').onclick = () => { let n = 0; el.querySelectorAll('[data-w]').forEach(x => { x.checked = n < 5; if (n < 5) n++; }); };
+    document.getElementById('prt').onclick = () => {
+      const w = window.open('', '_blank'); if (!w) return;
+      w.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${esc(P.title)} · Yıllık plan</title><style>body{font:12px/1.4 Arial,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin:0 0 4px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:5px;vertical-align:top;text-align:left}th{background:#eee}.urow td{background:#f6f6f6}ul{margin:0;padding-left:16px}details,summary,label{display:none}.pill{font-weight:bold}</style></head><body><h1>${esc(P.title)} · Yıllık plan</h1><p>${esc(P.subject || '')} · ${esc(P.level || '')} · Haftalık 2 ders saati · ${P.weeks.length} hafta</p><p>${esc(P.description || '')}</p>${document.getElementById('plantbl').innerHTML.replace(/<details>[\s\S]*?<\/details>/g, '')}</body></html>`);
+      w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+    };
+    document.getElementById('prod').onclick = async e => {
+      const weeks = [...el.querySelectorAll('[data-w]:checked')].map(x => +x.dataset.w), m = document.getElementById('pm');
+      if (!weeks.length) { m.textContent = 'Önce üretilecek haftaları işaretleyin.'; return; }
+      if (!confirm(`${weeks.length} haftanın videosu sıraya alınsın mı? İçerikler sırayla hazırlanır, her biri onayınıza gelir.`)) return;
+      e.target.disabled = true;
+      try { const r = await api(`/api/my/courses/${c.id}/produce`, { method: 'POST', body: { weeks } }); alert(r.message); route(); } catch (err) { m.textContent = err.message; e.target.disabled = false; }
     };
   }
   function alertBox(m) { const el = document.createElement('div'); el.className = 'card err'; el.style.marginTop = '12px'; el.textContent = m; app.appendChild(el); }

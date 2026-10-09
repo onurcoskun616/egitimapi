@@ -291,6 +291,7 @@ async function monthUsage(userId) {
 
 require('./lib/market')({ on, db, q, send, readBody, isAdmin, activeLimits, auth, shortId: () => shortId(), now });
 require('./lib/finance')({ on, db, q, send, readBody });
+require('./lib/series')({ on, db, q, send, readBody, isAdmin, activeLimits, monthUsage, background, FORMATS, TONES, now });
 /* ---------- hesaplar ---------- */
 on('POST', '/api/auth/register', async (req, res) => {
   const b = await readBody(req, 8000); const ip = ipOf(req); if (auth.tooMany(ip)) return send(res, 429, { error: 'Çok fazla deneme, biraz sonra tekrar deneyin' });

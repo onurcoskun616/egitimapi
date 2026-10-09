@@ -125,3 +125,5 @@ label.chk{display:flex;gap:8px;align-items:center;text-transform:none;letter-spa
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}.plan b{font:800 18px var(--display)}.plan .price{font:900 24px var(--display);color:var(--yel);margin:6px 0}.plan ul{padding-left:18px;margin:8px 0 14px;font-size:13px}.plan.cur{border-color:var(--green)}
 .mcourse{margin-bottom:14px}
 @media (max-width:640px){.top{gap:8px}.tbar{margin-left:0;width:100%}}
+
+.tbl.plan td{vertical-align:top}.tbl.plan .urow td{background:rgba(255,201,60,.06);padding-top:14px}.kzl{margin:0;padding-left:16px;font-size:12px}.st-queued{color:var(--muted)}
