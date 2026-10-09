@@ -93,3 +93,5 @@ a.btn.primary{background:var(--yel);color:#111}
 .lcode{font:800 15px var(--mono);margin:6px 0 12px}.lcode b{font:900 26px var(--mono);letter-spacing:.18em;color:var(--yel);margin-left:6px}
 
 tr.clk{cursor:pointer}tr.clk:hover td{background:rgba(63,176,255,.06)}
+
+.thprev{width:100%;max-height:340px;object-fit:contain;background:#000;border-radius:10px;margin-top:10px;display:block}
