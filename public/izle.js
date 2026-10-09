@@ -104,7 +104,7 @@
       render[x.type](x, body, submit);
     };
     const result = () => {
-      const n = c.questions.length, pass = okCount >= Math.ceil(n * 0.67);
+      const n = c.questions.length, pass = okCount / n >= 0.66;
       c.result = pass ? 'ok' : 'bad';
       ov.innerHTML = `<div class="q"><div class="qh"><span>Bölüm kontrolü · ${esc(c.title || '')}</span></div><div class="big">${okCount}/${n}</div>
         <p class="qt">${pass ? 'Harika, bu bölümü anlamışsın!' : 'Bu bölümü bir kez daha izlemeni öneririm.'}</p>

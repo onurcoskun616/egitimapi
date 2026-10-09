@@ -383,8 +383,8 @@ on('POST', '/api/l/:sid/answer', async (req, res, { sid }) => {
   const b = await readBody(req, 8000); const A = await attemptAuth(sid, b); if (!A) return send(res, 403, { error: 'Oturum geçersiz' });
   const x = A.v.data.checkpoints[+b.cp] && A.v.data.checkpoints[+b.cp].questions[+b.qi]; if (!x) return send(res, 400, { error: 'Soru yok' });
   const correct = quiz.check(x, b.response);
-  const answers = (A.a.answers || []).concat([{ cp: +b.cp, qi: +b.qi, pass: +b.pass || 1, response: b.response, correct, at: now() }]).slice(-400);
-  await db.update('lesson_attempts', `id=eq.${q(A.a.id)}`, { answers });
+  if ((A.a.answers || []).length >= 400) return send(res, 429, { error: 'Çok fazla deneme' });
+  await db.rpc('append_answer', { p_id: A.a.id, p_answer: { cp: +b.cp, qi: +b.qi, pass: +b.pass || 1, response: JSON.parse(JSON.stringify(b.response ?? null)), correct, at: now() } });
   send(res, 200, { correct, explain: x.explain, correct_text: quiz.correctText(x), answer: (x.type === 'mcq' || x.type === 'image') ? x.answer : undefined });
 }, true);
 on('POST', '/api/l/:sid/finish', async (req, res, { sid }) => {
