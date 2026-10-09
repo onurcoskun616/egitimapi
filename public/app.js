@@ -8,7 +8,7 @@
   async function api(path, opts = {}) {
     const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
     const j = await r.json().catch(() => ({}));
-    if (r.status === 401 && !path.endsWith('/login')) { location.hash = '#/login'; throw new Error('Giriş gerekli'); }
+    if (r.status === 401 && !path.endsWith('/login')) { location.hash = '#/ogretmen'; throw new Error('Giriş gerekli'); }
     if (!r.ok) throw new Error(j.error || 'İstek başarısız');
     return j;
   }
@@ -48,9 +48,37 @@
   }
 
   /* ---------- giriş ---------- */
-  function viewLogin() {
-    app.innerHTML = `<h1>Giriş</h1><form class="card" id="f" style="max-width:420px"><label for="pw">Şifre</label><input id="pw" type="password" autocomplete="current-password" required><div class="btns"><button class="primary" type="submit">Giriş yap</button></div><p class="note" id="msg"></p></form>`;
-    document.getElementById('f').onsubmit = async e => { e.preventDefault(); try { await api('/api/login', { method: 'POST', body: { password: document.getElementById('pw').value } }); location.hash = '#/'; } catch (err) { document.getElementById('msg').textContent = err.message; } };
+  // Ana sayfa: öğrenci ve öğretmen girişleri en baştan ayrı
+  function viewHome() {
+    setSub('Öğrenci ve öğretmen girişi');
+    app.innerHTML = `<section class="home"><h1 class="home-h">Eğitim Stüdyosu</h1><p class="muted home-p">Meslek eğitimi için anlatımlı, etkileşimli ders videoları.</p>
+      <div class="home-grid">
+        <form class="card role student" id="sf"><div class="role-ic" aria-hidden="true">▶</div><h2>Öğrenci girişi</h2>
+          <p class="note">Öğretmeninin verdiği ders kodunu yaz ya da QR kodu okut. Ders videosu bölüm aralarında durup sana soru soracak.</p>
+          <label for="code">Ders kodu</label><input id="code" required maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Örn. K7M2PX">
+          <div class="btns"><button class="primary" type="submit" id="sgo">Derse gir</button></div><p class="note err-t" id="smsg"></p></form>
+        <form class="card role teacher" id="tf"><div class="role-ic" aria-hidden="true">✎</div><h2>Öğretmen girişi</h2>
+          <p class="note">Konu yazın, içeriği ve görselleri onaylayın, seslendirilmiş videoyu ve etkileşimli dersi alın; öğrenci sonuçlarını izleyin.</p>
+          <label for="pw">Öğretmen şifresi</label><input id="pw" type="password" autocomplete="current-password" required>
+          <div class="btns"><button class="primary" type="submit" id="tgo">Giriş yap</button></div><p class="note err-t" id="tmsg"></p></form>
+      </div></section>`;
+    document.getElementById('sf').onsubmit = async e => {
+      e.preventDefault(); const b = document.getElementById('sgo'), m = document.getElementById('smsg'); const code = document.getElementById('code').value.trim().replace(/\s+/g, '');
+      b.disabled = true; m.textContent = '';
+      try { const r = await fetch('/api/l/' + encodeURIComponent(code) + '/check'); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Ders bulunamadı'); location.href = '/izle/' + encodeURIComponent(j.code); }
+      catch (err) { m.textContent = err.message === 'Ders bulunamadı ya da yayında değil' ? 'Bu kodla yayında bir ders bulunamadı. Kodu kontrol edin.' : err.message; b.disabled = false; }
+    };
+    document.getElementById('tf').onsubmit = async e => {
+      e.preventDefault(); const b = document.getElementById('tgo'); b.disabled = true;
+      try { await api('/api/login', { method: 'POST', body: { password: document.getElementById('pw').value } }); location.hash = '#/projeler'; }
+      catch (err) { document.getElementById('tmsg').textContent = err.message; b.disabled = false; }
+    };
+  }
+  function setSub(t) { const el = document.querySelector('.top .sub'); if (el) el.textContent = t; }
+  function teacherBar(on) {
+    let el = document.getElementById('tbar');
+    if (!on) { if (el) el.remove(); return; }
+    if (!el) { document.querySelector('.top').insertAdjacentHTML('beforeend', '<span id="tbar" class="tbar">Öğretmen · <a href="#/projeler">Projeler</a> · <button type="button" id="logout" class="linkbtn">Çıkış</button></span>'); document.getElementById('logout').onclick = async () => { await api('/api/logout', { method: 'POST' }).catch(() => {}); teacherBar(false); location.hash = '#/'; }; }
   }
 
   /* ---------- liste ---------- */
@@ -150,7 +178,7 @@
     if (!Q && p.quiz_status !== 'generating') html += `<div class="card"><p>Bu video için henüz soru hazırlanmadı.</p><div class="btns"><button class="primary" data-q="gen">Soruları hazırla</button></div></div>`;
     if (Q) {
       const link = p.share_id ? `${location.origin}/izle/${p.share_id}` : '';
-      html += `<div class="card"><strong>Paylaşım</strong>${p.quiz_published && link ? `<p class="note">Öğrenciler bu bağlantıdan dersi açar; şifre gerekmez.</p><div class="grid two" style="align-items:center"><div><input readonly value="${esc(link)}" id="lnk" onclick="this.select()"><div class="btns"><button data-q="copy">Bağlantıyı kopyala</button><a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Öğrenci gözüyle aç</a><button class="danger" data-q="unpub">Yayından kaldır</button></div></div><div id="qr" style="background:#fff;padding:10px;border-radius:12px;width:max-content"></div></div>` : `<p class="note">Soruları inceleyin; hazır olduğunda yayınlayıp bağlantıyı ya da QR kodu öğrencilerle paylaşın.</p><div class="btns"><button class="primary" data-q="pub">Yayınla ve bağlantı oluştur</button></div>`}</div>`;
+      html += `<div class="card"><strong>Paylaşım</strong>${p.quiz_published && link ? `<p class="note">Öğrenciler ana sayfadaki <b>Öğrenci girişi</b>ne bu kodu yazar, ya da bağlantıyı / QR kodu açar. Şifre gerekmez.</p><div class="lcode">Ders kodu: <b>${esc(p.share_id)}</b></div><div class="grid two" style="align-items:center"><div><input readonly value="${esc(link)}" id="lnk" onclick="this.select()"><div class="btns"><button data-q="copy">Bağlantıyı kopyala</button><a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Öğrenci gözüyle aç</a><button class="danger" data-q="unpub">Yayından kaldır</button></div></div><div id="qr" style="background:#fff;padding:10px;border-radius:12px;width:max-content"></div></div>` : `<p class="note">Soruları inceleyin; hazır olduğunda yayınlayıp bağlantıyı ya da QR kodu öğrencilerle paylaşın.</p><div class="btns"><button class="primary" data-q="pub">Yayınla ve bağlantı oluştur</button></div>`}</div>`;
       html += `<h2>Kazanımlar</h2><div class="card"><ul class="kz">${Q.kazanimlar.map(k => `<li><b>${esc(k.id)}</b> ${esc(k.text)}</li>`).join('')}</ul></div>`;
       html += `<h2>Bölüm sonu soruları <span class="muted" style="font-size:14px">· sürüm ${d.version}</span></h2>`;
       html += Q.checkpoints.map((c, ci) => `<div class="card" style="margin-bottom:12px"><strong>${ci + 1}. durak · ${esc(c.title || '')}</strong> <span class="muted">(${esc(c.after_k)}. sahneden sonra)</span>${c.questions.map((x, qi) => qCard(x, ci, qi)).join('')}</div>`).join('');
@@ -309,9 +337,11 @@
   async function route() {
     stop();
     const h = location.hash || '#/';
-    if (h === '#/login') return viewLogin();
     const me = await api('/api/me').catch(() => ({ ok: false }));
-    if (!me.ok) { location.hash = '#/login'; return viewLogin(); }
+    teacherBar(me.ok);
+    if (h === '#/' || h === '#' || h === '#/ogretmen' || h === '#/login') { if (me.ok && h !== '#/') { location.hash = '#/projeler'; return; } if (me.ok) return viewList(); return viewHome(); }
+    if (!me.ok) { location.hash = '#/'; return; }
+    setSub('Konu yaz · onayla · video al');
     const m = h.match(/^#\/p\/([\w-]+)(\/ders)?/);
     return m ? (m[2] ? viewLesson(m[1]) : viewProject(m[1])) : viewList();
   }

@@ -217,7 +217,9 @@ async function runQuiz(id, feedback) {
   await db.insert('versions', { project_id: id, stage: 'quiz', version: await nextVersion(id, 'quiz'), data, feedback: feedback || null });
   await db.update('projects', `id=eq.${q(id)}`, { quiz_status: 'ready', quiz_feedback: null });
 }
-const shortId = () => crypto.randomBytes(6).toString('base64url').replace(/[-_]/g, 'x').slice(0, 8);
+// Öğrencinin elle yazacağı ders kodu: 6 karakter, karışmayan harf/rakamlar (0/O, 1/I yok)
+const CODE_ABC = 'ABCDEFGHJKLMNPRSTUVYZ23456789';
+const shortId = () => Array.from(crypto.randomBytes(6), b => CODE_ABC[b % CODE_ABC.length]).join('');
 
 async function bundleFor(id, withAudio, format, versionId) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
@@ -242,6 +244,7 @@ on('POST', '/api/login', async (req, res) => {
   send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${SESSION()}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${publicBase().startsWith('https') ? '; Secure' : ''}` });
 }, true);
 on('GET', '/api/me', async (req, res) => send(res, 200, { ok: authed(req) }), true);
+on('POST', '/api/logout', async (req, res) => send(res, 200, { ok: true }, { 'Set-Cookie': `sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${publicBase().startsWith('https') ? '; Secure' : ''}` }), true);
 on('GET', '/api/tones', async (req, res) => send(res, 200, Object.entries(TONES).map(([k, [label, desc]]) => ({ k, label, desc }))));
 
 on('GET', '/api/projects', async (req, res) => send(res, 200, await db.select('projects', 'select=id,title,status,updated_at,target_seconds&status=neq.archived&order=updated_at.desc')));
@@ -352,9 +355,15 @@ on('POST', '/api/projects/:id/quiz/publish', async (req, res, { id }) => {
 
 /* ---------- öğrenci (herkese açık) ders uç noktaları ---------- */
 async function lessonBy(sid) {
-  const p = await db.one('projects', `share_id=eq.${q(sid)}&quiz_published=is.true&select=id,title,format,status`);
+  sid = String(sid || '').trim(); if (!sid || sid.length > 20) return null;
+  let p = await db.one('projects', `share_id=eq.${q(sid)}&quiz_published=is.true&select=id,title,format,status,share_id`);
+  if (!p && sid !== sid.toUpperCase()) p = await db.one('projects', `share_id=eq.${q(sid.toUpperCase())}&quiz_published=is.true&select=id,title,format,status,share_id`);
   if (!p) return null; const v = await latest(p.id, 'quiz'); return v ? { p, v } : null;
 }
+on('GET', '/api/l/:sid/check', async (req, res, { sid }) => {
+  const L = await lessonBy(sid); if (!L) return send(res, 404, { error: 'Ders bulunamadı ya da yayında değil' });
+  send(res, 200, { code: L.p.share_id, title: L.p.title });
+}, true);
 on('GET', '/api/l/:sid', async (req, res, { sid }) => {
   const L = await lessonBy(sid); if (!L) return send(res, 404, { error: 'Ders bulunamadı ya da yayında değil' });
   const { p, v } = L;

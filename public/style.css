@@ -80,3 +80,14 @@ button:disabled{opacity:.5;cursor:wait}
 .kz{list-style:none;padding:0;margin:6px 0}.kz li{padding:8px 0;border-top:1px solid var(--line)}.kz b{color:var(--yel);margin-right:6px}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}.tbl th,.tbl td{padding:8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.tbl th{color:var(--muted)}
 a.btn.primary{background:var(--yel);color:#111}
+
+.home{max-width:980px;margin:0 auto}.home-h{font-size:clamp(34px,6vw,56px);margin:10px 0 6px}.home-p{margin:0 0 22px}
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media (max-width:760px){.home-grid{grid-template-columns:1fr}}
+.role{position:relative;padding:24px}.role h2{margin:6px 0 8px}.role-ic{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font:900 22px var(--display,inherit);color:#111}
+.role.student{border-color:rgba(63,176,255,.45)}.role.student .role-ic{background:var(--lv)}
+.role.teacher{border-color:rgba(255,201,60,.45)}.role.teacher .role-ic{background:var(--yel)}
+#code{font-size:22px;letter-spacing:.2em;text-transform:uppercase}#code::placeholder{text-transform:none;letter-spacing:.04em;font-size:16px}
+.err-t{color:#ffb3b3}
+.tbar{margin-left:auto;font:700 13px var(--mono);color:var(--muted);display:flex;gap:8px;align-items:center}.linkbtn{background:none;border:0;padding:0;color:var(--lv);font:700 13px var(--mono);cursor:pointer;text-decoration:underline}
+
+.lcode{font:800 15px var(--mono);margin:6px 0 12px}.lcode b{font:900 26px var(--mono);letter-spacing:.18em;color:var(--yel);margin-left:6px}
