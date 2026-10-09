@@ -78,7 +78,7 @@
   function teacherBar(on) {
     let el = document.getElementById('tbar');
     if (!on) { if (el) el.remove(); return; }
-    if (!el) { document.querySelector('.top').insertAdjacentHTML('beforeend', '<span id="tbar" class="tbar">Öğretmen · <a href="#/projeler">Projeler</a> · <button type="button" id="logout" class="linkbtn">Çıkış</button></span>'); document.getElementById('logout').onclick = async () => { await api('/api/logout', { method: 'POST' }).catch(() => {}); teacherBar(false); location.hash = '#/'; }; }
+    if (!el) { document.querySelector('.top').insertAdjacentHTML('beforeend', '<span id="tbar" class="tbar">Öğretmen · <a href="#/projeler">Projeler</a> · <a href="#/sonuclar">Dersler ve sonuçlar</a> · <button type="button" id="logout" class="linkbtn">Çıkış</button></span>'); document.getElementById('logout').onclick = async () => { await api('/api/logout', { method: 'POST' }).catch(() => {}); teacherBar(false); location.hash = '#/'; }; }
   }
 
   /* ---------- liste ---------- */
@@ -165,6 +165,14 @@
       <div class="btns"><button data-act="visuals-revise">Yeniden çiz</button></div></div>
       <div class="btns"><button class="primary" data-act="visuals-approve">Onayla: seslendir ve videoyu üret</button><button class="danger" data-act="cancel">İptal</button></div></div></div>
       <div id="audit" class="audit"></div>`;
+  }
+
+  /* ---------- tüm dersler ve sonuçlar ---------- */
+  async function viewLessons() {
+    let list; try { list = await api('/api/lessons'); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
+    app.innerHTML = `<h1>Dersler ve sonuçlar</h1><p class="muted">Etkileşimli dersi olan videolar. Satıra tıklayınca soruları, ders kodunu, öğrenci tablosunu ve CSV indirme düğmesini görürsünüz.</p>
+      ${list.length ? `<div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Ders</th><th>Kod</th><th>Durum</th><th>Başlayan</th><th>Tamamlayan</th><th>Ortalama</th></tr></thead><tbody>${list.map(p => `<tr class="clk" data-href="#/p/${esc(p.id)}/ders"><td><a href="#/p/${esc(p.id)}/ders">${esc(p.title)}</a></td><td><b style="letter-spacing:.12em">${esc(p.share_id || '—')}</b></td><td>${p.quiz_published ? '<span style="color:var(--green)">Yayında</span>' : p.quiz_status === 'generating' ? 'Sorular hazırlanıyor' : p.quiz_status === 'failed' ? '<span style="color:var(--red)">Hata</span>' : 'Yayında değil'}</td><td>${p.started}</td><td>${p.finished}</td><td>${p.avg == null ? '—' : '%' + p.avg}</td></tr>`).join('')}</tbody></table></div>` : '<div class="card"><p class="muted">Henüz etkileşimli ders yok. Teslim edilmiş bir videonun sayfasında “Soruları ve sonuçları aç” ile başlayabilirsiniz.</p></div>'}`;
+    app.querySelectorAll('tr.clk').forEach(r => r.onclick = e => { if (e.target.tagName !== 'A') location.hash = r.dataset.href; });
   }
 
   /* ---------- etkileşimli ders (öğretmen) ---------- */
@@ -342,6 +350,7 @@
     if (h === '#/' || h === '#' || h === '#/ogretmen' || h === '#/login') { if (me.ok && h !== '#/') { location.hash = '#/projeler'; return; } if (me.ok) return viewList(); return viewHome(); }
     if (!me.ok) { location.hash = '#/'; return; }
     setSub('Konu yaz · onayla · video al');
+    if (h === '#/sonuclar') return viewLessons();
     const m = h.match(/^#\/p\/([\w-]+)(\/ders)?/);
     return m ? (m[2] ? viewLesson(m[1]) : viewProject(m[1])) : viewList();
   }

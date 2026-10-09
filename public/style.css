@@ -91,3 +91,5 @@ a.btn.primary{background:var(--yel);color:#111}
 .tbar{margin-left:auto;font:700 13px var(--mono);color:var(--muted);display:flex;gap:8px;align-items:center}.linkbtn{background:none;border:0;padding:0;color:var(--lv);font:700 13px var(--mono);cursor:pointer;text-decoration:underline}
 
 .lcode{font:800 15px var(--mono);margin:6px 0 12px}.lcode b{font:900 26px var(--mono);letter-spacing:.18em;color:var(--yel);margin-left:6px}
+
+tr.clk{cursor:pointer}tr.clk:hover td{background:rgba(63,176,255,.06)}

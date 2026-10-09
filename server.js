@@ -403,6 +403,11 @@ on('POST', '/api/l/:sid/finish', async (req, res, { sid }) => {
   send(res, 200, summary);
 }, true);
 
+on('GET', '/api/lessons', async (req, res) => {
+  const ps = await db.select('projects', 'select=id,title,share_id,quiz_status,quiz_published,updated_at&quiz_status=not.is.null&status=neq.archived&order=updated_at.desc');
+  const at = ps.length ? await db.select('lesson_attempts', `project_id=in.(${ps.map(p => p.id).join(',')})&select=project_id,finished_at,summary&limit=5000`) : [];
+  send(res, 200, ps.map(p => { const mine = at.filter(a => a.project_id === p.id), fin = mine.filter(a => a.summary); return { ...p, started: mine.length, finished: fin.length, avg: fin.length ? Math.round(fin.reduce((n, a) => n + (a.summary.pct || 0), 0) / fin.length) : null }; }));
+});
 on('GET', '/api/formats', async (req, res) => send(res, 200, FORMATS));
 on('POST', '/api/projects/:id/cancel', async (req, res, { id }) => { await setStatus(id, 'archived'); send(res, 200, { ok: true }); });
 on('POST', '/api/projects/:id/reopen', async (req, res, { id }) => { if (!await guard(res, id, ['delivered'], false)) return; await setStatus(id, 'visuals_review'); send(res, 200, { ok: true }); });
