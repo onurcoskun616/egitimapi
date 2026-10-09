@@ -15,6 +15,38 @@
   function stop() { clearTimeout(pollTimer); pollTimer = null; if (player) { player.stop(); player = null; } }
   const busy = (btn, on) => { if (btn) { btn.disabled = on; } };
 
+  /* ---------- kaynak dosyaları (tarayıcıda metne çevrilir) ---------- */
+  const loadScript = src => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('Kütüphane yüklenemedi')); document.head.appendChild(s); });
+  async function extractFile(f) {
+    const name = f.name.replace(/\.[^.]+$/, '').slice(0, 100), ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (ext === 'pdf') {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const doc = await window.pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise; const pages = [];
+      for (let i = 1; i <= Math.min(doc.numPages, 800); i++) { const tc = await (await doc.getPage(i)).getTextContent(); let t = '', lastY = null; for (const it of tc.items) { if (lastY !== null && Math.abs(it.transform[5] - lastY) > 4) t += '\n'; t += it.str + (it.hasEOL ? '\n' : ''); lastY = it.transform[5]; } pages.push(t.replace(/[ \t]+/g, ' ').trim()); }
+      return { name, pages };
+    }
+    if (ext === 'docx') {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+      const r = await window.mammoth.extractRawText({ arrayBuffer: await f.arrayBuffer() }); return { name, pages: chunk(r.value) };
+    }
+    if (['txt', 'md', 'csv'].includes(ext)) return { name, pages: chunk(await f.text()) };
+    throw new Error(`${f.name}: desteklenmeyen dosya türü (PDF, DOCX, TXT yükleyin)`);
+  }
+  // Sayfası olmayan metinleri ~3000 karakterlik "sayfalara" böl
+  function chunk(t) { const out = []; let cur = ''; for (const para of String(t).split(/\n\s*\n/)) { if ((cur + para).length > 3000 && cur) { out.push(cur.trim()); cur = ''; } cur += para + '\n\n'; } if (cur.trim()) out.push(cur.trim()); return out; }
+  async function extractAll(files, msgEl) {
+    const out = [];
+    for (const f of files) {
+      if (msgEl) msgEl.textContent = `${f.name} okunuyor…`;
+      const s = await extractFile(f); const chars = s.pages.reduce((n, p) => n + p.length, 0);
+      if (chars < 200) throw new Error(`${f.name}: metin bulunamadı. Taranmış (fotoğraf) PDF olabilir; metin seçilebilen bir PDF yükleyin.`);
+      out.push(s);
+    }
+    if (msgEl) msgEl.textContent = '';
+    return out;
+  }
+
   /* ---------- giriş ---------- */
   function viewLogin() {
     app.innerHTML = `<h1>Giriş</h1><form class="card" id="f" style="max-width:420px"><label for="pw">Şifre</label><input id="pw" type="password" autocomplete="current-password" required><div class="btns"><button class="primary" type="submit">Giriş yap</button></div><p class="note" id="msg"></p></form>`;
@@ -29,6 +61,8 @@
         <label for="b">Ne anlatılsın?</label><textarea id="b" required placeholder="Parçaların görevleri, sık arızalar, belirtiler ve çözümler…"></textarea>
         <div class="grid two"><div><label for="a">Hedef kitle</label><input id="a" placeholder="Meslek lisesi 11. sınıf"></div>
         <div><label for="d">Süre</label><select id="d"><option value="60">60 saniye</option><option value="90" selected>90 saniye</option><option value="150">2,5 dakika</option><option value="240">4 dakika</option></select></div></div>
+        <label for="src">Kaynak dosyalar <span class="muted">(isteğe bağlı: MEB modülü, ders kitabı, katalog — PDF, DOCX, TXT)</span></label><input id="src" type="file" multiple accept=".pdf,.docx,.txt,.md">
+        <p class="note">Kaynak yüklerseniz içerik bu kaynağa dayanarak yazılır; terimler, değerler ve bağlantılar kaynakla uyumlu olur ve her sahnede kaynak sayfası gösterilir.</p>
         <label for="fm">Video biçimi</label><select id="fm"><option value="dikey">Dikey 9:16 · Instagram Reels, TikTok, YouTube Shorts</option><option value="yatay">Yatay 16:9 · YouTube, sunum, akıllı tahta</option><option value="kare">Kare 1:1 · Instagram ve Facebook gönderisi</option><option value="dikey45">Dikey 4:5 · Instagram ve Facebook akışı</option></select>
         <label for="tn">Anlatım dili</label><select id="tn" required><option value="">Seçin…</option></select>
         <p class="note" id="tnd">İçeriğin hangi üslupla anlatılacağını seçin.</p>
@@ -37,8 +71,11 @@
       </form>
       <h2>Projeler</h2><div class="list" id="list"><div class="empty">Yükleniyor…</div></div>`;
     document.getElementById('nf').onsubmit = async e => {
-      e.preventDefault(); const btn = document.getElementById('go'); busy(btn, true);
-      try { const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value, tone: tn.value, tone_note: tno.value, format: document.getElementById('fm').value } }); location.hash = '#/p/' + p.id; }
+      e.preventDefault(); const btn = document.getElementById('go'); busy(btn, true); const msg = document.getElementById('msg');
+      try {
+        const files = [...(document.getElementById('src').files || [])];
+        const sources = files.length ? await extractAll(files, msg) : [];
+        const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value, tone: tn.value, tone_note: tno.value, format: document.getElementById('fm').value, sources } }); location.hash = '#/p/' + p.id; }
       catch (err) { document.getElementById('msg').textContent = err.message; busy(btn, false); }
     };
     const t = document.getElementById('t'), b = document.getElementById('b'), a = document.getElementById('a'), d = document.getElementById('d');
@@ -82,10 +119,13 @@
 
   function contentReview(d) {
     const sc = d.content.data.scenes; const chars = sc.reduce((n, s) => n + s.cap.join(' ').length, 0);
-    return `<p class="muted">Sürüm ${d.content.version} · ${sc.length} sahne · tahmini ${Math.round(chars / 14.5)} saniye</p>
-      <div class="grid">${sc.map(s => `<div class="scene"><h3><small>${esc(s.k)} · ${esc(s.ch)}</small>${esc(s.title)}${s.tag ? ` <span class="pill" style="color:var(--red)">${esc(s.tag.text)}</span>` : ''}</h3><ol>${s.cap.map(x => `<li>${esc(x)}</li>`).join('')}</ol>${s.big ? `<div class="big">${esc(s.big.text)}</div>` : ''}<div class="vis">Görsel: ${esc(s.visual && s.visual.subject)}</div></div>`).join('')}</div>
+    const srcs = d.sources || [];
+    const srcLine = s => (s.src && s.src.length) ? `<div class="vis">Kaynak: ${s.src.map(r => `${esc(r.doc)} s.${esc(r.p)}`).join(', ')}</div>` : (srcs.length ? `<div class="vis" style="color:var(--yel)">Kaynakta karşılığı yok (genel bilgi)</div>` : '');
+    return `<p class="muted">Sürüm ${d.content.version} · ${sc.length} sahne · tahmini ${Math.round(chars / 14.5)} saniye${srcs.length ? ` · Kaynak: ${srcs.map(x => esc(x.name)).join(', ')}` : ''}</p>
+      <div class="grid">${sc.map(s => `<div class="scene"><h3><small>${esc(s.k)} · ${esc(s.ch)}</small>${esc(s.title)}${s.tag ? ` <span class="pill" style="color:var(--red)">${esc(s.tag.text)}</span>` : ''}</h3><ol>${s.cap.map(x => `<li>${esc(x)}</li>`).join('')}</ol>${s.big ? `<div class="big">${esc(s.big.text)}</div>` : ''}<div class="vis">Görsel: ${esc(s.visual && s.visual.subject)}</div>${srcLine(s)}</div>`).join('')}</div>
       <div class="card" style="margin-top:16px"><label for="fb">Düzeltme isteği</label><textarea id="fb" placeholder="Örn. 3. sahneyi kısalt, arızalara bir örnek daha ekle"></textarea>
-      <div class="btns"><button class="primary" data-act="content-approve">Onayla, görselleri hazırla</button><button data-act="content-revise">Düzelt</button><button class="danger" data-act="cancel">İptal</button></div></div>`;
+      <div class="btns"><button class="primary" data-act="content-approve">Onayla, görselleri hazırla</button><button data-act="content-revise">Düzelt</button><button class="danger" data-act="cancel">İptal</button></div></div>
+      <div class="card" style="margin-top:12px"><label for="src2">Kaynak ekle</label><input id="src2" type="file" multiple accept=".pdf,.docx,.txt,.md"><div class="btns"><button data-act="add-source">Kaynağı ekle ve içeriği kaynağa göre yeniden yaz</button></div><p class="note" id="srcmsg"></p></div>`;
   }
   function visualsReview(d) {
     return `<div class="player"><div><div class="canvasWrap"><canvas id="cv" width="1080" height="1920" aria-label="Video önizlemesi"></canvas></div>
@@ -95,7 +135,47 @@
       <label for="sk">Hangi sahne?</label><select id="sk"><option value="">Tüm sahneler</option>${d.visuals.scenes.map(s => `<option value="${esc(s.k)}">${esc(s.k)} · ${esc(s.title)}</option>`).join('')}</select>
       <label for="fb">Düzeltme isteği</label><textarea id="fb" placeholder="Örn. motoru daha büyük çiz, etiketler üst üste biniyor"></textarea>
       <div class="btns"><button data-act="visuals-revise">Yeniden çiz</button></div></div>
-      <div class="btns"><button class="primary" data-act="visuals-approve">Onayla: seslendir ve videoyu üret</button><button class="danger" data-act="cancel">İptal</button></div></div></div>`;
+      <div class="btns"><button class="primary" data-act="visuals-approve">Onayla: seslendir ve videoyu üret</button><button class="danger" data-act="cancel">İptal</button></div></div></div>
+      <div id="audit" class="audit"></div>`;
+  }
+
+  /* ---------- teknik denetim paneli ---------- */
+  const SEVC = { 'yok': 'var(--green)', 'düşük': 'var(--lv)', 'orta': 'var(--yel)', 'yüksek': 'var(--red)', 'bilinmiyor': 'var(--muted)' };
+  const SEVL = { 'yok': 'Sorun yok', 'düşük': 'Küçük', 'orta': 'Orta', 'yüksek': 'Ciddi', 'bilinmiyor': 'Denetlenemedi' };
+  async function loadAudit(id) {
+    const el = document.getElementById('audit'); if (!el) return;
+    let a; try { a = await api(`/api/projects/${id}/audit`); } catch (e) { return; }
+    if (!document.getElementById('audit')) return;
+    const rows = a.titles.map(t => ({ ...t, r: a.scenes[t.k] }));
+    const done = rows.filter(x => x.r);
+    const cnt = s => done.filter(x => x.r.severity === s).length;
+    let head = '';
+    if (a.status === 'running') { const p = a.progress && a.progress.total ? a.progress : null; head = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div style="flex:1"><strong>Teknik denetim yapılıyor</strong><div class="note">Her sahne öğretmen gözüyle kontrol ediliyor, lütfen bekleyiniz. Bu sırada önizlemeyi inceleyebilirsiniz.</div>${p ? `<div class="note"><b>${p.done} / ${p.total} sahne denetlendi</b></div><div class="bar"><i style="width:${Math.round(p.done / p.total * 100)}%"></i></div>` : ''}</div></div>`; setTimeout(() => loadAudit(id), 6000); }
+    else if (a.status === 'failed') head = `<div class="card err">Teknik denetim tamamlanamadı.<details><summary>Teknik ayrıntı</summary>${esc(a.error || '')}</details><div class="btns"><button data-aud="rerun">Denetimi yeniden başlat</button></div></div>`;
+    else if (a.status === 'none') head = `<div class="card"><strong>Teknik denetim</strong><p class="note">Bu sürüm için denetim yapılmamış.</p><div class="btns"><button data-aud="rerun">Denetimi başlat</button></div></div>`;
+    if (done.length) {
+      const bad = done.filter(x => ['orta', 'yüksek', 'düşük'].includes(x.r.severity) && (x.r.fix_note || (x.r.issues || []).length));
+      head += `<div class="card"><strong>Teknik denetim raporu</strong><p class="note">${done.length} sahne denetlendi · <b style="color:var(--red)">${cnt('yüksek')} ciddi</b> · <b style="color:var(--yel)">${cnt('orta')} orta</b> · ${cnt('düşük')} küçük · <b style="color:var(--green)">${cnt('yok')} sorunsuz</b></p>
+        ${bad.length ? `<div class="btns"><button class="primary" data-aud="fixall">Sorunlu ${bad.length} sahneyi önerilerle düzelt</button>${a.status !== 'running' ? '<button data-aud="rerun">Yeniden denetle</button>' : ''}</div>` : (a.status === 'done' ? '<div class="btns"><button data-aud="rerun">Yeniden denetle</button></div>' : '')}</div>`;
+    }
+    const cards = rows.map(x => {
+      const r = x.r;
+      const img = r && r.sheetUrl ? `<img loading="lazy" src="${esc(r.sheetUrl)}" alt="Sahne ${esc(x.k)} kareleri">` : `<div class="noimg">${a.status === 'running' ? 'Bekleniyor…' : 'Görüntü yok'}</div>`;
+      const badge = r ? `<span class="sev" style="border-color:${SEVC[r.severity] || 'var(--muted)'};color:${SEVC[r.severity] || 'var(--muted)'}">${SEVL[r.severity] || esc(r.severity)}</span>` : '';
+      const issues = r && r.issues && r.issues.length ? `<ul>${r.issues.map(i => `<li><b>${esc(i.type)}:</b> ${esc(i.detail)}${i.fix ? `<br><span class="muted">Öneri: ${esc(i.fix)}</span>` : ''}</li>`).join('')}</ul>` : '';
+      const fix = r && r.severity !== 'yok' && (r.fix_note || (r.issues || []).length) ? `<div class="btns"><button data-aud="fix" data-k="${esc(x.k)}">Bu sahneyi öneriyle yeniden çiz</button></div>` : '';
+      return `<div class="aud-scene"><div class="aud-head"><b>${esc(x.k)} · ${esc(x.title)}</b>${badge}</div>${img}${r && r.summary ? `<p class="note">${esc(r.summary)}</p>` : ''}${issues}${fix}</div>`;
+    }).join('');
+    el.innerHTML = `<h2>Toplu sahne görünümü ve teknik denetim</h2>${head}<div class="aud-grid">${cards}</div>`;
+    el.querySelectorAll('[data-aud]').forEach(btn => btn.onclick = async () => {
+      const act = btn.dataset.aud; btn.disabled = true;
+      try {
+        if (act === 'rerun') await api(`/api/projects/${id}/audit`, { method: 'POST' });
+        else if (act === 'fix') await api(`/api/projects/${id}/visuals/fix`, { method: 'POST', body: { ks: [btn.dataset.k] } });
+        else if (act === 'fixall') await api(`/api/projects/${id}/visuals/fix`, { method: 'POST', body: {} });
+        route();
+      } catch (e) { alertBox(e.message); btn.disabled = false; }
+    });
   }
   const ASPECT = { dikey: '9/16', yatay: '16/9', kare: '1/1', dikey45: '4/5' };
   function delivered(d) {
@@ -134,10 +214,17 @@
   }
 
   function wire(id, d) {
-    if (d.project.status === 'visuals_review') startPreview(id).catch(e => console.error(e));
+    if (d.project.status === 'visuals_review') { startPreview(id).catch(e => console.error(e)); loadAudit(id); }
     app.querySelectorAll('[data-act]').forEach(btn => btn.onclick = async () => {
       const act = btn.dataset.act, fb = document.getElementById('fb');
       if ((act === 'content-revise' || act === 'visuals-revise') && !(fb && fb.value.trim())) { fb.focus(); fb.placeholder = 'Önce ne değişsin, onu yaz'; return; }
+      if (act === 'add-source') {
+        const files = [...(document.getElementById('src2').files || [])], m = document.getElementById('srcmsg'); if (!files.length) { m.textContent = 'Önce dosya seçin'; return; }
+        busy(btn, true);
+        try { const sources = await extractAll(files, m); await api(`/api/projects/${id}/sources`, { method: 'POST', body: { sources } }); await api(`/api/projects/${id}/content/revise`, { method: 'POST', body: { feedback: 'Yeni eklenen kaynak dosyalarını kullanarak içeriği kaynağa dayandır: terimleri, değerleri ve sıralamayı kaynağa göre düzelt, her sahneye kaynak sayfalarını (src) yaz.' } }); route(); }
+        catch (e) { m.textContent = e.message; busy(btn, false); }
+        return;
+      }
       if (act === 'revoice' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Güncel sesle yeniden üretilsin mi? Tekrar bas'; return; }
       if (act === 'cancel' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Emin misin? Tekrar bas'; return; }
       busy(btn, true); app.querySelectorAll('[data-act]').forEach(b => b.disabled = true);

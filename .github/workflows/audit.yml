@@ -1,0 +1,38 @@
+name: audit
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Denetim görev kimliği
+        required: true
+      api_base:
+        description: Uygulama adresi
+        required: true
+      token:
+        description: Tek kullanımlık görev jetonu
+        required: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Jetonu gizle
+        env:
+          TASK_TOKEN: ${{ inputs.token }}
+        run: echo "::add-mask::$TASK_TOKEN"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Araçlar
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          npm i --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+          npm install -g @anthropic-ai/claude-code
+      - name: Denetim
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          TASK_ID: ${{ inputs.task_id }}
+          API_BASE: ${{ inputs.api_base }}
+          TASK_TOKEN: ${{ inputs.token }}
+        run: node render/audit.mjs

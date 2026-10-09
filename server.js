@@ -7,6 +7,8 @@ const { db, storage, q } = require('./lib/supa');
 const claude = require('./lib/claude');
 const { TONES, voiceForTone } = require('./lib/tones');
 const eleven = require('./lib/eleven');
+const { pagesFor } = require('./lib/sources');
+const audit = require('./lib/audit');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -33,7 +35,7 @@ async function logUsage(project_id, provider, units, note) { try { await db.inse
 
 // Arka plan işi: hata olursa proje "failed" olur, hangi adımda kaldığı saklanır
 // Adımlar projects.pending'e yazılır; sunucu yeniden başlarsa kaldığı yerden sürdürülür
-const STEPS = { content: (id, fb) => runContent(id, fb), visuals: (id, k, fb) => runVisuals(id, k, fb), voice: id => runVoiceAndRender(id), render: (id, fmt) => startRender(id, fmt) };
+const STEPS = { content: (id, fb) => runContent(id, fb), visuals: (id, k, fb, fixes) => runVisuals(id, k, fb, fixes), voice: id => runVoiceAndRender(id), render: (id, fmt) => startRender(id, fmt) };
 const RUNNING = new Set();
 function background(id, stage, args = []) {
   RUNNING.add(id);
@@ -100,33 +102,68 @@ async function runContent(id, feedback) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
   const prev = feedback ? await latest(id, 'content') : null;
   await setStatus(id, 'content_generating', { error: null });
-  const { data, usage } = await claude.generateContent(p, prev && prev.data, feedback, ctxFor(id, 'content'));
+  const { data, usage } = await claude.generateContent(p, prev && prev.data, feedback, ctxFor(id, 'content'), await loadSources(id));
   await logUsage(id, 'claude', tokensOf(usage), 'content');
   await db.insert('versions', { project_id: id, stage: 'content', version: await nextVersion(id, 'content'), data, feedback: feedback || null });
   await setStatus(id, 'content_review');
 }
 
-async function runVisuals(id, onlyK, feedback) {
+async function loadSources(id) { return db.select('project_sources', `project_id=eq.${q(id)}&select=name,pages&order=created_at.asc`); }
+
+// fixes: [{k, note}] → yalnızca bu sahneleri notlarıyla yeniden çizer (denetim önerileri)
+async function runVisuals(id, onlyK, feedback, fixes) {
   const content = await latest(id, 'content');
   const prevV = await latest(id, 'visuals');
   await setStatus(id, 'visuals_generating', { error: null });
   const topic = content.data.topic;
-  let scenes;
+  const sources = await loadSources(id);
+  const srcOf = s => pagesFor(sources, s.src);
+  let scenes, changed = null, label = feedback || null;
   const ctx = ctxFor(id, 'visuals');
-  if (onlyK && prevV) {
+  const fixList = Array.isArray(fixes) && prevV ? fixes.filter(f => f && f.k && f.note) : [];
+  if (fixList.length) {
+    scenes = prevV.data.scenes.map(s => ({ ...s }));
+    const targets = fixList.map(f => ({ f, s: scenes.find(x => x.k === f.k) })).filter(x => x.s);
+    const res = await claude.generateSceneCodes(targets.map(({ f, s }) => ({ scene: strip(s), feedback: f.note, prevCode: s.code, srcText: srcOf(s) })), topic, ctx);
+    targets.forEach(({ s }, i) => { s.code = res[i].code; });
+    await logUsage(id, 'claude', res.reduce((n, r) => n + tokensOf(r.usage), 0), 'denetim düzeltmesi');
+    changed = targets.map(x => x.s.k); label = `[denetim önerisi: ${changed.join(', ')}]`;
+  } else if (onlyK && prevV) {
     scenes = prevV.data.scenes.map(s => ({ ...s }));
     const s = scenes.find(x => x.k === onlyK);
-    const [r] = await claude.generateSceneCodes([{ scene: strip(s), feedback, prevCode: s.code }], topic, ctx);
+    const [r] = await claude.generateSceneCodes([{ scene: strip(s), feedback, prevCode: s.code, srcText: srcOf(s) }], topic, ctx);
     s.code = r.code; await logUsage(id, 'claude', tokensOf(r.usage), 'scene ' + onlyK);
+    changed = [onlyK]; label = `[${onlyK}] ${feedback}`;
   } else {
-    const jobs = content.data.scenes.map(s => ({ scene: s, feedback, prevCode: prevV && feedback ? (prevV.data.scenes.find(x => x.k === s.k) || {}).code : null }));
+    const jobs = content.data.scenes.map(s => ({ scene: s, feedback, srcText: srcOf(s), prevCode: prevV && feedback ? (prevV.data.scenes.find(x => x.k === s.k) || {}).code : null }));
     const res = await claude.generateSceneCodes(jobs, topic, ctx);
     await logUsage(id, 'claude', res.reduce((n, r) => n + tokensOf(r.usage), 0), 'scenes');
     scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
-  await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes }, feedback: feedback ? (onlyK ? `[${onlyK}] ` : '') + feedback : null });
+  const v = await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes }, feedback: label });
   await setStatus(id, 'visuals_review');
+  startAudit(id, v, changed, prevV).catch(e => console.error('denetim', e));
 }
+
+/* ---------- teknik denetim ---------- */
+async function startAudit(id, v, ks, prevV) {
+  if (!v || !v.id) v = await latest(id, 'visuals');
+  const sources = await loadSources(id);
+  const carried = {};
+  if (ks && prevV && prevV.audit && prevV.audit.scenes) for (const [k, r] of Object.entries(prevV.audit.scenes)) if (!ks.includes(k)) carried[k] = r;
+  const scenes = v.data.scenes.filter(s => !ks || ks.includes(s.k));
+  if (!scenes.length) return;
+  const items = scenes.map(s => ({ k: s.k, user: audit.auditPrompt(s, v.data.topic, pagesFor(sources, s.src)) }));
+  try {
+    const token = crypto.randomBytes(24).toString('hex');
+    const task = await db.insert('gen_tasks', { project_id: id, kind: 'audit', items, model: claude.MODEL(), token, meta: { version_id: v.id } });
+    await db.update('versions', `id=eq.${v.id}`, { audit: { status: 'running', task_id: task.id, total: scenes.length, scenes: carried, started_at: now() } });
+    await dispatch('audit.yml', { task_id: task.id, token });
+  } catch (e) {
+    await db.update('versions', `id=eq.${v.id}`, { audit: { status: 'failed', error: e.message, scenes: carried } });
+  }
+}
+
 const strip = s => { const { code, ...rest } = s; return rest; };
 
 async function runVoiceAndRender(id) {
@@ -155,9 +192,9 @@ async function startRender(id, format) {
   await dispatch('render.yml', { job_id: job.id, token });
 }
 
-async function bundleFor(id, withAudio, format) {
+async function bundleFor(id, withAudio, format, versionId) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
-  const vis = await latest(id, 'visuals');
+  const vis = versionId ? await db.one('versions', `id=eq.${q(versionId)}`) : await latest(id, 'visuals');
   if (!vis) return null;
   const scenes = vis.data.scenes.map(s => ({ k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, code: s.code }));
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', scenes };
@@ -181,13 +218,24 @@ on('GET', '/api/me', async (req, res) => send(res, 200, { ok: authed(req) }), tr
 on('GET', '/api/tones', async (req, res) => send(res, 200, Object.entries(TONES).map(([k, [label, desc]]) => ({ k, label, desc }))));
 
 on('GET', '/api/projects', async (req, res) => send(res, 200, await db.select('projects', 'select=id,title,status,updated_at,target_seconds&status=neq.archived&order=updated_at.desc')));
+async function saveSources(id, list) {
+  const out = [];
+  for (const s of (Array.isArray(list) ? list : []).slice(0, 10)) {
+    const pages = (Array.isArray(s.pages) ? s.pages : []).slice(0, 800).map(p => String(p || '').slice(0, 20000));
+    const chars = pages.reduce((n, p) => n + p.length, 0);
+    if (!chars) continue;
+    out.push(await db.insert('project_sources', { project_id: id, name: String(s.name || 'kaynak').slice(0, 120), pages, chars }));
+  }
+  return out;
+}
 on('POST', '/api/projects', async (req, res) => {
-  const b = await readBody(req);
+  const b = await readBody(req, 12e6);
   if (!b.title || !b.brief) return send(res, 400, { error: 'Konu ve açıklama gerekli' });
   let tone = String(b.tone || '');
   if (tone === 'ozel') tone = 'ozel:' + String(b.tone_note || '').trim().slice(0, 300);
   if (!(TONES[tone] || (tone.startsWith('ozel:') && tone.length > 8))) return send(res, 400, { error: 'Anlatım dilini seçin (özelse kısaca tarif edin)' });
   const p = await db.insert('projects', { title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', status: 'content_generating' });
+  await saveSources(p.id, b.sources);
   background(p.id, 'content', []);
   send(res, 201, p);
 });
@@ -202,9 +250,34 @@ on('GET', '/api/projects/:id', async (req, res, { id }) => {
   for (const j of done) { const f = j.format || 'dikey'; if (seen.has(f) || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; seen.add(f); videos.push({ format: f, label: FORMATS[f] || f, url: await storage.signedUrl(j.output_path, 24 * 3600) }); }
   const main = videos.find(v => v.format === (p.format || 'dikey')) || videos[0];
   const videoUrl = main ? main.url : null;
+  const sources = await db.select('project_sources', `project_id=eq.${q(id)}&select=name,chars,created_at&order=created_at.asc`);
   let gen = null;
-  if (/_generating$/.test(p.status)) { const g = await db.one('gen_tasks', `project_id=eq.${q(id)}&consumed=is.false&order=created_at.desc&select=status,progress,created_at`); if (g) gen = g; }
-  send(res, 200, { project: p, gen, content, visuals: visuals && { version: visuals.version, feedback: visuals.feedback, scenes: visuals.data.scenes.map(s => ({ k: s.k, title: s.title })) }, job, videoUrl, videos, mainFormat: main ? main.format : (p.format || 'dikey'), formats: FORMATS });
+  if (/_generating$/.test(p.status)) { const g = await db.one('gen_tasks', `project_id=eq.${q(id)}&consumed=is.false&kind=neq.audit&order=created_at.desc&select=status,progress,created_at`); if (g) gen = g; }
+  send(res, 200, { project: p, gen, content, visuals: visuals && { version: visuals.version, feedback: visuals.feedback, scenes: visuals.data.scenes.map(s => ({ k: s.k, title: s.title })) }, job, videoUrl, videos, mainFormat: main ? main.format : (p.format || 'dikey'), formats: FORMATS, sources });
+});
+on('POST', '/api/projects/:id/sources', async (req, res, { id }) => {
+  const b = await readBody(req, 12e6); const saved = await saveSources(id, b.sources);
+  send(res, 200, { added: saved.map(x => ({ name: x.name, pages: x.pages.length, chars: x.chars })) });
+});
+on('GET', '/api/projects/:id/audit', async (req, res, { id }) => {
+  const v = await latest(id, 'visuals'); if (!v) return send(res, 404, { error: 'Görsel yok' });
+  const a = v.audit || null; let progress = null;
+  if (a && a.status === 'running' && a.task_id) { const t = await db.one('gen_tasks', `id=eq.${q(a.task_id)}&select=status,progress,created_at`); progress = t && t.progress; if (t && t.status === 'failed') a.status = 'failed'; }
+  const scenes = {};
+  if (a && a.scenes) for (const [k, r] of Object.entries(a.scenes)) scenes[k] = { ...r, sheetUrl: r.sheet ? await storage.signedUrl(r.sheet, 3600) : null };
+  send(res, 200, { version: v.version, status: a ? a.status : 'none', error: a && a.error, total: a && a.total, progress, scenes, titles: v.data.scenes.map(s => ({ k: s.k, title: s.title })) });
+});
+on('POST', '/api/projects/:id/audit', async (req, res, { id }) => {
+  if (!await guard(res, id, ['visuals_review'], false)) return;
+  const v = await latest(id, 'visuals'); await startAudit(id, v, null, null); send(res, 202, { ok: true });
+});
+on('POST', '/api/projects/:id/visuals/fix', async (req, res, { id }) => {
+  const { ks } = await readBody(req);
+  const v = await latest(id, 'visuals'); const sc = (v && v.audit && v.audit.scenes) || {};
+  const fixes = (Array.isArray(ks) ? ks : Object.keys(sc)).map(k => ({ k: String(k), note: sc[k] && (sc[k].fix_note || (sc[k].issues || []).map(i => i.fix).filter(Boolean).join(' ')) })).filter(f => f.note && sc[f.k] && sc[f.k].severity !== 'yok');
+  if (!fixes.length) return send(res, 400, { error: 'Düzeltilecek öneri yok' });
+  if (!await guard(res, id, ['visuals_review'])) return;
+  background(id, 'visuals', [null, null, fixes]); send(res, 202, { ok: true, count: fixes.length });
 });
 on('GET', '/api/projects/:id/bundle', async (req, res, { id }) => { const b = await bundleFor(id, new URL(req.url, 'http://x').searchParams.get('audio') === '1'); b ? send(res, 200, b) : send(res, 404, { error: 'Görsel yok' }); });
 
@@ -246,6 +319,7 @@ async function taskAuth(req, taskId) {
 on('GET', '/api/task/:taskId', async (req, res, { taskId }) => {
   const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
   await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'running' });
+  if (t.kind === 'audit') return send(res, 200, { items: t.items, model: t.model, system: audit.AUDIT_SYSTEM, bundle: await bundleFor(t.project_id, false, 'dikey', t.meta && t.meta.version_id) });
   send(res, 200, { items: t.items, model: t.model });
 }, true);
 on('POST', '/api/task/:taskId/progress', async (req, res, { taskId }) => {
@@ -254,13 +328,37 @@ on('POST', '/api/task/:taskId/progress', async (req, res, { taskId }) => {
   await db.update('gen_tasks', `id=eq.${q(taskId)}`, { progress: { done: +b.done || 0, total: +b.total || 0 } });
   send(res, 200, { ok: true });
 }, true);
+on('POST', '/api/task/:taskId/upload-url', async (req, res, { taskId }) => {
+  const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
+  const { name } = await readBody(req);
+  const p = `audit/${t.project_id}/${(t.meta && t.meta.version_id) || 'x'}/${String(name || 'img.jpg').replace(/[^\w.-]/g, '_')}`;
+  send(res, 200, { url: await storage.signedUploadUrl(p), path: p });
+}, true);
 on('POST', '/api/task/:taskId/result', async (req, res, { taskId }) => {
   const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
   const b = await readBody(req, 20e6);
+  if (t.kind === 'audit') await saveAudit(t, b);
   if (b.error) await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'failed', error: String(b.error).slice(0, 900), finished_at: now() });
   else await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'done', results: b.results, finished_at: now() });
   send(res, 200, { ok: true });
 }, true);
+
+async function saveAudit(t, b) {
+  const vid = t.meta && t.meta.version_id; if (!vid) return;
+  const v = await db.one('versions', `id=eq.${q(vid)}&select=id,audit`); if (!v) return;
+  const a = v.audit || { scenes: {} }; a.scenes = a.scenes || {};
+  if (b.error) { a.status = 'failed'; a.error = String(b.error).slice(0, 500); }
+  else {
+    for (const r of b.results || []) {
+      if (!r || !r.k) continue;
+      let rep = null; try { rep = audit.normalize(r.text ? claude.extractJson(r.text) : null); } catch { }
+      a.scenes[r.k] = rep ? { ...rep, sheet: r.sheet || null } : { severity: 'bilinmiyor', summary: 'Bu sahne denetlenemedi' + (r.error ? ': ' + String(r.error).slice(0, 120) : ''), issues: [], fix_note: '', sheet: r.sheet || null };
+    }
+    a.status = 'done'; a.finished_at = now();
+  }
+  await db.update('versions', `id=eq.${v.id}`, { audit: a });
+  await db.update('gen_tasks', `id=eq.${q(t.id)}`, { consumed: true });
+}
 
 /* render işçisi (GitHub Actions) uç noktaları — iş jetonuyla korunur */
 async function jobAuth(req, jobId) {
