@@ -294,33 +294,36 @@
   }
   // Kapak: koyu zemin + ızgara, sahne çizimi, büyük başlık, marka ve rozet
   function drawCover(cv, f, st, o) {
-    cv.width = f.w; cv.height = f.h; const c = cv.getContext('2d'), W = f.w, H = f.h, land = W > H * 1.2, S = Math.min(W, H) / 1080;
-    const bg = c.createRadialGradient(W * (land ? .68 : .5), H * (land ? .5 : .42), 10, W * .5, H * .5, Math.max(W, H) * .8); bg.addColorStop(0, '#16264a'); bg.addColorStop(1, '#05070e'); c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    cv.width = f.w; cv.height = f.h; const c = cv.getContext('2d'), W = f.w, H = f.h, land = W > H * 1.2, S = Math.min(W, H) / 1080, pad = 64 * S;
+    const bg = c.createRadialGradient(W * (land ? .7 : .5), H * .55, 10, W * .5, H * .5, Math.max(W, H) * .8); bg.addColorStop(0, '#16264a'); bg.addColorStop(1, '#05070e'); c.fillStyle = bg; c.fillRect(0, 0, W, H);
     c.fillStyle = 'rgba(120,150,210,.10)'; const g = 80 * S; for (let x = g / 2; x < W; x += g) for (let y = g / 2; y < H; y += g) { c.fillRect(x - 7 * S, y - 1, 14 * S, 2); c.fillRect(x - 1, y - 7 * S, 2, 14 * S); }
-    // görsel
-    const r = st.r, ar = r.w / r.h; let iw, ih, ix, iy;
-    if (land) { ih = H * .86; iw = ih * ar; ix = W - iw - W * .02; iy = (H - ih) / 2; }
-    else if (H > W * 1.3) { iw = W * .98; ih = iw / ar; ix = (W - iw) / 2; iy = H * .36; }
-    else { iw = W * .78; ih = iw / ar; ix = (W - iw) / 2; iy = H * .30; }
-    c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 40 * S; c.drawImage(st.img, r.x, r.y, r.w, r.h, ix, iy, iw, ih); c.restore();
-    if (land) { const fade = c.createLinearGradient(ix, 0, ix + iw * .35, 0); fade.addColorStop(0, 'rgba(5,7,14,.95)'); fade.addColorStop(1, 'rgba(5,7,14,0)'); c.fillStyle = fade; c.fillRect(ix - 2, 0, iw * .35, H); }
-    // marka
-    const pad = 64 * S; c.fillStyle = '#ffc93c'; c.fillRect(pad, pad, 18 * S, 18 * S); c.font = `900 ${30 * S}px Archivo, sans-serif`; c.fillStyle = '#eef1f7'; c.textBaseline = 'top'; c.fillText('EĞİTİM STÜDYOSU', pad + 30 * S, pad - 6 * S);
-    // başlık
-    const tw = land ? W * .5 : W - pad * 2; let size = (land ? 104 : 118) * S; const words = (o.title || '').toLocaleUpperCase('tr').split(/\s+/).filter(Boolean);
+    // başlık satırları (önce ölç)
+    const tw = land ? W * .42 : W - pad * 2, maxLines = 3;
+    let size = (land ? 96 : H > W * 1.3 ? 112 : 84) * S; const words = (o.title || '').toLocaleUpperCase('tr').split(/\s+/).filter(Boolean);
     const lines = () => { c.font = `900 ${size}px Archivo, sans-serif`; const L = []; let cur = ''; for (const w of words) { const t = (cur + ' ' + w).trim(); if (c.measureText(t).width > tw && cur) { L.push(cur); cur = w; } else cur = t; } if (cur) L.push(cur); return L; };
-    let L = lines(); while ((L.length > 3 || L.some(l => c.measureText(l).width > tw)) && size > 40 * S) { size -= 4 * S; L = lines(); }
-    const ty = land ? (H - L.length * size * 1.02) / 2 - 20 * S : pad + 90 * S;
-    c.save(); c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 24 * S; c.textBaseline = 'top';
-    L.forEach((l, i) => { const gr = c.createLinearGradient(0, ty + i * size, 0, ty + (i + 1) * size); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#c9d2e3'); c.fillStyle = gr; c.fillText(l, pad, ty + i * size * 1.02); });
+    let L = lines(); while ((L.length > maxLines || L.some(l => c.measureText(l).width > tw)) && size > 36 * S) { size -= 3 * S; L = lines(); }
+    const lh = size * 1.02, subH = o.sub ? 54 * S : 0, textH = L.length * lh + 18 * S + 10 * S + 24 * S + subH;
+    const bh = 62 * S, bottom = H - pad - (o.badge ? bh + 24 * S : 0);
+    const ty = land ? (H - textH) / 2 : pad + 70 * S;
+    // görsel kutusu
+    const r = st.r, ar = r.w / r.h; let bx, by, bw, bhh;
+    if (land) { bx = W * .47; by = H * .1; bw = W * .51; bhh = H * .8; }
+    else { bx = pad * .5; by = ty + textH + 20 * S; bw = W - pad; bhh = bottom - by - 10 * S; }
+    let iw = bw, ih = iw / ar; if (ih > bhh) { ih = bhh; iw = ih * ar; }
+    const ix = bx + (bw - iw) / 2, iy = by + (bhh - ih) / 2;
+    if (ih > 40) { c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 40 * S; c.drawImage(st.img, r.x, r.y, r.w, r.h, ix, iy, iw, ih); c.restore(); }
+    // marka
+    c.fillStyle = '#ffc93c'; c.fillRect(pad, pad, 18 * S, 18 * S); c.font = `900 ${30 * S}px Archivo, sans-serif`; c.fillStyle = '#eef1f7'; c.textBaseline = 'top'; c.fillText('EĞİTİM STÜDYOSU', pad + 30 * S, pad - 6 * S);
+    // başlık
+    c.save(); c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 24 * S; c.textBaseline = 'top'; c.font = `900 ${size}px Archivo, sans-serif`;
+    L.forEach((l, i) => { const gr = c.createLinearGradient(0, ty + i * lh, 0, ty + (i + 1) * lh); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#c9d2e3'); c.fillStyle = gr; c.fillText(l, pad, ty + i * lh); });
     c.restore();
-    let y = ty + L.length * size * 1.02 + 18 * S;
-    c.fillStyle = '#ffc93c'; c.fillRect(pad, y, 120 * S, 10 * S); y += 34 * S;
-    if (o.sub) { c.font = `800 ${34 * S}px "JetBrains Mono", monospace`; c.fillStyle = '#c9d2e3'; c.textBaseline = 'top'; c.fillText(o.sub, pad, y); y += 54 * S; }
+    let y = ty + L.length * lh + 18 * S; c.fillStyle = '#ffc93c'; c.fillRect(pad, y, 120 * S, 10 * S); y += 34 * S;
+    if (o.sub) { let fs = 34 * S; c.font = `800 ${fs}px "JetBrains Mono", monospace`; while (c.measureText(o.sub).width > tw && fs > 18 * S) { fs -= 2 * S; c.font = `800 ${fs}px "JetBrains Mono", monospace`; } c.fillStyle = '#c9d2e3'; c.textBaseline = 'top'; c.fillText(o.sub, pad, y); }
     if (o.badge) {
-      const txt = o.code ? `ETKİLEŞİMLİ DERS · KOD ${o.code}` : 'ETKİLEŞİMLİ DERS'; c.font = `900 ${30 * S}px "JetBrains Mono", monospace`; const bw = c.measureText(txt).width + 48 * S, bh = 62 * S;
-      const bx = pad, by = land ? H - pad - bh : H - pad - bh;
-      c.fillStyle = '#3fb0ff'; c.beginPath(); c.roundRect ? c.roundRect(bx, by, bw, bh, bh / 2) : c.rect(bx, by, bw, bh); c.fill(); c.fillStyle = '#05070e'; c.textBaseline = 'middle'; c.fillText(txt, bx + 24 * S, by + bh / 2 + 2 * S);
+      const txt = o.code ? `ETKİLEŞİMLİ DERS · KOD ${o.code}` : 'ETKİLEŞİMLİ DERS'; c.font = `900 ${30 * S}px "JetBrains Mono", monospace`; const bw2 = c.measureText(txt).width + 48 * S;
+      const x0 = pad, y0 = H - pad - bh;
+      c.fillStyle = '#3fb0ff'; c.beginPath(); if (c.roundRect) c.roundRect(x0, y0, bw2, bh, bh / 2); else c.rect(x0, y0, bw2, bh); c.fill(); c.fillStyle = '#05070e'; c.textBaseline = 'middle'; c.fillText(txt, x0 + 24 * S, y0 + bh / 2 + 2 * S);
     }
   }
 
