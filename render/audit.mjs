@@ -21,7 +21,7 @@ function runClaude(system, user, model, i) {
     let out = '', err = '';
     p.stdout.on('data', d => out += d); p.stderr.on('data', d => err += d);
     p.on('close', code => {
-      try { const j = JSON.parse(out); if (j.is_error || code !== 0) return ok({ error: String(j.result || err || 'kod ' + code).slice(0, 400) }); ok({ text: j.result }); }
+      try { const j = JSON.parse(out); if (j.is_error || code !== 0) return ok({ error: String(j.result || err || 'kod ' + code).slice(0, 400) }); ok({ text: j.result, usage: j.usage ? { ...j.usage, cost_usd: j.total_cost_usd || 0 } : null }); }
       catch { ok({ error: ('çıktı okunamadı: ' + (err || out)).slice(0, 400) }); }
     });
     p.stdin.end(user);

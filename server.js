@@ -32,7 +32,15 @@ const now = () => new Date().toISOString();
 async function setStatus(id, status, extra = {}) { return db.update('projects', `id=eq.${q(id)}`, { status, updated_at: now(), ...extra }); }
 async function nextVersion(id, stage) { const v = await latest(id, stage); return (v ? v.version : 0) + 1; }
 async function latest(id, stage) { return db.one('versions', `project_id=eq.${q(id)}&stage=eq.${stage}&order=version.desc`); }
-async function logUsage(project_id, provider, units, note) { try { await db.insert('usage', { project_id, provider, units, note }); } catch (e) { console.error('usage', e.message); } }
+async function logUsage(project_id, provider, units, note, detail) { try { await db.insert('usage', { project_id, provider, units, note, detail: detail || null }); } catch (e) { console.error('usage', e.message); } }
+// Claude kullanımı: girdi/çıktı/önbellek ayrı tutulur (maliyet raporu için); CLI'nin bildirdiği dolar karşılığı da saklanır
+function logClaude(project_id, usages, note) {
+  const list = [].concat(usages || []).filter(Boolean);
+  const d = { model: claude.MODEL(), in: 0, out: 0, cw: 0, cr: 0, cli_usd: 0 };
+  for (const u of list) { d.in += u.input_tokens || 0; d.out += u.output_tokens || 0; d.cw += u.cache_creation_input_tokens || 0; d.cr += u.cache_read_input_tokens || 0; d.cli_usd += +u.cost_usd || 0; }
+  if (!d.cli_usd) delete d.cli_usd;
+  return logUsage(project_id, 'claude', d.in + d.out, note, d);
+}
 
 // Arka plan işi: hata olursa proje "failed" olur, hangi adımda kaldığı saklanır
 // Adımlar projects.pending'e yazılır; sunucu yeniden başlarsa kaldığı yerden sürdürülür
@@ -107,7 +115,6 @@ const ctxFor = (projectId, kind) => ({
     throw new Error('Claude yanıtı 40 dakikada gelmedi');
   },
 });
-const tokensOf = u => u ? (u.input_tokens || 0) + (u.output_tokens || 0) : 0;
 
 /* ---------- üretim adımları ---------- */
 async function runContent(id, feedback) {
@@ -115,7 +122,7 @@ async function runContent(id, feedback) {
   const prev = feedback ? await latest(id, 'content') : null;
   await setStatus(id, 'content_generating', { error: null });
   const { data, usage } = await claude.generateContent(p, prev && prev.data, feedback, ctxFor(id, 'content'), await loadSources(id));
-  await logUsage(id, 'claude', tokensOf(usage), 'content');
+  await logClaude(id, usage, 'content');
   await db.insert('versions', { project_id: id, stage: 'content', version: await nextVersion(id, 'content'), data, feedback: feedback || null });
   await setStatus(id, 'content_review');
 }
@@ -138,18 +145,18 @@ async function runVisuals(id, onlyK, feedback, fixes) {
     const targets = fixList.map(f => ({ f, s: scenes.find(x => x.k === f.k) })).filter(x => x.s);
     const res = await claude.generateSceneCodes(targets.map(({ f, s }) => ({ scene: strip(s), feedback: f.note, prevCode: s.code, srcText: srcOf(s) })), topic, ctx);
     targets.forEach(({ s }, i) => { s.code = res[i].code; });
-    await logUsage(id, 'claude', res.reduce((n, r) => n + tokensOf(r.usage), 0), 'denetim düzeltmesi');
+    await logClaude(id, res.map(r => r.usage), 'denetim düzeltmesi');
     changed = targets.map(x => x.s.k); label = `[denetim önerisi: ${changed.join(', ')}]`;
   } else if (onlyK && prevV) {
     scenes = prevV.data.scenes.map(s => ({ ...s }));
     const s = scenes.find(x => x.k === onlyK);
     const [r] = await claude.generateSceneCodes([{ scene: strip(s), feedback, prevCode: s.code, srcText: srcOf(s) }], topic, ctx);
-    s.code = r.code; await logUsage(id, 'claude', tokensOf(r.usage), 'scene ' + onlyK);
+    s.code = r.code; await logClaude(id, r.usage, 'scene ' + onlyK);
     changed = [onlyK]; label = `[${onlyK}] ${feedback}`;
   } else {
     const jobs = content.data.scenes.map(s => ({ scene: s, feedback, srcText: srcOf(s), prevCode: prevV && feedback ? (prevV.data.scenes.find(x => x.k === s.k) || {}).code : null }));
     const res = await claude.generateSceneCodes(jobs, topic, ctx);
-    await logUsage(id, 'claude', res.reduce((n, r) => n + tokensOf(r.usage), 0), 'scenes');
+    await logClaude(id, res.map(r => r.usage), 'scenes');
     scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
   const v = await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes }, feedback: label });
@@ -186,7 +193,7 @@ async function runVoiceAndRender(id) {
   const voice = p.voice_id || voiceForTone(p.tone) || process.env.ELEVENLABS_VOICE_ID;
   if (!voice) throw new Error('ElevenLabs ses kimliği (ELEVENLABS_VOICE_ID) tanımlı değil');
   const { audio, alignment } = await eleven.tts(text, voice);
-  await logUsage(id, 'elevenlabs', text.length, 'tts');
+  await logUsage(id, 'elevenlabs', text.length, 'tts', { voice, seconds: +(alignment.character_end_times_seconds.at(-1) || 0).toFixed(1) });
   const audioPath = `audio/${id}/${Date.now()}.mp3`;
   await storage.upload(audioPath, audio, 'audio/mpeg');
   const tm = eleven.timings(vis.data.scenes, marks, alignment);
@@ -220,7 +227,7 @@ async function runQuiz(id, feedback) {
   const [r] = await claude.complete([{ system: quiz.QUIZ_SYSTEM, user, max: 12000 }], ctxFor(id, 'quiz'));
   if (!r || r.error) throw new Error((r && r.error) || 'yanıt yok');
   const data = quiz.validate(claude.extractJson(r.text), scenes);
-  await logUsage(id, 'claude', tokensOf(r.usage), 'quiz');
+  await logClaude(id, r.usage, 'quiz');
   await db.insert('versions', { project_id: id, stage: 'quiz', version: await nextVersion(id, 'quiz'), data, feedback: feedback || null });
   await db.update('projects', `id=eq.${q(id)}`, { quiz_status: 'ready', quiz_feedback: null });
 }
@@ -283,6 +290,7 @@ async function monthUsage(userId) {
 }
 
 require('./lib/market')({ on, db, q, send, readBody, isAdmin, activeLimits, auth, shortId: () => shortId(), now });
+require('./lib/finance')({ on, db, q, send, readBody });
 /* ---------- hesaplar ---------- */
 on('POST', '/api/auth/register', async (req, res) => {
   const b = await readBody(req, 8000); const ip = ipOf(req); if (auth.tooMany(ip)) return send(res, 429, { error: 'Çok fazla deneme, biraz sonra tekrar deneyin' });
@@ -607,6 +615,7 @@ async function saveAudit(t, b) {
     a.status = 'done'; a.finished_at = now();
   }
   await db.update('versions', `id=eq.${v.id}`, { audit: a });
+  if (!b.error) await logClaude(t.project_id, (b.results || []).map(r => r && r.usage), 'denetim');
   await db.update('gen_tasks', `id=eq.${q(t.id)}`, { consumed: true });
 }
 

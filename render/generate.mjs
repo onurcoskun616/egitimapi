@@ -22,7 +22,7 @@ function runClaude(system, user, model, dir, i) {
       try {
         const j = JSON.parse(out);
         if (j.is_error || code !== 0) return ok({ error: (j.result || err || 'claude hata kodu ' + code).toString().slice(0, 500) });
-        ok({ text: j.result, usage: j.usage || null });
+        ok({ text: j.result, usage: j.usage ? { ...j.usage, cost_usd: j.total_cost_usd || 0 } : null });
       } catch { ok({ error: ('çıktı okunamadı: ' + (err || out)).slice(0, 500) }); }
     });
     p.stdin.end(user);

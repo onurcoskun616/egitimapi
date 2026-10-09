@@ -715,7 +715,7 @@
   async function viewAdmin() {
     setSub('Yönetim');
     const tab = qsOf().get('t') || 'ogretmen';
-    const tabs = { ogretmen: 'Öğretmen başvuruları', kullanici: 'Kullanıcılar', proje: 'Video sahipleri', siparis: 'Siparişler', paket: 'Paketler' };
+    const tabs = { ogretmen: 'Öğretmen başvuruları', kullanici: 'Kullanıcılar', proje: 'Video sahipleri', siparis: 'Siparişler', paket: 'Paketler', maliyet: 'Maliyet ve kâr' };
     let s = {}; try { s = await api('/api/admin/summary'); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
     app.innerHTML = `<h1>Yönetim</h1><div class="stats"><div><b>${s.teachers}</b><span>öğretmen</span></div><div><b>${s.pendingTeachers}</b><span>başvuru</span></div><div><b>${s.students}</b><span>öğrenci</span></div><div><b>${s.courses}</b><span>yayında eğitim</span></div><div><b>${s.pendingOrders}</b><span>bekleyen sipariş</span></div><div><b>${s.unowned}</b><span>sahipsiz video</span></div></div>
       <div class="seg wide">${Object.entries(tabs).map(([k, v]) => `<a href="#/yonetim?t=${k}" aria-selected="${k === tab}">${v}</a>`).join('')}</div><div id="ad"><div class="empty">Yükleniyor…</div></div><p class="note err-t" id="m"></p>`;
@@ -740,6 +740,8 @@
       const OS = { pending: '<span style="color:var(--yel)">Bekliyor</span>', paid: '<span style="color:var(--green)">Ödendi</span>', canceled: 'İptal', failed: 'Başarısız', refunded: 'İade' };
       el.innerHTML = `<p class="note">Çevrim içi ödeme henüz bağlı değil. Ödemeyi (havale vb.) aldığınızda “Ödendi” deyin: paket talebinde paket 30 günlüğüne açılır, eğitim satın almada öğrenci eğitime kaydolur.</p><div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Tarih</th><th>Kullanıcı</th><th>Tür</th><th>Ürün</th><th>Tutar</th><th>Durum</th><th></th></tr></thead><tbody>${os.map(o => `<tr><td>${fmtDate(o.created_at)}</td><td>${esc(o.user ? o.user.name : '')}<div class="note">${esc(o.user ? o.user.email : '')}</div></td><td>${o.kind === 'plan' ? 'Paket' : 'Eğitim'}</td><td>${esc(o.item)}</td><td>${o.amount_cents ? tl(o.amount_cents) : 'Ücretsiz'}</td><td>${OS[o.status] || o.status}</td><td>${o.status === 'pending' ? `<span class="ibtn"><button class="primary" data-o="${o.id}" data-a="paid">Ödendi / onayla</button><button data-o="${o.id}" data-a="cancel">İptal</button></span>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="note">Sipariş yok</td></tr>'}</tbody></table></div>`;
       el.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { b.disabled = true; act('/api/admin/orders/' + b.dataset.o, { action: b.dataset.a }, 'Sipariş güncellendi.'); });
+    } else if (tab === 'maliyet') {
+      return viewFinance(el, msg);
     } else if (tab === 'paket') {
       const plans = await api('/api/plans');
       el.innerHTML = `<p class="note">Fiyatlar ödeme sistemi bağlandığında kullanılır. Sınırlar hemen geçerli olur.</p>${plans.map(p => `<form class="card" data-pl="${p.id}" style="margin-bottom:12px"><div class="grid two"><div><label>Paket adı</label><input name="name" value="${esc(p.name)}"></div><div><label>Aylık fiyat (TL)</label><input name="price" inputmode="decimal" value="${p.price_cents / 100}"></div></div>
@@ -749,6 +751,59 @@
     }
   }
 
+
+  /* ---------- yönetim: maliyet ve kâr ---------- */
+  const TL = v => v == null || !isFinite(v) ? '—' : (Math.abs(v) < 10 ? v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(v).toLocaleString('tr-TR')) + ' TL';
+  const dk = s => s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : '—';
+  async function viewFinance(el, msg) {
+    const per = qsOf().get('p') || 'month';
+    const PER = { month: 'Bu ay', last: 'Geçen ay', '30': 'Son 30 gün', '90': 'Son 90 gün', all: 'Tüm zamanlar' }; // sıralama korunur
+    let d; try { d = await api('/api/admin/finance?p=' + per); } catch (e) { el.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
+    const S = d.summary, C = d.costs, un = Object.fromEntries(d.teachers.map(t => [t.id, t.name]));
+    const prof = S.profit >= 0 ? 'var(--green)' : 'var(--red)';
+    const verdict = x => x.price === 0 ? '<span class="note">ücretsiz</span>' : x.margin_worst == null ? '—' : x.margin_worst < 0 ? '<b style="color:var(--red)">Zarar riski</b>' : x.margin_worst < x.price * 0.5 ? '<b style="color:var(--yel)">İnce kâr</b>' : '<b style="color:var(--green)">Sağlıklı</b>';
+    el.innerHTML = `<div class="seg" style="margin-top:0">${Object.entries(PER).map(([k, v]) => `<a href="#/yonetim?t=maliyet&p=${k}" aria-selected="${k === per}">${v}</a>`).join('')}</div>
+      <div class="stats">
+        <div><b>${TL(S.revenue)}</b><span>gelir (paket ${TL(S.revPlan)} · komisyon ${TL(S.revComm)})</span></div>
+        <div><b>${TL(S.variable)}</b><span>değişken maliyet (${S.videos} video)</span></div>
+        <div><b>${TL(S.fixed)}</b><span>sabit gider (dönem payı)</span></div>
+        <div><b style="color:${prof}">${TL(S.profit)}</b><span>net kâr / zarar</span></div>
+        <div><b>${TL(S.avgVideo)}</b><span>teslim edilen video başına</span></div>
+        <div><b>${TL(S.avgMin)}</b><span>video dakikası başına</span></div>
+      </div>
+      <p class="note">Maliyet dağılımı: Claude ${TL(S.byProvider.claude)} · ElevenLabs ${TL(S.byProvider.eleven)} · GitHub Actions ${TL(S.byProvider.actions)}. ${C.claude_billing === 'subscription' ? `Claude şu an <b>abonelikle</b> hesaplanıyor (değişken maliyete eklenmedi). API'ye geçilse bu dönem yaklaşık <b>${TL(S.claudeApiTry)}</b> tutardı.` : 'Claude <b>API fiyatıyla</b> hesaplanıyor (ANTHROPIC_API_KEY ile çalışınca ödenecek tutar).'}${S.estimated ? ' Eski kayıtlarda girdi/çıktı ayrımı olmadığı için Claude tutarının bir kısmı tahminidir.' : ''} Video başı tutara içerik ve görsel düzeltmeleri, denetim, sorular ve başarısız denemeler dahildir.</p>
+
+      <h2>Paketler kârlı mı?</h2><p class="note">Öğretmen paketini sonuna kadar kullanırsa (her ay tüm video hakkı, her video en uzun sürede) oluşacak değişken maliyet. Önerilen en düşük fiyat bu maliyetin 3 katıdır. Claude her zaman API fiyatıyla hesaplanır (video dakikası başına ${TL(S.avgMinApi)}), çünkü başka öğretmenler için üretim API anahtarıyla yapılır.</p>
+      <div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Paket</th><th>Aylık fiyat</th><th>Hak</th><th>En kötü maliyet</th><th>Fark</th><th>Önerilen en düşük fiyat</th><th>Durum</th></tr></thead><tbody>${d.planCheck.map(x => `<tr><td><b>${esc(x.name)}</b>${x.active ? '' : ' <span class="note">(kapalı)</span>'}</td><td>${TL(x.price)}</td><td>${x.videos} video × ${Math.round(x.max_seconds / 60 * 10) / 10} dk</td><td>${TL(x.worst)}</td><td style="color:${x.margin_worst < 0 ? 'var(--red)' : 'inherit'}">${TL(x.margin_worst)}</td><td>${TL(x.min_price)}</td><td>${verdict(x)}</td></tr>`).join('')}</tbody></table></div>
+      ${S.avgMin == null ? '<p class="note">Bu dönemde teslim edilmiş video olmadığı için paket hesabı yapılamadı. "Tüm zamanlar"ı seçin.</p>' : ''}
+
+      <h2>Öğretmen bazında</h2><div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Öğretmen</th><th>Video</th><th>Teslim</th><th>Maliyet</th><th>Gelir</th><th>Kâr</th></tr></thead><tbody>${d.teachers.map(t => `<tr><td>${esc(t.name)}</td><td>${t.videos}</td><td>${t.delivered}</td><td>${TL(t.cost)}</td><td>${TL(t.revenue)}</td><td style="color:${t.profit < 0 ? 'var(--red)' : 'var(--green)'}">${TL(t.profit)}</td></tr>`).join('') || '<tr><td colspan="6" class="note">Kayıt yok</td></tr>'}</tbody></table></div>
+
+      <h2>Video bazında <button class="linkbtn" id="csv" style="font-size:13px;margin-left:8px">CSV indir</button></h2><div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Video</th><th>Öğretmen</th><th>Süre</th><th>Claude</th><th>Ses</th><th>Actions</th><th>Toplam</th><th>Dakika başı</th><th>Düzeltme</th></tr></thead><tbody>${d.projects.map(x => `<tr><td><a href="#/p/${x.id}">${esc(x.title)}</a>${x.delivered ? '' : ' <span class="note">(' + esc(STATUS[x.status] || x.status) + ')</span>'}</td><td>${esc(un[x.owner_id || '-'] || '')}</td><td>${dk(x.seconds)}</td><td>${TL(x.usd.claude * C.usd_try)}<div class="note">${Math.round(x.tokens / 1000)}k token</div></td><td>${TL(x.usd.eleven * C.usd_try)}<div class="note">${x.chars.toLocaleString('tr-TR')} kr</div></td><td>${TL(x.usd.actions * C.usd_try)}<div class="note">${x.minutes} dk</div></td><td><b>${TL(x.try_total)}</b></td><td>${TL(x.try_per_min)}</td><td>${x.revisions}${x.failed ? ` · ${x.failed} hatalı üretim` : ''}</td></tr>`).join('') || '<tr><td colspan="9" class="note">Bu dönemde üretim yok</td></tr>'}</tbody></table></div>
+
+      <h2>Fiyat ayarları</h2><form class="card" id="cf">
+        <div class="grid two"><div><label>Dolar kuru (TL)</label><input name="usd_try" inputmode="decimal" value="${C.usd_try}"></div>
+        <div><label>Claude hesaplama</label><select name="claude_billing"><option value="api" ${C.claude_billing === 'api' ? 'selected' : ''}>API fiyatı (token başına)</option><option value="subscription" ${C.claude_billing === 'subscription' ? 'selected' : ''}>Abonelik (sabit gider)</option></select></div></div>
+        <div class="grid two"><div><label>Claude girdi $ / milyon token</label><input name="claude_in" inputmode="decimal" value="${C.claude_in}"></div><div><label>Claude çıktı $ / milyon token</label><input name="claude_out" inputmode="decimal" value="${C.claude_out}"></div>
+        <div><label>Önbelleğe yazma $ / milyon</label><input name="claude_cw" inputmode="decimal" value="${C.claude_cw}"></div><div><label>Önbellekten okuma $ / milyon</label><input name="claude_cr" inputmode="decimal" value="${C.claude_cr}"></div>
+        <div><label>ElevenLabs $ / 1000 karakter</label><input name="eleven_per_1k" inputmode="decimal" value="${C.eleven_per_1k}"></div><div><label>GitHub Actions $ / dakika</label><input name="actions_per_min" inputmode="decimal" value="${C.actions_per_min}"></div>
+        <div><label>Eğitim satış komisyonu (%)</label><input name="commission_pct" inputmode="decimal" value="${C.commission_pct}"></div></div>
+        <label style="margin-top:18px">Aylık sabit giderler (TL)</label><div id="fx">${(C.fixed || []).map(f => `<div class="cp" style="margin-bottom:6px"><input data-fn value="${esc(f.name)}"><input data-ft inputmode="decimal" value="${f.try}" style="max-width:160px"></div>`).join('')}</div>
+        <div class="btns"><button type="button" id="fxa">Gider ekle</button><button class="primary" type="submit">Kaydet ve yeniden hesapla</button></div>
+        <p class="note">Varsayılanlar: Claude Opus 5.5 API fiyatı (4 $ girdi, 20 $ çıktı), ElevenLabs Creator paketi (22 $ / 121 bin karakter ≈ 0,18 $), herkese açık depoda GitHub Actions ücretsiz, kur 49,2 TL. Kendi faturalarınıza göre güncelleyin.</p></form>`;
+    document.getElementById('fxa').onclick = () => document.getElementById('fx').insertAdjacentHTML('beforeend', '<div class="cp" style="margin-bottom:6px"><input data-fn placeholder="Gider adı"><input data-ft inputmode="decimal" placeholder="0" style="max-width:160px"></div>');
+    document.getElementById('cf').onsubmit = async e => {
+      e.preventDefault(); const f = e.target, body = {};
+      ['usd_try', 'claude_billing', 'claude_in', 'claude_out', 'claude_cw', 'claude_cr', 'eleven_per_1k', 'actions_per_min', 'commission_pct'].forEach(k => body[k] = f.elements[k].value);
+      body.fixed = [...f.querySelectorAll('#fx .cp')].map(r => ({ name: r.querySelector('[data-fn]').value, try: r.querySelector('[data-ft]').value || 0 }));
+      try { await api('/api/admin/finance/costs', { method: 'POST', body }); viewFinance(el, msg); msg('Fiyatlar kaydedildi.'); } catch (err) { msg(err.message); }
+    };
+    document.getElementById('csv').onclick = () => {
+      const rows = [['Video', 'Öğretmen', 'Durum', 'Süre (sn)', 'Claude TL', 'Ses TL', 'Actions TL', 'Toplam TL', 'Dakika başı TL', 'Token', 'Karakter', 'Düzeltme']].concat(d.projects.map(x => [x.title, un[x.owner_id || '-'] || '', STATUS[x.status] || x.status, x.seconds, (x.usd.claude * C.usd_try).toFixed(2), (x.usd.eleven * C.usd_try).toFixed(2), (x.usd.actions * C.usd_try).toFixed(2), x.try_total.toFixed(2), x.try_per_min == null ? '' : x.try_per_min.toFixed(2), x.tokens, x.chars, x.revisions]));
+      const csv = '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = `maliyet-${per}.csv`; a.click();
+    };
+  }
   function alertBox(m) { const el = document.createElement('div'); el.className = 'card err'; el.style.marginTop = '12px'; el.textContent = m; app.appendChild(el); }
 
   async function route() {
