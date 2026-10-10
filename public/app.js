@@ -62,6 +62,7 @@
         <label for="src">Kaynak dosyalar <span class="muted">(isteğe bağlı: MEB modülü, ders kitabı, katalog — PDF, DOCX, TXT)</span></label><input id="src" type="file" multiple accept=".pdf,.docx,.txt,.md">
         <p class="note">Kaynak yüklerseniz içerik bu kaynağa dayanarak yazılır; terimler, değerler ve bağlantılar kaynakla uyumlu olur ve her sahnede kaynak sayfası gösterilir.</p>
         <label for="fm">Video biçimi</label><select id="fm"><option value="dikey">Dikey 9:16 · Instagram Reels, TikTok, YouTube Shorts</option><option value="yatay">Yatay 16:9 · YouTube, sunum, akıllı tahta</option><option value="kare">Kare 1:1 · Instagram ve Facebook gönderisi</option><option value="dikey45">Dikey 4:5 · Instagram ve Facebook akışı</option></select>
+        <label for="sr0">Anlatım hızı</label><select id="sr0"><option value="normal" selected>Normal · öğrenci için önerilen</option><option value="yavas">Yavaş · ders dinler gibi, en anlaşılır</option><option value="hizli">Hızlı · tekrar ve özet için</option></select>
         <label for="tn">Anlatım dili</label><select id="tn" required><option value="">Seçin…</option></select>
         <p class="note" id="tnd">İçeriğin hangi üslupla anlatılacağını seçin.</p>
         <div id="tnoWrap" hidden><label for="tno">Anlatım dilini tarif edin</label><input id="tno" maxlength="300" placeholder="Örn. esprili ama saygılı, kısa cümlelerle, futbol benzetmeleri kullanan"></div>
@@ -73,7 +74,7 @@
       try {
         const files = [...(document.getElementById('src').files || [])];
         const sources = files.length ? await extractAll(files, msg) : [];
-        const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value, tone: tn.value, tone_note: tno.value, format: document.getElementById('fm').value, sources } }); location.hash = '#/p/' + p.id; }
+        const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value, tone: tn.value, tone_note: tno.value, format: document.getElementById('fm').value, speech_rate: document.getElementById('sr0').value, sources } }); location.hash = '#/p/' + p.id; }
       catch (err) { document.getElementById('msg').textContent = err.message; busy(btn, false); }
     };
     const t = document.getElementById('t'), b = document.getElementById('b'), a = document.getElementById('a'), d = document.getElementById('d');
@@ -128,6 +129,8 @@
       <div class="btns"><button class="primary" data-act="content-approve">Onayla, görselleri hazırla</button><button data-act="content-revise">Düzelt</button><button class="danger" data-act="cancel">İptal</button></div></div>
       <div class="card" style="margin-top:12px"><label for="src2">Kaynak ekle</label><input id="src2" type="file" multiple accept=".pdf,.docx,.txt,.md"><div class="btns"><button data-act="add-source">Kaynağı ekle ve içeriği kaynağa göre yeniden yaz</button></div><p class="note" id="srcmsg"></p></div>`;
   }
+  const SR = { yavas: 'Yavaş · ders dinler gibi, en anlaşılır', normal: 'Normal · öğrenci için önerilen', hizli: 'Hızlı · tekrar ve özet için' };
+  const SR_OPTS = cur => Object.entries(SR).map(([k, v]) => `<option value="${k}" ${k === (cur || 'normal') ? 'selected' : ''}>${v}</option>`).join('');
   function visualsReview(d) {
     return `<div class="player"><div><div class="canvasWrap"><canvas id="cv" width="1080" height="1920" aria-label="Video önizlemesi"></canvas></div>
       <input type="range" class="scrub" id="scrub" min="0" max="1000" value="0" aria-label="Zaman">
@@ -136,6 +139,7 @@
       <label for="sk">Hangi sahne?</label><select id="sk"><option value="">Tüm sahneler</option>${d.visuals.scenes.map(s => `<option value="${esc(s.k)}">${esc(s.k)} · ${esc(s.title)}</option>`).join('')}</select>
       <label for="fb">Düzeltme isteği</label><textarea id="fb" placeholder="Örn. motoru daha büyük çiz, etiketler üst üste biniyor"></textarea>
       <div class="btns"><button data-act="visuals-revise">Yeniden çiz</button></div></div>
+      <div class="card" style="margin-top:12px"><label for="sr">Anlatım hızı</label><select id="sr">${SR_OPTS(d.project.speech_rate)}</select></div>
       <div class="btns"><button class="primary" data-act="visuals-approve">Onayla: seslendir ve videoyu üret</button><button class="danger" data-act="cancel">İptal</button></div></div></div>
       <div id="audit" class="audit"></div>`;
   }
@@ -426,6 +430,7 @@
     return `<div class="player"><div><div class="canvasWrap" style="aspect-ratio:${ASPECT[d.mainFormat] || '9/16'}"><video controls playsinline src="${esc(d.videoUrl)}"></video></div></div>
       <div><div class="card"><strong>Video hazır</strong><p class="note">60 FPS, seslendirme gömülü. İndirme bağlantıları 24 saat geçerlidir; sayfayı yenileyince yenisi oluşur.</p>
       <div class="btns">${links}</div>${more}
+      <label for="sr">Anlatım hızı</label><select id="sr">${SR_OPTS(d.project.speech_rate)}</select><p class="note">Hızı değiştirip "Yeniden seslendir"e basarsanız aynı görsellerle yeni hızda ses ve video üretilir.</p>
       <div class="btns"><button data-act="reopen">Bir sahneyi düzelt</button><button data-act="revoice">Yeniden seslendir</button></div></div>
       <div class="card" style="margin-top:12px" id="pub"><strong>Yayına hazırlık</strong><p class="note">YouTube ve sosyal medyaya yüklemeden önce gerekenler.</p>
         <div class="btns"><button data-pub="srt">Altyazı dosyası (.srt)</button><button data-pub="text">YouTube başlık, açıklama ve bölümler</button></div>
@@ -476,7 +481,7 @@
       if (act === 'revoice' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Güncel sesle yeniden üretilsin mi? Tekrar bas'; return; }
       if (act === 'cancel' && !btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Emin misin? Tekrar bas'; return; }
       busy(btn, true); app.querySelectorAll('[data-act]').forEach(b => b.disabled = true);
-      const map = { 'content-approve': ['content/approve'], 'content-revise': ['content/revise', { feedback: fb && fb.value }], 'visuals-approve': ['visuals/approve'], 'visuals-revise': ['visuals/revise', (() => { const k = (document.getElementById('sk') || {}).value || null, er = window.EVEngine && window.EVEngine.errors || {}; let f = fb && fb.value; if (k && er[k]) f += ` (Tarayıcıdaki çizim hatası: ${er[k]})`; return { feedback: f, k }; })()], cancel: ['cancel'], retry: ['retry'], reopen: ['reopen'], revoice: ['visuals/approve'], 'render-format': ['render', { format: (document.getElementById('nf2') || {}).value }] }[act];
+      const map = { 'content-approve': ['content/approve'], 'content-revise': ['content/revise', { feedback: fb && fb.value }], 'visuals-approve': ['visuals/approve', { speech_rate: (document.getElementById('sr') || {}).value }], 'visuals-revise': ['visuals/revise', (() => { const k = (document.getElementById('sk') || {}).value || null, er = window.EVEngine && window.EVEngine.errors || {}; let f = fb && fb.value; if (k && er[k]) f += ` (Tarayıcıdaki çizim hatası: ${er[k]})`; return { feedback: f, k }; })()], cancel: ['cancel'], retry: ['retry'], reopen: ['reopen'], revoice: ['visuals/approve', { speech_rate: (document.getElementById('sr') || {}).value }], 'render-format': ['render', { format: (document.getElementById('nf2') || {}).value }] }[act];
       try { await api(`/api/projects/${id}/${map[0]}`, { method: 'POST', body: map[1] || {} }); route(); } catch (e) { alertBox(e.message); busy(btn, false); app.querySelectorAll('[data-act]').forEach(b => b.disabled = false); }
     });
   }

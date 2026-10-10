@@ -192,8 +192,9 @@ async function runVoiceAndRender(id) {
   const { text, marks } = eleven.buildScript(vis.data.scenes);
   const voice = p.voice_id || voiceForTone(p.tone) || process.env.ELEVENLABS_VOICE_ID;
   if (!voice) throw new Error('ElevenLabs ses kimliği (ELEVENLABS_VOICE_ID) tanımlı değil');
-  const { audio, alignment } = await eleven.tts(text, voice);
-  await logUsage(id, 'elevenlabs', text.length, 'tts', { voice, seconds: +(alignment.character_end_times_seconds.at(-1) || 0).toFixed(1) });
+  const speed = SPEEDS[p.speech_rate] || +process.env.ELEVENLABS_SPEED || SPEEDS.normal;
+  const { audio, alignment } = await eleven.tts(text, voice, speed);
+  await logUsage(id, 'elevenlabs', text.length, 'tts', { voice, speed, seconds: +(alignment.character_end_times_seconds.at(-1) || 0).toFixed(1) });
   const audioPath = `audio/${id}/${Date.now()}.mp3`;
   await storage.upload(audioPath, audio, 'audio/mpeg');
   const tm = eleven.timings(vis.data.scenes, marks, alignment);
@@ -202,6 +203,8 @@ async function runVoiceAndRender(id) {
   await startRender(id);
 }
 
+// Anlatım hızı (ElevenLabs speed). Ölçüm: hız 1.0'da Türkçe ~13,5 harf/sn; 0.9'da ~12 harf/sn.
+const SPEEDS = { yavas: 0.84, normal: 0.9, hizli: 1.0 };
 const FORMATS = { dikey: 'Dikey 9:16 (1080×1920)', yatay: 'Yatay 16:9 (1920×1080)', kare: 'Kare 1:1 (1080×1080)', dikey45: 'Dikey 4:5 (1080×1350)' };
 async function startRender(id, format) {
   const token = crypto.randomBytes(24).toString('hex');
@@ -364,7 +367,7 @@ on('POST', '/api/projects', async (req, res) => {
   if (!lim) return send(res, 402, { error: 'Video üretmek için etkin bir paketiniz yok. Paketim sayfasından paket seçin.' });
   if (await monthUsage(req.user.id) >= (lim.limits.videos_per_month || 0)) return send(res, 402, { error: `Bu ayki video hakkınız doldu (${lim.limits.videos_per_month} video). Paketinizi yükseltebilirsiniz.` });
   if ((+b.target_seconds || 90) > (lim.limits.max_seconds || 300)) return send(res, 402, { error: `Paketiniz en fazla ${lim.limits.max_seconds} saniyelik videoya izin veriyor.` });
-  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', status: 'content_generating' });
+  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', status: 'content_generating' });
   await saveSources(p.id, b.sources);
   background(p.id, 'content', []);
   send(res, 201, p);
@@ -419,7 +422,9 @@ on('POST', '/api/projects/:id/content/approve', async (req, res, { id }) => {
 });
 on('POST', '/api/projects/:id/visuals/revise', async (req, res, { id }) => { const { feedback, k } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); if (!await guard(res, id, ['visuals_review'])) return; background(id, 'visuals', [k || null, feedback]); send(res, 202, { ok: true }); });
 on('POST', '/api/projects/:id/visuals/approve', async (req, res, { id }) => {
+  const b = await readBody(req, 2000).catch(() => ({}));
   if (!await guard(res, id, ['visuals_review', 'delivered'])) return; // teslimden sonra: aynı görsellerle yeni sesle yeniden üret
+  if (b && SPEEDS[b.speech_rate]) await db.update('projects', `id=eq.${q(id)}`, { speech_rate: b.speech_rate });
   const v = await latest(id, 'visuals'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
   background(id, 'voice', []); send(res, 202, { ok: true });
   const pq = await db.one('projects', `id=eq.${q(id)}&select=quiz_status`);
