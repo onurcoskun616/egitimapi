@@ -192,19 +192,21 @@ async function runVoiceAndRender(id) {
   const { text, marks } = eleven.buildScript(vis.data.scenes);
   const voice = p.voice_id || voiceForTone(p.tone) || process.env.ELEVENLABS_VOICE_ID;
   if (!voice) throw new Error('ElevenLabs ses kimliği (ELEVENLABS_VOICE_ID) tanımlı değil');
-  const speed = SPEEDS[p.speech_rate] || +process.env.ELEVENLABS_SPEED || SPEEDS.normal;
+  const speed = +process.env.ELEVENLABS_SPEED || 1, pace = PACE[p.speech_rate] || PACE.normal;
   const { audio, alignment } = await eleven.tts(text, voice, speed);
-  await logUsage(id, 'elevenlabs', text.length, 'tts', { voice, speed, seconds: +(alignment.character_end_times_seconds.at(-1) || 0).toFixed(1) });
+  await logUsage(id, 'elevenlabs', text.length, 'tts', { voice, speed, pace: p.speech_rate || 'normal', seconds: +(alignment.character_end_times_seconds.at(-1) || 0).toFixed(1) });
   const audioPath = `audio/${id}/${Date.now()}.mp3`;
   await storage.upload(audioPath, audio, 'audio/mpeg');
-  const tm = eleven.timings(vis.data.scenes, marks, alignment);
-  const dur = alignment.character_end_times_seconds.at(-1);
-  await db.insert('audio_tracks', { project_id: id, path: audioPath, alignment: { timings: tm, visuals_version: vis.version }, duration_s: dur });
+  const tm = eleven.timings(vis.data.scenes, marks, alignment, pace);
+  await db.insert('audio_tracks', { project_id: id, path: audioPath, alignment: { timings: tm.timings, cuts: tm.cuts, visuals_version: vis.version }, duration_s: +tm.end.toFixed(3) });
   await startRender(id);
 }
 
-// Anlatım hızı (ElevenLabs speed). Ölçüm: hız 1.0'da Türkçe ~13,5 harf/sn; 0.9'da ~12 harf/sn.
-const SPEEDS = { yavas: 0.84, normal: 0.9, hizli: 1.0 };
+// Anlatım temposu: ses doğal hızda (1.0) üretilir, cümle ve sahne aralarına sessizlik eklenir.
+// ElevenLabs'te hızı düşürmek sesi yankılı/boğuk yapıyordu. Ölçüm: 1.0'da ~13,5 harf/sn;
+// normal tempoda cümle arası 0,45 sn ile etkin hız ~12 harf/sn.
+const PACE = { yavas: { sent: 0.8, scene: 1.2 }, normal: { sent: 0.45, scene: 0.8 }, hizli: { sent: 0.15, scene: 0.4 } };
+const SPEEDS = PACE;
 const FORMATS = { dikey: 'Dikey 9:16 (1080×1920)', yatay: 'Yatay 16:9 (1920×1080)', kare: 'Kare 1:1 (1080×1080)', dikey45: 'Dikey 4:5 (1080×1350)' };
 async function startRender(id, format) {
   const token = crypto.randomBytes(24).toString('hex');
@@ -269,7 +271,7 @@ async function bundleFor(id, withAudio, format, versionId) {
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', scenes };
   if (withAudio) {
     const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc`);
-    if (a) { a.alignment.timings.forEach((t, i) => Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; }
+    if (a) { a.alignment.timings.forEach((t, i) => Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; if (a.alignment.cuts && a.alignment.cuts.length) b.audioCuts = a.alignment.cuts; }
   }
   return b;
 }
