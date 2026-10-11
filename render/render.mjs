@@ -19,7 +19,8 @@ async function main() {
   let audioIn = audioFile;
   if (bundle.audioUrl) {
     const a = await fetch(bundle.audioUrl); if (!a.ok) throw new Error('Ses indirilemedi: ' + a.status); await writeFile(audioFile, Buffer.from(await a.arrayBuffer()));
-    if (Array.isArray(bundle.audioCuts) && bundle.audioCuts.length) { audioIn = path.join(here, 'audio_paced.wav'); await pace(audioFile, bundle.audioCuts, audioIn); }
+    if (process.env.AUDIO_CLEAN !== '0') { const c = path.join(here, 'audio_clean.wav'); await clean(audioIn, c); audioIn = c; }
+    if (Array.isArray(bundle.audioCuts) && bundle.audioCuts.length) { const o = path.join(here, 'audio_paced.wav'); await pace(audioIn, bundle.audioCuts, o); audioIn = o; }
   }
 
   const browser = await chromium.launch();
@@ -66,6 +67,13 @@ async function main() {
   if (!up.ok) throw new Error('Yükleme başarısız: ' + up.status + ' ' + await up.text());
   await post('status', { status: 'done', path: storePath });
   console.log('Tamamlandı:', storePath);
+}
+
+// Ses temizliği: bazı ElevenLabs seslerinin kaydında oda yankısı ve uğultu var. Alçak frekans uğultusunu keser,
+// sabit oda gürültüsünü azaltır, kelime aralarındaki yankı kuyruğunu bastırır.
+async function clean(input, output) {
+  const f = 'highpass=f=70,afftdn=nr=24:nf=-40:tn=1,agate=threshold=0.03:ratio=4:attack=5:release=90:range=0.06';
+  await new Promise((ok, no) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', input, '-af', f, '-ac', '1', '-ar', '44100', output], { stdio: 'inherit' }).on('close', c => c === 0 ? ok() : no(new Error('ses temizliği ffmpeg ' + c))));
 }
 
 // Cümle/sahne aralarına sessizlik ekler (anlatım temposu). Ses hızına dokunulmaz, kalite bozulmaz.
