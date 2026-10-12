@@ -1,0 +1,23 @@
+{
+  "name": "Eğitim Stüdyosu",
+  "short_name": "Eğitim Stüdyosu",
+  "description": "Öğretmenlerin hazırladığı, bölüm aralarında soru soran etkileşimli ders videoları.",
+  "lang": "tr",
+  "id": "/",
+  "start_url": "/?kaynak=uygulama",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05070e",
+  "theme_color": "#05070e",
+  "categories": ["education"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Derslerim", "url": "/#/derslerim", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Ders kodu gir", "url": "/#/", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

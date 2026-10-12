@@ -505,6 +505,7 @@
       if (u.role === 'admin') links.push('<a href="#/yonetim">Yönetim</a>');
       links.push(`<a href="#/profil" title="Profil">${esc(u.name)}</a>`, '<button type="button" id="logout" class="linkbtn">Çıkış</button>');
     }
+    if (!isStandalone()) links.push(`<a href="#/uygulama" class="appl" title="Telefon uygulaması">📱 Uygulama</a>`);
     document.querySelector('.top').insertAdjacentHTML('beforeend', `<nav id="tbar" class="tbar">${links.join('')}</nav>`);
     const lo = document.getElementById('logout'); if (lo) lo.onclick = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); ME = { user: null }; location.hash = '#/'; route(); };
     document.querySelectorAll('#tbar a').forEach(a => { if (a.getAttribute('href') === location.hash.split('?')[0]) a.classList.add('on'); });
@@ -847,6 +848,35 @@
       try { const r = await api(`/api/my/courses/${c.id}/produce`, { method: 'POST', body: { weeks } }); alert(r.message); route(); } catch (err) { m.textContent = err.message; e.target.disabled = false; }
     };
   }
+
+  /* ---------- telefon uygulaması ---------- */
+  let installEvt = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; nav(); });
+  window.addEventListener('appinstalled', () => { installEvt = null; nav(); });
+  const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || document.referrer.startsWith('android-app://');
+  const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = () => /android/i.test(navigator.userAgent);
+  async function viewApp() {
+    setSub('Telefon uygulaması');
+    let info = {}; try { info = await api('/api/app-info'); } catch { }
+    const inApp = isStandalone();
+    app.innerHTML = `<section class="appdl"><img src="/icons/icon-512.png" alt="" class="appicon"><h1>Eğitim Stüdyosu uygulaması</h1>
+      <p class="muted">Derslerini telefonunun ana ekranından tek dokunuşla aç. Uygulama tam ekran açılır, giriş bilgilerin hatırlanır.</p>
+      ${inApp ? '<div class="card" style="border-color:rgba(62,224,161,.5)"><b style="color:var(--green)">✓ Uygulamayı zaten kullanıyorsun.</b></div>' : ''}
+      <div class="grid two" style="margin-top:14px">
+        <div class="card"><h2 style="margin-top:0">Android</h2>
+          ${installEvt ? '<p>Tek dokunuşla telefonuna yükle:</p><div class="btns"><button class="primary" id="inst">Uygulamayı yükle</button></div>' : `<ol class="steps-l"><li>Bu sayfayı <b>Chrome</b> ile aç.</li><li>Sağ üstteki <b>⋮</b> menüsüne dokun.</li><li><b>Uygulamayı yükle</b> ya da <b>Ana ekrana ekle</b>'yi seç.</li></ol>`}
+          ${info.play ? `<div class="btns"><a class="btn" href="${esc(info.play)}" target="_blank" rel="noopener">Google Play'den indir</a></div>` : ''}
+          ${info.apk ? `<p class="note">Ya da uygulama dosyasını doğrudan indir (APK):</p><div class="btns"><a class="btn" href="${esc(info.apk)}">APK indir</a></div><p class="note">İlk kurulumda telefon "bilinmeyen kaynak" izni isteyebilir.</p>` : ''}</div>
+        <div class="card"><h2 style="margin-top:0">iPhone ve iPad</h2>
+          ${info.ios ? `<div class="btns"><a class="btn" href="${esc(info.ios)}" target="_blank" rel="noopener">App Store'dan indir</a></div>` : ''}
+          <ol class="steps-l"><li>Bu sayfayı <b>Safari</b> ile aç.</li><li>Alttaki <b>Paylaş</b> düğmesine (kare ve yukarı ok) dokun.</li><li><b>Ana Ekrana Ekle</b>'yi seç, sonra <b>Ekle</b>'ye dokun.</li></ol></div>
+      </div>
+      <div class="card" style="margin-top:14px"><h2 style="margin-top:0">Bilgisayar</h2><p class="note" style="margin:0">Chrome ya da Edge'de adres çubuğunun sağındaki <b>yükle</b> simgesine tıkla.</p></div>
+      <div class="card" style="margin-top:14px;text-align:center"><p class="note" style="margin-top:0">Telefonunla okut, uygulama sayfası açılsın:</p><div id="qrapp" style="background:#fff;padding:10px;border-radius:12px;width:max-content;margin:0 auto"></div></div></section>`;
+    const b = document.getElementById('inst'); if (b) b.onclick = async () => { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); if (r && r.outcome === 'accepted') { installEvt = null; viewApp(); } };
+    loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js').then(() => { const el = document.getElementById('qrapp'); if (el && window.QRCode) new window.QRCode(el, { text: location.origin + '/#/uygulama', width: 150, height: 150 }); }).catch(() => {});
+  }
   function alertBox(m) { const el = document.createElement('div'); el.className = 'card err'; el.style.marginTop = '12px'; el.textContent = m; app.appendChild(el); }
 
   async function route() {
@@ -859,6 +889,7 @@
     // herkese açık sayfalar
     if (h === '#/' || h === '#') { if (u && isTeacher() && u.role !== 'admin') { location.hash = '#/projeler'; return; } return viewStore(); }
     if (h === '#/vitrin') return viewStore();
+    if (h === '#/uygulama') return viewApp();
     if (h === '#/giris' || h === '#/ogretmen' || h === '#/login') { if (u) { location.hash = homeOf(u); return; } return viewLogin(); }
     if (h === '#/kayit') { if (u) { location.hash = homeOf(u); return; } return viewRegister(); }
     let m = h.match(/^#\/o\/([\w-]+)$/); if (m) return viewTeacher(m[1]);

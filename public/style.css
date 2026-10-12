@@ -127,3 +127,11 @@ label.chk{display:flex;gap:8px;align-items:center;text-transform:none;letter-spa
 @media (max-width:640px){.top{gap:8px}.tbar{margin-left:0;width:100%}}
 
 .tbl.plan td{vertical-align:top}.tbl.plan .urow td{background:rgba(255,201,60,.06);padding-top:14px}.kzl{margin:0;padding-left:16px;font-size:12px}.st-queued{color:var(--muted)}
+
+/* telefon uygulaması */
+.top{padding-top:max(18px,env(safe-area-inset-top))}
+body{padding-bottom:env(safe-area-inset-bottom)}
+.appdl{max-width:820px;margin:0 auto}.appicon{width:96px;height:96px;border-radius:22px;display:block;margin:6px 0 10px}
+.steps-l{padding-left:20px;margin:8px 0}.steps-l li{margin:6px 0}
+.tbar a.appl{color:var(--yel)}
+@media (display-mode: standalone){.tbar a.appl{display:none}}

@@ -1,0 +1,36 @@
+// Eğitim Stüdyosu Android uygulaması: siteyi tam ekran açan Trusted Web Activity (TWA)
+plugins { id 'com.android.application' }
+
+def siteHost = 'egitim-studyosu.onrender.com'
+
+android {
+    namespace 'tr.egitimstudyosu.app'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'tr.egitimstudyosu.app'
+        minSdk 21
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '1')
+        versionName System.getenv('VERSION_NAME') ?: '1.0.0'
+        resValue 'string', 'app_name', 'Eğitim Stüdyosu'
+        resValue 'string', 'launch_url', "https://${siteHost}/?kaynak=android"
+        resValue 'string', 'host', siteHost
+        resValue 'string', 'asset_statements', "[{ \\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], \\\"target\\\": { \\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"https://${siteHost}\\\" } }]"
+    }
+    signingConfigs {
+        release {
+            storeFile file('../egitimstudyosu.keystore')
+            storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            keyAlias 'egitimstudyosu'
+            keyPassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

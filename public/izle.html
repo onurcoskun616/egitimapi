@@ -5,6 +5,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Etkileşimli Ders</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#05070e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Eğitim Stüdyosu">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
 <style>
@@ -49,7 +57,8 @@ h1{font:900 clamp(28px,6vw,44px)/1.05 var(--d);margin:0 0 10px;letter-spacing:-.
 </head>
 <body>
 <main class="wrap" id="app"><div class="brand"><i></i>EĞİTİM STÜDYOSU</div><p class="muted">Ders yükleniyor…</p></main>
-<script src="/engine.js?v=13"></script>
-<script src="/izle.js?v=13"></script>
+<script src="/engine.js?v=14"></script>
+<script src="/izle.js?v=14"></script>
+<script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));</script>
 </body>
 </html>

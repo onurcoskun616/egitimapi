@@ -1,0 +1,37 @@
+# Android uygulaması (TWA): imzalı APK ve AAB üretir, "android-latest" sürümüne yükler.
+name: android
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.7' }
+      - name: Gizli anahtar kontrolü
+        env: { ANDROID_KEYSTORE_PASSWORD: '${{ secrets.ANDROID_KEYSTORE_PASSWORD }}' }
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then echo "::error::ANDROID_KEYSTORE_PASSWORD adlı GitHub secret tanımlı değil"; exit 1; fi
+      - name: Derle
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+        run: gradle --no-daemon assembleRelease bundleRelease
+      - name: Sürüme yükle
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk egitim-studyosu.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab egitim-studyosu.aab
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest egitim-studyosu.apk egitim-studyosu.aab --title "Android uygulaması 1.0.${{ github.run_number }}" --notes "APK: telefona doğrudan kurulum. AAB: Google Play'e yükleme." --latest=false

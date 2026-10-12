@@ -15,7 +15,7 @@ const audit = require('./lib/audit');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg', '.apk': 'application/vnd.android.package-archive' };
 const publicBase = () => (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 
 /* ---------- yardımcılar ---------- */
@@ -296,6 +296,15 @@ async function monthUsage(userId) {
 
 require('./lib/market')({ on, db, q, send, readBody, isAdmin, activeLimits, auth, shortId: () => shortId(), now });
 require('./lib/finance')({ on, db, q, send, readBody });
+// APK bağlantısı yalnızca GitHub'daki sürüm gerçekten varsa gösterilir (saatte bir kontrol)
+const APK_URL = process.env.APP_APK_URL || 'https://github.com/onurcoskun616/egitimapi/releases/download/android-latest/egitim-studyosu.apk';
+let apkOk = { at: 0, ok: false };
+async function apkAvailable() {
+  if (Date.now() - apkOk.at < 3600e3) return apkOk.ok;
+  let ok = false; try { const r = await fetch(APK_URL, { method: 'HEAD', redirect: 'manual' }); ok = r.status === 200 || (r.status >= 300 && r.status < 400); } catch { }
+  apkOk = { at: Date.now(), ok }; return ok;
+}
+on('GET', '/api/app-info', async (req, res) => send(res, 200, { apk: await apkAvailable() ? APK_URL : null, play: process.env.APP_PLAY_URL || null, ios: process.env.APP_IOS_URL || null }), 'public');
 require('./lib/series')({ on, db, q, send, readBody, isAdmin, activeLimits, monthUsage, background, FORMATS, TONES, now });
 /* ---------- hesaplar ---------- */
 on('POST', '/api/auth/register', async (req, res) => {
@@ -684,10 +693,18 @@ http.createServer(async (req, res) => {
       return send(res, 404, { error: 'Yok' });
     }
     if (url.pathname === '/healthz') return send(res, 200, 'ok');
+    // Android uygulaması (TWA) alan adı doğrulaması: uygulama imza parmak izi ortam değişkeninden
+    if (url.pathname === '/.well-known/assetlinks.json') {
+      const fps = String(process.env.ANDROID_CERT_SHA256 || 'F8:55:D1:5C:DC:50:F8:82:F3:9D:CA:DB:90:38:98:A6:AF:FC:91:DE:D1:E4:70:D1:62:FD:AF:1E:86:FF:2D:ED').split(',').map(s => s.trim()).filter(Boolean);
+      return send(res, 200, fps.length ? [{ relation: ['delegate_permission/common.handle_all_urls'], target: { namespace: 'android_app', package_name: process.env.ANDROID_PACKAGE || 'tr.egitimstudyosu.app', sha256_cert_fingerprints: fps } }] : []);
+    }
     let file = path.normalize(path.join(PUBLIC, url.pathname === '/' ? 'index.html' : url.pathname));
     if (/^\/izle\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'izle.html');
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    const hdr = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' };
+    if (file.endsWith('sw.js')) hdr['Service-Worker-Allowed'] = '/';
+    if (file.includes(path.sep + 'icons' + path.sep)) hdr['Cache-Control'] = 'public, max-age=604800';
+    res.writeHead(200, hdr);
     fs.createReadStream(file).pipe(res);
   } catch (e) { console.error(e); if (!res.headersSent) send(res, 500, { error: e.message }); }
 }).listen(PORT, () => { console.log('Sunucu hazır: ' + PORT); seedAdmin().catch(e => console.error('seedAdmin', e)); resumePending().catch(e => console.error('resume', e)); resumeQuiz().catch(e => console.error('resumeQuiz', e)); });
