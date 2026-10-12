@@ -1,0 +1,25 @@
+name: thumbs
+on:
+  workflow_dispatch:
+    inputs:
+      task_id: { description: Görev kimliği, required: true }
+      api_base: { description: Uygulama adresi, required: true }
+      token: { description: Tek kullanımlık jeton, required: true }
+jobs:
+  thumbs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Jetonu gizle
+        env: { TASK_TOKEN: '${{ inputs.token }}' }
+        run: echo "::add-mask::$TASK_TOKEN"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: Kapakları çıkar
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          API_BASE: ${{ inputs.api_base }}
+          TASK_TOKEN: ${{ inputs.token }}
+        run: node render/thumbs.mjs

@@ -62,6 +62,15 @@ async function main() {
     await new Promise((ok, no) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', out, '-c:v', 'libx264', '-preset', 'medium', '-b:v', kb + 'k', '-maxrate', kb + 'k', '-bufsize', kb * 2 + 'k', '-c:a', 'copy', '-movflags', '+faststart', file], { stdio: 'inherit' }).on('close', c => c === 0 ? ok() : no(new Error('ffmpeg yeniden sıkıştırma ' + c))));
     size = (await stat(file)).size; console.log(`Yeni boyut: ${(size / 1048576).toFixed(1)} MB`);
   }
+  // kapak: ilk sahnenin sonuna yakın kare (başlık ve ana görsel yerleşmiş olur)
+  try {
+    const first = bundle.scenes[0] && bundle.scenes[0].dur ? bundle.scenes[0].dur : 4;
+    const at = Math.max(1, Math.min(first - 0.4, n / FPS - 0.5)), thumb = path.join(here, 'thumb.jpg');
+    await new Promise((ok, no) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-ss', at.toFixed(2), '-i', out, '-frames:v', '1', '-vf', 'scale=720:-2', '-q:v', '4', thumb], { stdio: 'inherit' }).on('close', c => c === 0 ? ok() : no(new Error('kapak ' + c))));
+    const t = await post('upload-url', { kind: 'thumb' });
+    const tu = await fetch(t.url, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true' }, body: await readFile(thumb) });
+    if (tu.ok) await post('status', { thumb: t.path }); else console.log('Kapak yüklenemedi', tu.status);
+  } catch (e) { console.log('Kapak çıkarılamadı:', e.message); }
   const { url, path: storePath } = await post('upload-url');
   const up = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'x-upsert': 'true' }, body: await readFile(file) });
   if (!up.ok) throw new Error('Yükleme başarısız: ' + up.status + ' ' + await up.text());

@@ -3,6 +3,7 @@
 <head>
 <meta name="google" content="notranslate">
 <meta charset="utf-8">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Etkileşimli Ders</title>
 <link rel="manifest" href="/manifest.webmanifest">
@@ -14,15 +15,17 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="/icons/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap">
 <style>
-:root{--bg:#05070e;--panel:#0c1222;--panel2:#111a2e;--line:#1d2742;--fg:#eef1f7;--muted:#8a94ad;--yel:#ffc93c;--hv:#ff8a2a;--lv:#3fb0ff;--green:#3ee0a1;--red:#ff4f4f;--d:'Archivo',system-ui,sans-serif;--m:'JetBrains Mono',ui-monospace,monospace}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font:500 15px/1.5 var(--m)}
+:root{--bg:#05070e;--panel:#0c1222;--panel2:#111a2e;--line:#1d2742;--fg:#eef1f7;--muted:#8a94ad;--yel:#ffc93c;--hv:#ff8a2a;--lv:#3fb0ff;--green:#3ee0a1;--red:#ff4f4f;--d:'Archivo',system-ui,sans-serif;--m:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--code:'JetBrains Mono',ui-monospace,monospace;--field:#070b16;--err-t:#ffb3b3}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f5f6f9;--panel:#fff;--panel2:#eef1f6;--line:#dbe0ea;--fg:#141a28;--muted:#5d6678;--lv:#0b6bcb;--green:#0f8a5f;--red:#c62828;--field:#fff;--err-t:#b3261e}}
+:root[data-theme="light"]{--bg:#f5f6f9;--panel:#fff;--panel2:#eef1f6;--line:#dbe0ea;--fg:#141a28;--muted:#5d6678;--lv:#0b6bcb;--green:#0f8a5f;--red:#c62828;--field:#fff;--err-t:#b3261e}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.55 var(--m)}
 body{min-height:100vh;min-height:100dvh}
 button{font:800 15px var(--m);color:var(--fg);background:var(--panel2);border:1.5px solid var(--line);border-radius:12px;padding:12px 16px;cursor:pointer;touch-action:manipulation}
 button:hover:not(:disabled){border-color:var(--lv)}button:disabled{opacity:.45;cursor:default}
 button.primary{background:var(--yel);color:#111;border-color:var(--yel)}
-input{width:100%;font:500 16px var(--m);color:var(--fg);background:#070b16;border:1.5px solid var(--line);border-radius:10px;padding:12px}
+input{width:100%;font:500 16px var(--m);color:var(--fg);background:var(--field);border:1.5px solid var(--line);border-radius:10px;padding:12px}
 label{display:block;font:800 12px var(--m);letter-spacing:.12em;color:var(--muted);margin:14px 0 6px;text-transform:uppercase}
 h1{font:900 clamp(28px,6vw,44px)/1.05 var(--d);margin:0 0 10px;letter-spacing:-.01em}
 .wrap{max-width:760px;margin:0 auto;padding:20px 16px 40px}
@@ -35,7 +38,7 @@ h1{font:900 clamp(28px,6vw,44px)/1.05 var(--d);margin:0 0 10px;letter-spacing:-.
 .stage:fullscreen{max-height:none;border-radius:0;display:flex;align-items:center;justify-content:center}.stage:fullscreen video{height:100%;width:auto;max-width:100%}
 .fsbtn{position:absolute;top:10px;right:10px;padding:6px 10px;font-size:12px;background:rgba(5,7,14,.7);z-index:3}
 .cps{display:flex;gap:6px;align-items:center;margin:12px 0 4px;flex-wrap:wrap}.cps span{flex:1;min-width:18px;height:6px;border-radius:3px;background:var(--line)}.cps span.ok{background:var(--green)}.cps span.bad{background:var(--yel)}.cps span.now{background:var(--lv)}
-.ov{position:absolute;inset:0;background:rgba(5,7,14,.94);z-index:5;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:16px}
+.ov{position:absolute;inset:0;background:var(--bg);z-index:5;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:16px}
 .q{width:100%;max-width:640px;margin:auto 0}
 .qh{display:flex;justify-content:space-between;gap:8px;font:800 12px var(--m);letter-spacing:.1em;text-transform:uppercase;color:var(--lv);margin-bottom:10px}
 .qt{font:800 clamp(18px,3.6vw,24px)/1.3 var(--d);margin:0 0 16px}
@@ -51,14 +54,17 @@ h1{font:900 clamp(28px,6vw,44px)/1.05 var(--d);margin:0 0 10px;letter-spacing:-.
 .res{list-style:none;padding:0;margin:12px 0}.res li{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
 .chip{font:800 12px var(--m);border:1.5px solid;border-radius:999px;padding:2px 10px;white-space:nowrap;align-self:flex-start}
 .big{font:900 56px var(--d);color:var(--yel)}
-.err{color:#ffb3b3}
+.err{color:var(--err-t)}
 .btnl{display:inline-flex;font:800 14px var(--m);color:var(--fg);background:var(--panel2);border:1.5px solid var(--line);border-radius:12px;padding:12px 16px;text-decoration:none}.btnl.pri{background:var(--yel);color:#111;border-color:var(--yel)}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .big,:root:not([data-theme="dark"]) .kaz b,:root:not([data-theme="dark"]) .res b{color:#9a6700!important}}
+:root[data-theme="light"] .big,:root[data-theme="light"] .kaz b,:root[data-theme="light"] .res b{color:#9a6700!important}
+button,.btnl{min-height:44px}
 </style>
 </head>
 <body>
 <main class="wrap" id="app"><div class="brand"><i></i>EĞİTİM STÜDYOSU</div><p class="muted">Ders yükleniyor…</p></main>
-<script src="/engine.js?v=14"></script>
-<script src="/izle.js?v=14"></script>
+<script src="/engine.js?v=15"></script>
+<script src="/izle.js?v=15"></script>
 <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));</script>
 </body>
 </html>

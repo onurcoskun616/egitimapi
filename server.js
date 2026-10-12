@@ -271,7 +271,7 @@ async function bundleFor(id, withAudio, format, versionId) {
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', scenes };
   if (withAudio) {
     const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc`);
-    if (a) { a.alignment.timings.forEach((t, i) => Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; if (a.alignment.cuts && a.alignment.cuts.length) b.audioCuts = a.alignment.cuts; }
+    if (a) { (a.alignment.timings || []).forEach((t, i) => scenes[i] && Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; if (a.alignment.cuts && a.alignment.cuts.length) b.audioCuts = a.alignment.cuts; }
   }
   return b;
 }
@@ -294,7 +294,14 @@ async function monthUsage(userId) {
   const rows = await db.select('projects', `owner_id=eq.${q(userId)}&created_at=gte.${start.toISOString()}&select=id`); return rows.length;
 }
 
-require('./lib/market')({ on, db, q, send, readBody, isAdmin, activeLimits, auth, shortId: () => shortId(), now });
+// Kapak görseli için imzalı adres (5 saat önbellek)
+const THUMBS = new Map();
+async function thumbUrl(p) {
+  const c = THUMBS.get(p); if (c && c.exp > Date.now()) return c.url;
+  try { const url = await storage.signedUrl(p, 6 * 3600); THUMBS.set(p, { url, exp: Date.now() + 5 * 3600e3 }); return url; } catch { return null; }
+}
+const MARKET = { on, db, q, send, readBody, isAdmin, activeLimits, auth, shortId: () => shortId(), now, thumbUrl };
+require('./lib/market')(MARKET);
 require('./lib/finance')({ on, db, q, send, readBody });
 // APK bağlantısı yalnızca GitHub'daki sürüm gerçekten varsa gösterilir (saatte bir kontrol)
 const APK_URL = process.env.APP_APK_URL || 'https://github.com/onurcoskun616/egitimapi/releases/download/android-latest/egitim-studyosu.apk';
@@ -356,8 +363,22 @@ on('GET', '/api/tones', async (req, res) => send(res, 200, Object.entries(TONES)
 
 on('GET', '/api/projects', async (req, res) => {
   const own = isAdmin(req.user) ? '' : `&owner_id=eq.${q(req.user.id)}`;
-  send(res, 200, await db.select('projects', `select=id,title,status,updated_at,target_seconds,owner_id&status=neq.archived${own}&order=updated_at.desc`));
+  const ps = await db.select('projects', `select=id,title,status,updated_at,target_seconds,owner_id,format,thumb_path&status=neq.archived${own}&order=updated_at.desc`);
+  for (const p of ps) { p.thumb = p.thumb_path ? await thumbUrl(p.thumb_path) : null; delete p.thumb_path; }
+  send(res, 200, ps);
 });
+// Kapağı olmayan teslim edilmiş videolar için kapak üret (yönetici)
+async function startThumbs() {
+  const ps = await db.select('projects', 'status=eq.delivered&thumb_path=is.null&select=id&limit=200');
+  if (!ps.length) return 0;
+  const items = [];
+  for (const p of ps) { const a = await db.one('audio_tracks', `project_id=eq.${q(p.id)}&order=created_at.desc&select=alignment`); const d = a && a.alignment && a.alignment.timings && a.alignment.timings[0] ? a.alignment.timings[0].dur : 4; items.push({ project_id: p.id, at: +Math.max(1, d - 0.4).toFixed(2) }); }
+  const token = crypto.randomBytes(24).toString('hex');
+  const t = await db.insert('gen_tasks', { project_id: null, kind: 'thumbs', items, token });
+  await dispatch('thumbs.yml', { task_id: t.id, token });
+  return items.length;
+}
+on('POST', '/api/admin/thumbs', async (req, res) => { try { send(res, 200, { count: await startThumbs() }); } catch (e) { send(res, 500, { error: e.message }); } }, 'admin');
 async function saveSources(id, list) {
   const out = [];
   for (const s of (Array.isArray(list) ? list : []).slice(0, 10)) {
@@ -503,6 +524,16 @@ on('GET', '/api/l/:sid/check', async (req, res, { sid }) => {
   if (L.denied) return send(res, req.user ? 403 : 401, await deniedInfo(L.p));
   send(res, 200, { code: L.p.share_id, title: L.p.title });
 }, true);
+// İzleme ilerlemesi (giriş yapmış kullanıcı): kaldığı yer ve dersin bitip bitmediği
+on('POST', '/api/l/:sid/progress', async (req, res, { sid }) => {
+  if (!req.user) return send(res, 200, { ok: false });
+  const b = await readBody(req, 1000); const L = await lessonBy(sid, req.user); if (!L || L.denied) return send(res, 404, { error: 'Ders bulunamadı' });
+  const t = Math.max(0, +b.t || 0), dur = Math.max(0, +b.dur || 0), done = !!b.done || (dur > 0 && t >= dur * 0.92);
+  const k = `user_id=eq.${q(req.user.id)}&project_id=eq.${q(L.p.id)}`, ex = await db.one('watch_progress', k + '&select=completed,seconds');
+  const row = { seconds: +t.toFixed(1), duration: dur || null, completed: done || !!(ex && ex.completed), updated_at: now() };
+  if (ex) await db.update('watch_progress', k, row); else await db.insert('watch_progress', { user_id: req.user.id, project_id: L.p.id, ...row }).catch(() => db.update('watch_progress', k, row));
+  send(res, 200, { ok: true, completed: row.completed });
+}, true);
 on('GET', '/api/l/:sid', async (req, res, { sid }) => {
   const L = await lessonBy(sid, req.user); if (!L) return send(res, 404, { error: 'Ders bulunamadı ya da yayında değil' });
   if (L.denied) return send(res, req.user ? 403 : 401, await deniedInfo(L.p));
@@ -512,7 +543,9 @@ on('GET', '/api/l/:sid', async (req, res, { sid }) => {
   const videos = {}; for (const j of done) { const f = j.format || 'dikey'; if (videos[f] || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; videos[f] = await storage.signedUrl(j.output_path, 6 * 3600); }
   if (!Object.keys(videos).length) return send(res, 404, { error: 'Dersin videosu henüz hazır değil' });
   const bundle = await bundleFor(p.id, true, p.format || 'dikey'); delete bundle.audioUrl;
-  send(res, 200, { title: p.title, format: p.format || 'dikey', videos, bundle, quiz: v ? quiz.publicQuiz(v.data, v.version * 7919 + 13) : null, version: v ? v.version : null, me: req.user ? { name: req.user.name, role: req.user.role } : null });
+  let resume = null;
+  if (req.user) { const w = await db.one('watch_progress', `user_id=eq.${q(req.user.id)}&project_id=eq.${q(p.id)}&select=seconds,completed`); if (w && !w.completed && +w.seconds > 10) resume = +w.seconds; }
+  send(res, 200, { title: p.title, format: p.format || 'dikey', videos, bundle, quiz: v ? quiz.publicQuiz(v.data, v.version * 7919 + 13) : null, version: v ? v.version : null, me: req.user ? { name: req.user.name, role: req.user.role } : null, resume });
 }, true);
 async function attemptAuth(sid, b, user) {
   const L = await lessonBy(sid, user); if (!L || L.denied || !L.v) return null;
@@ -595,6 +628,7 @@ on('GET', '/api/task/:taskId', async (req, res, { taskId }) => {
   const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
   await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'running' });
   if (t.kind === 'audit') return send(res, 200, { items: t.items, model: t.model, system: audit.AUDIT_SYSTEM, bundle: await bundleFor(t.project_id, false, 'dikey', t.meta && t.meta.version_id) });
+  if (t.kind === 'thumbs') { const items = []; for (const it of t.items) { const j = await db.one('render_jobs', `project_id=eq.${q(it.project_id)}&status=eq.done&order=created_at.desc&select=output_path`); if (j && j.output_path) items.push({ ...it, video_url: await storage.signedUrl(j.output_path, 3600) }); } return send(res, 200, { items }); }
   send(res, 200, { items: t.items, model: t.model });
 }, true);
 on('POST', '/api/task/:taskId/progress', async (req, res, { taskId }) => {
@@ -606,13 +640,14 @@ on('POST', '/api/task/:taskId/progress', async (req, res, { taskId }) => {
 on('POST', '/api/task/:taskId/upload-url', async (req, res, { taskId }) => {
   const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
   const { name } = await readBody(req);
-  const p = `audit/${t.project_id}/${(t.meta && t.meta.version_id) || 'x'}/${String(name || 'img.jpg').replace(/[^\w.-]/g, '_')}`;
+  const p = t.kind === 'thumbs' ? `covers/${String(name || 'x.jpg').replace(/[^\w.-]/g, '_')}` : `audit/${t.project_id}/${(t.meta && t.meta.version_id) || 'x'}/${String(name || 'img.jpg').replace(/[^\w.-]/g, '_')}`;
   send(res, 200, { url: await storage.signedUploadUrl(p), path: p });
 }, true);
 on('POST', '/api/task/:taskId/result', async (req, res, { taskId }) => {
   const t = await taskAuth(req, taskId); if (!t) return send(res, 403, { error: 'Geçersiz görev' });
   const b = await readBody(req, 20e6);
   if (t.kind === 'audit') await saveAudit(t, b);
+  if (t.kind === 'thumbs') for (const r of b.results || []) if (r && r.path && /^covers\/[\w-]+\.jpg$/.test(r.path)) await db.update('projects', `id=eq.${q(r.project_id)}`, { thumb_path: r.path, thumb_at: now() });
   if (b.error) await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'failed', error: String(b.error).slice(0, 900), finished_at: now() });
   else await db.update('gen_tasks', `id=eq.${q(taskId)}`, { status: 'done', results: b.results, finished_at: now() });
   send(res, 200, { ok: true });
@@ -650,12 +685,14 @@ on('GET', '/api/render/:jobId/bundle', async (req, res, { jobId }) => {
 }, true);
 on('POST', '/api/render/:jobId/upload-url', async (req, res, { jobId }) => {
   const job = await jobAuth(req, jobId); if (!job) return send(res, 403, { error: 'Geçersiz iş' });
-  const p = `videos/${job.project_id}/${job.id}.mp4`;
+  const b = await readBody(req).catch(() => ({}));
+  const p = b && b.kind === 'thumb' ? `covers/${job.project_id}.jpg` : `videos/${job.project_id}/${job.id}.mp4`;
   send(res, 200, { url: await storage.signedUploadUrl(p), path: p });
 }, true);
 on('POST', '/api/render/:jobId/status', async (req, res, { jobId }) => {
   const job = await jobAuth(req, jobId); if (!job) return send(res, 403, { error: 'Geçersiz iş' });
   const b = await readBody(req);
+  if (b.thumb && /^covers\/[\w-]+\.jpg$/.test(b.thumb)) { await db.update('projects', `id=eq.${q(job.project_id)}`, { thumb_path: b.thumb, thumb_at: now() }); return send(res, 200, { ok: true }); }
   if (b.status === 'done') {
     await db.update('render_jobs', `id=eq.${q(jobId)}`, { status: 'done', progress: 100, output_path: b.path, finished_at: now() });
     await setStatus(job.project_id, 'delivered');

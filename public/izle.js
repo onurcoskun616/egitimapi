@@ -19,7 +19,7 @@
     if (!sid) { app.innerHTML = brand() + '<p class="err">Bağlantı hatalı.</p>'; return; }
     try { L = await api(''); } catch (e) { return denied(e); }
     document.title = L.title + (L.quiz ? ' · Etkileşimli Ders' : ' · Ders');
-    if (!L.quiz) return player(0, false);
+    if (!L.quiz) return player(L.resume || 0, !!L.resume);
     // kontrol noktası zamanları videodaki sahne sınırlarından
     const lay = window.EVEngine.layout(L.bundle);
     const end = k => { const s = lay.scenes.find(x => x.k === k); return s ? s.e : lay.total; };
@@ -71,8 +71,9 @@
     const pv = pickVideo();
     app.innerHTML = `${brand()}<h1 style="font-size:clamp(22px,4.5vw,32px)">${esc(L.title)}</h1>
       <div class="stage" id="st" style="aspect-ratio:${AR[pv.f] || '9/16'}"><video id="v" playsinline preload="auto" controls controlslist="nofullscreen nodownload noplaybackrate" disablepictureinpicture src="${esc(pv.url)}"></video><button class="fsbtn" id="fs" type="button">Tam ekran</button></div>
-      <div class="cps" id="cps" aria-label="Bölüm kontrolleri"></div><p class="note" id="hint">${resumed ? 'Kaldığın yerden devam ediyorsun.' : cps.length ? 'Oynat düğmesine bas. Video bölüm sonlarında soru sormak için duracak.' : 'Oynat düğmesine bas.'}</p>`;
+      <div class="cps" id="cps" aria-label="Bölüm kontrolleri"></div><p class="note" id="hint">${resumed ? `Kaldığın yerden devam ediyorsun.${!L.quiz ? ' <button type="button" id="rst" style="min-height:32px;padding:4px 10px;font-size:13px;margin-left:6px">Baştan izle</button>' : ''}` : cps.length ? 'Oynat düğmesine bas. Video bölüm sonlarında soru sormak için duracak.' : 'Oynat düğmesine bas.'}</p>`;
     video = document.getElementById('v'); stage = document.getElementById('st');
+    const rst = document.getElementById('rst'); if (rst) rst.onclick = () => { video.currentTime = 0; video.play().catch(() => { }); rst.remove(); };
     document.getElementById('fs').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => { }); };
     video.addEventListener('loadedmetadata', () => { const d = video.duration; cps.forEach(c => { c.tv = Math.min(c.t - 0.12, d - 0.2); }); if (t0) video.currentTime = Math.min(t0, nextLimit()); });
     // ileri sarma kilidi: cevaplanmamış kontrol noktasını geçemez
@@ -84,6 +85,17 @@
     const loop = () => { if (!document.body.contains(video)) return; const c = cps.find(x => !x.done); if (c && c.tv != null && video.currentTime >= c.tv && !document.getElementById('ov')) { video.pause(); ask(c); } requestAnimationFrame(loop); };
     requestAnimationFrame(loop);
     clearInterval(guard); if (S) guard = setInterval(save, 5000);
+    // hesapla izleyenin ilerlemesi sunucuya (Derslerim'de "devam et" ve ilerleme çubuğu için)
+    if (L.me) {
+      clearInterval(progT); progT = setInterval(() => { if (!video.paused) prog(false); }, 15000);
+      video.addEventListener('pause', () => prog(false)); video.addEventListener('ended', () => prog(!L.quiz));
+      document.addEventListener('visibilitychange', () => { if (document.hidden) prog(false); });
+    }
+  }
+  let progT = 0;
+  function prog(done) {
+    if (!L.me || !video || !isFinite(video.duration)) return;
+    try { fetch('/api/l/' + sid + '/progress', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: video.currentTime, dur: video.duration, done }) }).catch(() => { }); } catch { }
   }
   const nextLimit = () => { const c = cps.find(x => !x.done); return c ? (c.tv ?? c.t) : 1e9; };
   function flash(m) { const h = document.getElementById('hint'); if (h) { h.textContent = m; h.style.color = 'var(--yel)'; setTimeout(() => { h.style.color = ''; }, 2500); } }
@@ -173,6 +185,7 @@
     clearInterval(guard);
     let r; try { r = await api('/finish', { attempt: S.attempt, token: S.token }); } catch (e) { app.insertAdjacentHTML('beforeend', `<p class="err">${esc(e.message)}</p>`); return; }
     try { localStorage.removeItem(KEY); } catch { }
+    prog(true); clearInterval(progT);
     app.innerHTML = `${brand()}<h1>Ders tamamlandı</h1><div class="card"><div class="big">%${r.pct}</div><p>${esc(S.name)}, ${r.total} sorudan ${r.correct} tanesini doğru cevapladın.</p>
       <ul class="res">${r.kazanimlar.map(k => `<li><span><b style="color:var(--yel)">${esc(k.id)}</b> ${esc(k.text)}</span><span class="chip" style="color:${k.learned ? 'var(--green)' : 'var(--yel)'}">${k.learned ? '✓ Öğrenildi' : '↻ Tekrar et'}</span></li>`).join('')}</ul>
       <p class="note">Sonuçların öğretmenine iletildi.</p><div class="row"><button id="again">Dersi baştan izle</button></div></div>`;

@@ -3,10 +3,12 @@
 <head>
 <meta name="google" content="notranslate">
 <meta charset="utf-8">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Eğitim Stüdyosu</title>
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#05070e">
+<meta name="theme-color" content="#05070e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f6f9" media="(prefers-color-scheme: light)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,8 +16,8 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="/icons/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
-<link rel="stylesheet" href="/style.css?v=18">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="/style.css?v=19">
 </head>
 <body>
 <header class="top">
@@ -23,8 +25,8 @@
   <span class="sub">Konu yaz · onayla · video al</span>
 </header>
 <main id="app" aria-live="polite"></main>
-<script src="/engine.js?v=18"></script>
-<script src="/app.js?v=18"></script>
+<script src="/engine.js?v=19"></script>
+<script src="/app.js?v=19"></script>
 <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));</script>
 </body>
 </html>

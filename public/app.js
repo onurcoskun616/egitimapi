@@ -50,43 +50,100 @@
   function setSub(t) { const el = document.querySelector('.top .sub'); if (el) el.textContent = t; }
 
   /* ---------- liste ---------- */
+  // Öğretmen ana sayfası: adım adım yeni video + videolarım
+  const FMT_OPTS = [['yatay', 'Yatay 16:9', 'YouTube, akıllı tahta, sunum', '16/9'], ['dikey', 'Dikey 9:16', 'Reels, TikTok, Shorts', '9/16'], ['kare', 'Kare 1:1', 'Instagram ve Facebook gönderisi', '1/1'], ['dikey45', 'Dikey 4:5', 'Instagram ve Facebook akışı', '4/5']];
+  const DUR_OPTS = [[60, '1 dk'], [90, '1,5 dk'], [150, '2,5 dk'], [240, '4 dk']];
+  const SPD_OPTS = [['yavas', 'Yavaş', 'ders dinler gibi'], ['normal', 'Normal', 'önerilen'], ['hizli', 'Hızlı', 'tekrar ve özet']];
+  const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { } };
+  const radios = (name, opts, cur, render) => opts.map(o => `<label class="tile"><input type="radio" name="${name}" value="${esc(o[0])}" ${String(o[0]) === String(cur) ? 'checked' : ''}>${render(o)}</label>`).join('');
   async function viewList() {
     setSub('Konu yaz · onayla · video al');
     const P = ME.plan; const quota = P ? `<p class="note">${esc(P.plan)} paketi · bu ay ${ME.used} / ${P.limits.videos_per_month} video · <a href="#/paketim">Paketim</a></p>` : `<div class="card" style="border-color:rgba(255,201,60,.5);margin-bottom:12px">Video üretmek için etkin bir paketiniz yok. <a href="#/paketim">Paket seçin</a>.</div>`;
-    app.innerHTML = `<h1>Yeni eğitim videosu</h1>${quota}
-      <form class="card" id="nf">
-        <label for="t">Konu</label><input id="t" required maxlength="120" placeholder="Örn. Elektrikli araçta AG ve YG sistemleri">
-        <label for="b">Ne anlatılsın?</label><textarea id="b" required placeholder="Parçaların görevleri, sık arızalar, belirtiler ve çözümler…"></textarea>
-        <div class="grid two"><div><label for="a">Hedef kitle</label><input id="a" placeholder="Meslek lisesi 11. sınıf"></div>
-        <div><label for="d">Süre</label><select id="d"><option value="60">60 saniye</option><option value="90" selected>90 saniye</option><option value="150">2,5 dakika</option><option value="240">4 dakika</option></select></div></div>
-        <label for="src">Kaynak dosyalar <span class="muted">(isteğe bağlı: MEB modülü, ders kitabı, katalog — PDF, DOCX, TXT)</span></label><input id="src" type="file" multiple accept=".pdf,.docx,.txt,.md">
-        <p class="note">Kaynak yüklerseniz içerik bu kaynağa dayanarak yazılır; terimler, değerler ve bağlantılar kaynakla uyumlu olur ve her sahnede kaynak sayfası gösterilir.</p>
-        <label for="fm">Video biçimi</label><select id="fm"><option value="dikey">Dikey 9:16 · Instagram Reels, TikTok, YouTube Shorts</option><option value="yatay">Yatay 16:9 · YouTube, sunum, akıllı tahta</option><option value="kare">Kare 1:1 · Instagram ve Facebook gönderisi</option><option value="dikey45">Dikey 4:5 · Instagram ve Facebook akışı</option></select>
-        <label for="sr0">Anlatım hızı</label><select id="sr0"><option value="normal" selected>Normal · öğrenci için önerilen</option><option value="yavas">Yavaş · ders dinler gibi, en anlaşılır</option><option value="hizli">Hızlı · tekrar ve özet için</option></select>
-        <label for="tn">Anlatım dili</label><select id="tn" required><option value="">Seçin…</option></select>
-        <p class="note" id="tnd">İçeriğin hangi üslupla anlatılacağını seçin.</p>
-        <div id="tnoWrap" hidden><label for="tno">Anlatım dilini tarif edin</label><input id="tno" maxlength="300" placeholder="Örn. esprili ama saygılı, kısa cümlelerle, futbol benzetmeleri kullanan"></div>
-        <div class="btns"><button class="primary" type="submit" id="go">İçeriği hazırla</button></div><p class="note" id="msg"></p>
+    const def = { tone: lsGet('v_tone', ''), fmt: lsGet('v_fmt', 'yatay'), dur: lsGet('v_dur', '150'), spd: lsGet('v_spd', 'normal') };
+    app.innerHTML = `<div id="guide"></div><div id="waiting"></div>
+      <h1>Yeni eğitim videosu</h1>${quota}
+      <form class="card wiz" id="nf" novalidate>
+        <ol class="wsteps" aria-label="Adımlar"><li data-i="1" class="on">Konu</li><li data-i="2">Anlatım</li><li data-i="3">Biçim</li><li data-i="4">Kaynak</li></ol>
+        <section class="wstep" data-s="1">
+          <label for="t">Konu</label><input id="t" maxlength="120" placeholder="Örn. Elektrikli araçta AG ve YG sistemleri" autocomplete="off">
+          <label for="b">Ne anlatılsın?</label><textarea id="b" placeholder="Parçaların görevleri, sık arızalar, belirtiler ve çözümler…"></textarea>
+          <label for="a">Hedef kitle <span class="muted opt">(isteğe bağlı)</span></label><input id="a" placeholder="Meslek lisesi 11. sınıf">
+        </section>
+        <section class="wstep" data-s="2" hidden>
+          <label>Anlatım dili</label><div class="tiles" id="tones"><div class="empty">Yükleniyor…</div></div>
+          <div id="tnoWrap" hidden><label for="tno">Anlatım dilini tarif edin</label><input id="tno" maxlength="300" placeholder="Örn. esprili ama saygılı, kısa cümlelerle"></div>
+          <label>Anlatım hızı</label><div class="tiles row3">${radios('spd', SPD_OPTS, def.spd, o => `<b>${o[1]}</b><span>${o[2]}</span>`)}</div>
+        </section>
+        <section class="wstep" data-s="3" hidden>
+          <label>Video biçimi</label><div class="tiles">${radios('fmt', FMT_OPTS, def.fmt, o => `<i class="ar" style="aspect-ratio:${o[3]}"></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
+          <label>Süre</label><div class="tiles row4">${radios('dur', DUR_OPTS, def.dur, o => `<b>${o[1]}</b>`)}</div>
+        </section>
+        <section class="wstep" data-s="4" hidden>
+          <label for="src">Kaynak dosyalar <span class="muted opt">(isteğe bağlı)</span></label><input id="src" type="file" multiple accept=".pdf,.docx,.txt,.md">
+          <p class="note">MEB modülü, ders kitabı ya da katalog yüklerseniz içerik bu kaynağa dayanarak yazılır; terimler ve değerler kaynakla uyumlu olur.</p>
+          <div class="summary" id="sum"></div>
+        </section>
+        <div class="wnav"><button type="button" id="wback" hidden>Geri</button><button type="button" class="primary" id="wnext">Devam</button><button class="primary" type="submit" id="go" hidden>İçeriği hazırla</button></div>
+        <p class="note err-t" id="msg"></p>
       </form>
-      <h2>${ME.user.role === 'admin' ? 'Tüm videolar' : 'Videolarım'}</h2><div class="list" id="list"><div class="empty">Yükleniyor…</div></div>`;
-    document.getElementById('nf').onsubmit = async e => {
-      e.preventDefault(); const btn = document.getElementById('go'); busy(btn, true); const msg = document.getElementById('msg');
+      <div class="vhead"><h2>${ME.user.role === 'admin' ? 'Tüm videolar' : 'Videolarım'}</h2><div class="chips" id="vf"><button type="button" data-f="" class="on">Tümü</button><button type="button" data-f="wait">Onayımı bekleyen</button><button type="button" data-f="work">Hazırlanan</button><button type="button" data-f="done">Teslim edilen</button></div></div>
+      <div class="list" id="list"><div class="empty">Yükleniyor…</div></div>`;
+    const f = document.getElementById('nf'), msg = document.getElementById('msg');
+    let step = 1, tones = [];
+    const val = n => (f.querySelector(`input[name="${n}"]:checked`) || {}).value;
+    const show = n => {
+      step = n; f.querySelectorAll('.wstep').forEach(s => s.hidden = +s.dataset.s !== n);
+      f.querySelectorAll('.wsteps li').forEach(li => { const i = +li.dataset.i; li.className = i === n ? 'on' : i < n ? 'done' : ''; });
+      document.getElementById('wback').hidden = n === 1; document.getElementById('wnext').hidden = n === 4; document.getElementById('go').hidden = n !== 4; msg.textContent = '';
+      if (n === 4) { const tx = tones.find(x => x.k === val('tone')); const fo = FMT_OPTS.find(o => o[0] === val('fmt')); const du = DUR_OPTS.find(o => String(o[0]) === val('dur')); const sp = SPD_OPTS.find(o => o[0] === val('spd'));
+        document.getElementById('sum').innerHTML = `<b>Özet</b><ul><li>${esc(document.getElementById('t').value)}</li><li>${esc(val('tone') === 'ozel' ? 'Özel anlatım' : tx ? tx.label : '')} · ${esc(sp ? sp[1] : '')} hız</li><li>${esc(fo ? fo[1] : '')} · ${esc(du ? du[1] : '')}</li></ul>`; }
+      f.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    };
+    const check = n => {
+      if (n === 1) { if (document.getElementById('t').value.trim().length < 3) return 'Konuyu yazın'; if (document.getElementById('b').value.trim().length < 10) return 'Ne anlatılacağını birkaç kelimeyle yazın'; }
+      if (n === 2) { if (!val('tone')) return 'Bir anlatım dili seçin'; if (val('tone') === 'ozel' && document.getElementById('tno').value.trim().length < 3) return 'Anlatım dilini kısaca tarif edin'; }
+      return '';
+    };
+    document.getElementById('wnext').onclick = () => { const e = check(step); if (e) { msg.textContent = e; return; } show(step + 1); };
+    document.getElementById('wback').onclick = () => show(step - 1);
+    f.querySelectorAll('.wsteps li').forEach(li => li.onclick = () => { const i = +li.dataset.i; for (let k = 1; k < i; k++) { const e = check(k); if (e) { show(k); msg.textContent = e; return; } } show(i); });
+    f.onsubmit = async e => {
+      e.preventDefault(); for (let k = 1; k <= 3; k++) { const er = check(k); if (er) { show(k); msg.textContent = er; return; } }
+      const btn = document.getElementById('go'); busy(btn, true);
       try {
         const files = [...(document.getElementById('src').files || [])];
         const sources = files.length ? await extractAll(files, msg) : [];
-        const p = await api('/api/projects', { method: 'POST', body: { title: t.value, brief: b.value, audience: a.value, target_seconds: +d.value, tone: tn.value, tone_note: tno.value, format: document.getElementById('fm').value, speech_rate: document.getElementById('sr0').value, sources } }); location.hash = '#/p/' + p.id; }
-      catch (err) { document.getElementById('msg').textContent = err.message; busy(btn, false); }
+        ['tone', 'fmt', 'dur', 'spd'].forEach(k => lsSet('v_' + k, val(k)));
+        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), sources } });
+        location.hash = '#/p/' + p.id;
+      } catch (err) { msg.textContent = err.message; busy(btn, false); }
     };
-    const t = document.getElementById('t'), b = document.getElementById('b'), a = document.getElementById('a'), d = document.getElementById('d');
-    const tn = document.getElementById('tn'), tno = document.getElementById('tno'), tnd = document.getElementById('tnd'), tnoWrap = document.getElementById('tnoWrap');
     api('/api/tones').then(list => {
-      tn.insertAdjacentHTML('beforeend', list.map(x => `<option value="${esc(x.k)}">${esc(x.label)}</option>`).join('') + '<option value="ozel">Diğer (kendim tarif edeyim)</option>');
-      tn.onchange = () => { const x = list.find(y => y.k === tn.value); tnd.textContent = x ? x.desc : tn.value === 'ozel' ? 'Aşağıya istediğiniz üslubu kısaca yazın.' : 'İçeriğin hangi üslupla anlatılacağını seçin.'; tnoWrap.hidden = tn.value !== 'ozel'; tno.required = tn.value === 'ozel'; };
+      tones = list;
+      document.getElementById('tones').innerHTML = radios('tone', list.map(x => [x.k, x.label, String(x.desc || '').split(/(?<=[.!?])\s/)[0]]).concat([['ozel', 'Diğer', 'Kendim tarif edeyim']]), def.tone, o => `<b>${esc(o[1])}</b><span>${esc(o[2])}</span>`);
+      f.querySelectorAll('input[name="tone"]').forEach(r => r.onchange = () => { document.getElementById('tnoWrap').hidden = val('tone') !== 'ozel'; });
     }).catch(() => {});
-    try {
-      const list = await api('/api/projects');
-      document.getElementById('list').innerHTML = list.length ? list.map(p => `<a class="row" href="#/p/${p.id}"><span>${esc(p.title)}</span><span class="pill st-${p.status}">${STATUS[p.status] || p.status}</span></a>`).join('') : '<div class="empty">Henüz proje yok. Yukarıdan ilk konunu yaz.</div>';
-    } catch (e) { }
+    let list = [];
+    try { list = await api('/api/projects'); } catch (e) { }
+    const WAIT = ['content_review', 'visuals_review'], WORK = ['queued', 'content_generating', 'visuals_generating', 'voicing', 'rendering'];
+    const draw = flt => {
+      const L = list.filter(p => !flt || (flt === 'wait' ? WAIT.includes(p.status) : flt === 'work' ? WORK.includes(p.status) : p.status === 'delivered'));
+      document.getElementById('list').innerHTML = L.length ? L.map(p => `<a class="row lrow" href="#/p/${p.id}">${thumbBox(p.thumb)}<span class="lmain"><span class="ltitle">${esc(p.title)}</span><span class="note">${fmtDate(p.updated_at)}</span></span><span class="pill st-${p.status}">${STATUS[p.status] || p.status}</span></a>`).join('') : `<div class="empty">${list.length ? 'Bu filtrede video yok.' : 'Henüz video yok. Yukarıdan ilk konunu yaz.'}</div>`;
+    };
+    draw('');
+    document.querySelectorAll('#vf button').forEach(b => b.onclick = () => { document.querySelectorAll('#vf button').forEach(x => x.classList.toggle('on', x === b)); draw(b.dataset.f); });
+    const w = list.filter(p => WAIT.includes(p.status));
+    if (w.length) document.getElementById('waiting').innerHTML = `<a class="waitbar" href="#/p/${w[0].id}"><b>${w.length} video onayınızı bekliyor</b><span>${esc(w[0].title)}${w.length > 1 ? ` ve ${w.length - 1} video daha` : ''} →</span></a>`;
+    if (!list.length && lsGet('rehber_kapali', '') !== '1') {
+      document.getElementById('guide').innerHTML = `<div class="card guide"><button type="button" class="gclose" aria-label="Kapat">✕</button><b class="gt">3 adımda ilk videonuz</b>
+        <ol class="gsteps"><li><span>1</span><div><b>Konuyu yazın</b><p>Konu ve ne anlatılacağını yazın, anlatım dilini ve biçimi seçin. İsterseniz MEB modülünü kaynak olarak ekleyin.</p></div></li>
+        <li><span>2</span><div><b>İçeriği ve görselleri onaylayın</b><p>1–2 dakikada sahne sahne metin gelir; düzeltme isteyebilirsiniz. Sonra görseller çizilir, onları da inceleyip onaylarsınız.</p></div></li>
+        <li><span>3</span><div><b>Videonuzu alın, öğrencilere açın</b><p>Seslendirme ve video kendiliğinden hazırlanır. Ders kodu ve QR ile paylaşın ya da bir eğitime ekleyin; soruların sonuçlarını takip edin.</p></div></li></ol>
+        <div class="btns"><button class="primary" id="gstart">Başlayalım</button></div></div>`;
+      document.querySelector('.gclose').onclick = () => { lsSet('rehber_kapali', '1'); document.getElementById('guide').innerHTML = ''; };
+      document.getElementById('gstart').onclick = () => { document.getElementById('t').focus(); f.scrollIntoView({ behavior: 'smooth' }); };
+    }
   }
 
   /* ---------- proje ---------- */
@@ -126,7 +183,7 @@
     return `<p class="muted">Sürüm ${d.content.version} · ${sc.length} sahne · tahmini ${Math.round(chars / 14.5)} saniye${srcs.length ? ` · Kaynak: ${srcs.map(x => esc(x.name)).join(', ')}` : ''}</p>
       <div class="grid">${sc.map(s => `<div class="scene"><h3><small>${esc(s.k)} · ${esc(s.ch)}</small>${esc(s.title)}${s.tag ? ` <span class="pill" style="color:var(--red)">${esc(s.tag.text)}</span>` : ''}</h3><ol>${s.cap.map(x => `<li>${esc(x)}</li>`).join('')}</ol>${s.big ? `<div class="big">${esc(s.big.text)}</div>` : ''}<div class="vis">Görsel: ${esc(s.visual && s.visual.subject)}</div>${srcLine(s)}</div>`).join('')}</div>
       <div class="card" style="margin-top:16px"><label for="fb">Düzeltme isteği</label><textarea id="fb" placeholder="Örn. 3. sahneyi kısalt, arızalara bir örnek daha ekle"></textarea>
-      <div class="btns"><button class="primary" data-act="content-approve">Onayla, görselleri hazırla</button><button data-act="content-revise">Düzelt</button><button class="danger" data-act="cancel">İptal</button></div></div>
+      <div class="btns stickyact"><button class="primary" data-act="content-approve">Onayla, görselleri hazırla</button><button data-act="content-revise">Düzelt</button><button class="danger" data-act="cancel">İptal</button></div></div>
       <div class="card" style="margin-top:12px"><label for="src2">Kaynak ekle</label><input id="src2" type="file" multiple accept=".pdf,.docx,.txt,.md"><div class="btns"><button data-act="add-source">Kaynağı ekle ve içeriği kaynağa göre yeniden yaz</button></div><p class="note" id="srcmsg"></p></div>`;
   }
   const SR = { yavas: 'Yavaş · ders dinler gibi, en anlaşılır', normal: 'Normal · öğrenci için önerilen', hizli: 'Hızlı · tekrar ve özet için' };
@@ -140,7 +197,7 @@
       <label for="fb">Düzeltme isteği</label><textarea id="fb" placeholder="Örn. motoru daha büyük çiz, etiketler üst üste biniyor"></textarea>
       <div class="btns"><button data-act="visuals-revise">Yeniden çiz</button></div></div>
       <div class="card" style="margin-top:12px"><label for="sr">Anlatım hızı</label><select id="sr">${SR_OPTS(d.project.speech_rate)}</select></div>
-      <div class="btns"><button class="primary" data-act="visuals-approve">Onayla: seslendir ve videoyu üret</button><button class="danger" data-act="cancel">İptal</button></div></div></div>
+      <div class="btns stickyact"><button class="primary" data-act="visuals-approve">Onayla: seslendir ve videoyu üret</button><button class="danger" data-act="cancel">İptal</button></div></div></div>
       <div id="audit" class="audit"></div>`;
   }
 
@@ -495,21 +552,52 @@
   const fmtDate = d => d ? new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   const initials = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toLocaleUpperCase('tr')).join('');
 
+  // Basit çizgi simgeler (alt menü)
+  const IC = {
+    home: '<path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5"/>',
+    book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20"/>',
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+    video: '<rect x="3" y="5" width="13" height="14" rx="2"/><path d="m16 10 5-3v10l-5-3"/>',
+    layers: '<path d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5"/>',
+    inbox: '<path d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+  };
+  const icon = k => `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
+  const THEMES = ['', 'light', 'dark'], THEME_L = { '': 'Tema: otomatik', light: 'Tema: açık', dark: 'Tema: koyu' }, THEME_I = { '': '◐', light: '☀', dark: '☾' };
+  const curTheme = () => document.documentElement.dataset.theme || '';
+  function setTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; try { t ? localStorage.setItem('tema', t) : localStorage.removeItem('tema'); } catch { } nav(); }
   function nav() {
     let el = document.getElementById('tbar'); if (el) el.remove();
-    const u = ME.user; let links = [];
-    if (!u) links = ['<a href="#/">Eğitimler</a>', '<a href="#/giris">Giriş</a>', '<a href="#/kayit" class="navcta">Kayıt ol</a>'];
-    else {
-      if (u.role === 'student') links = ['<a href="#/">Eğitimler</a>', '<a href="#/derslerim">Derslerim</a>'];
-      else if (isTeacher()) links = ['<a href="#/projeler">Videolar</a>', '<a href="#/egitimler">Eğitimlerim</a>', `<a href="#/talepler">Talepler${ME.pending ? ` <b class="badge">${ME.pending}</b>` : ''}</a>`, '<a href="#/sonuclar">Sonuçlar</a>', '<a href="#/paketim">Paketim</a>'];
+    let bb = document.getElementById('bbar'); if (bb) bb.remove();
+    const u = ME.user; let links = [], tabs = [];
+    if (!u) {
+      links = ['<a href="#/">Eğitimler</a>', '<a href="#/giris">Giriş</a>', '<a href="#/kayit" class="navcta">Kayıt ol</a>'];
+      tabs = [['#/', 'home', 'Eğitimler'], ['#/?ara=1', 'search', 'Ara'], ['#/giris', 'key', 'Giriş'], ['#/kayit', 'user', 'Kayıt ol']];
+    } else {
+      if (u.role === 'student') {
+        links = ['<a href="#/">Eğitimler</a>', '<a href="#/derslerim">Derslerim</a>'];
+        tabs = [['#/', 'home', 'Ana sayfa'], ['#/derslerim', 'book', 'Derslerim'], ['#/?ara=1', 'search', 'Ara'], ['#/profil', 'user', 'Profil']];
+      } else if (isTeacher()) {
+        links = ['<a href="#/projeler">Videolar</a>', '<a href="#/egitimler">Eğitimlerim</a>', `<a href="#/talepler">Talepler${ME.pending ? ` <b class="badge">${ME.pending}</b>` : ''}</a>`, '<a href="#/sonuclar">Sonuçlar</a>', '<a href="#/paketim">Paketim</a>'];
+        tabs = [['#/projeler', 'video', 'Videolar'], ['#/egitimler', 'layers', 'Eğitimler'], ['#/talepler', 'inbox', 'Talepler', ME.pending], ['#/sonuclar', 'chart', 'Sonuçlar'], ['#/profil', 'user', 'Profil']];
+      } else tabs = [['#/', 'home', 'Ana sayfa'], ['#/profil', 'user', 'Profil']];
       if (u.role === 'admin') links.push('<a href="#/yonetim">Yönetim</a>');
       links.push(`<a href="#/profil" title="Profil">${esc(u.name)}</a>`, '<button type="button" id="logout" class="linkbtn">Çıkış</button>');
     }
     if (!isStandalone()) links.push(`<a href="#/uygulama" class="appl" title="Telefon uygulaması">📱 Uygulama</a>`);
-    document.querySelector('.top').insertAdjacentHTML('beforeend', `<nav id="tbar" class="tbar">${links.join('')}</nav>`);
-    const lo = document.getElementById('logout'); if (lo) lo.onclick = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); ME = { user: null }; location.hash = '#/'; route(); };
-    document.querySelectorAll('#tbar a').forEach(a => { if (a.getAttribute('href') === location.hash.split('?')[0]) a.classList.add('on'); });
+    const th = curTheme();
+    document.querySelector('.top').insertAdjacentHTML('beforeend', `<nav id="tbar" class="tbar" aria-label="Ana menü">${links.join('')}<button type="button" class="themebtn" id="themebtn" title="${THEME_L[th]}" aria-label="${THEME_L[th]}">${THEME_I[th]}</button></nav>`);
+    const hcur = location.hash || '#/', hbase = hcur.split('?')[0];
+    const active = h => { const b = h.split('?')[0]; if (h.includes('ara=1')) return hcur.includes('ara=1'); if (b === '#/') return (hbase === '#/' || hbase === '#') && !hcur.includes('ara=1'); return hbase === b || hbase.startsWith(b + '/') || (b === '#/projeler' && hbase.startsWith('#/p/')) || (b === '#/egitimler' && hbase.startsWith('#/egitimler')); };
+    document.body.insertAdjacentHTML('beforeend', `<nav id="bbar" class="bbar" aria-label="Alt menü">${tabs.map(([h, ic, l, n]) => `<a href="${h}" class="${active(h) ? 'on' : ''}" ${active(h) ? 'aria-current="page"' : ''}>${icon(ic)}<span>${l}</span>${n ? `<b class="bdot">${n}</b>` : ''}</a>`).join('')}</nav>`);
+    document.getElementById('themebtn').onclick = () => setTheme(THEMES[(THEMES.indexOf(curTheme()) + 1) % 3]);
+    const lo = document.getElementById('logout'); if (lo) lo.onclick = logout;
+    document.querySelectorAll('#tbar a').forEach(a => { if (a.getAttribute('href') === hbase) a.classList.add('on'); });
   }
+  async function logout() { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); ME = { user: null }; location.hash = '#/'; route(); }
 
   /* ---------- vitrin ---------- */
   async function viewStore() {
@@ -534,8 +622,9 @@
       document.getElementById('clist').innerHTML = list.length ? list.map(courseCard).join('') : '<div class="empty">Eşleşen eğitim yok.</div>';
     };
     document.getElementById('cq').oninput = draw; draw();
+    if (qsOf().get('ara')) { const cq = document.getElementById('cq'); cq.scrollIntoView({ block: 'center' }); setTimeout(() => cq.focus(), 50); }
   }
-  const courseCard = c => `<a class="ccard" href="#/e/${esc(c.id)}"><span class="ctag">${esc(c.subject || 'Eğitim')}</span><b>${esc(c.title)}</b>${c.teacher ? `<span class="note">${esc(c.teacher.name)}</span>` : ''}<span class="cmeta"><span>${c.lessons} ders</span><span class="acc acc-${c.access}">${c.access === 'paid' ? tl(c.price_cents) : ACCESS[c.access]}</span></span></a>`;
+  const courseCard = c => `<a class="ccard" href="#/e/${esc(c.id)}">${thumbBox(c.thumb, 'ccover')}<span class="ctag">${esc(c.subject || 'Eğitim')}</span><b>${esc(c.title)}</b>${c.teacher ? `<span class="note">${esc(c.teacher.name)}</span>` : ''}<span class="cmeta"><span>${c.lessons} ders</span><span class="acc acc-${c.access}">${c.access === 'paid' ? tl(c.price_cents) : ACCESS[c.access]}</span></span></a>`;
 
   async function viewTeacher(slug) {
     let d; try { d = await api('/api/t/' + encodeURIComponent(slug)); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
@@ -560,7 +649,7 @@
     app.innerHTML = `<p class="muted"><a href="#/">← Tüm eğitimler</a>${t.slug ? ` · <a href="#/o/${esc(t.slug)}">${esc(t.name)}</a>` : ''}</p>
       <span class="ctag">${esc(c.subject || 'Eğitim')}${c.level ? ' · ' + esc(c.level) : ''}</span><h1>${esc(c.title)}</h1>
       <div class="grid two" style="align-items:start"><div>${c.description ? `<div class="card"><p style="margin:0;white-space:pre-wrap">${esc(c.description)}</p></div>` : ''}
-        <h2>Dersler <span class="muted" style="font-size:14px">· ${d.lessons.length}</span></h2><div class="list">${d.lessons.map(l => l.code ? `<a class="row" href="/izle/${esc(l.code)}"><span><b class="muted">${l.n}.</b> ${esc(l.title)}</span><span class="pill" style="color:var(--green)">${l.quiz ? 'Etkileşimli ▶' : 'İzle ▶'}</span></a>` : `<div class="row locked"><span><b class="muted">${l.n}.</b> ${esc(l.title)}</span><span class="note">${l.ready ? '🔒' : 'hazırlanıyor'}</span></div>`).join('') || '<div class="empty">Henüz ders yok.</div>'}</div></div>
+        <h2>Dersler <span class="muted" style="font-size:14px">· ${d.lessons.length}</span></h2><div class="list">${d.lessons.map(l => l.code ? lessonRow(l, l.n - 1) : `<div class="row locked lrow">${thumbBox(l.thumb)}<span class="lmain"><span class="ltitle"><b class="muted">${l.n}.</b> ${esc(l.title)}</span></span><span class="note">${l.ready ? '🔒' : 'hazırlanıyor'}</span></div>`).join('') || '<div class="empty">Henüz ders yok.</div>'}</div></div>
         <div class="card"><div class="tprof sm"><span class="av">${esc(initials(t.name))}</span><div><b>${esc(t.name || '')}</b><div class="note">${esc([t.subject, t.school].filter(Boolean).join(' · '))}</div></div></div>
         <p class="note">${ACCESS[c.access]}${c.access === 'paid' ? ' · ' + tl(c.price_cents) : ''}</p>${action}<p class="note err-t" id="cmsg"></p></div></div>`;
     app.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => {
@@ -624,27 +713,40 @@
   async function viewProfile() {
     setSub('Profil');
     const u = ME.user;
-    app.innerHTML = `<h1>Profil</h1><form class="card" id="pf"><label for="nm">Ad soyad</label><input id="nm" value="${esc(u.name)}" required minlength="3">
+    const qlinks = [u.role !== 'student' && isTeacher() ? ['#/paketim', 'Paketim'] : null, u.role === 'admin' ? ['#/yonetim', 'Yönetim'] : null, u.role === 'student' ? ['#/derslerim', 'Derslerim'] : ['#/projeler', 'Videolar'], ['#/', 'Eğitim vitrini'], isStandalone() ? null : ['#/uygulama', 'Telefon uygulaması']].filter(Boolean);
+    app.innerHTML = `<h1>Profil</h1>
+      <div class="card qcard"><div class="qlinks">${qlinks.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}<button type="button" class="btn danger" id="lo2">Çıkış yap</button></div>
+      <label for="thm">Görünüm</label><select id="thm"><option value="">Otomatik (telefonun ayarı)</option><option value="light">Açık</option><option value="dark">Koyu</option></select></div>
+      <h2>Bilgilerim</h2><form class="card" id="pf"><label for="nm">Ad soyad</label><input id="nm" value="${esc(u.name)}" required minlength="3">
       <label>E-posta</label><input value="${esc(u.email)}" disabled>
       <label for="sc">Okul / kurum</label><input id="sc" value="${esc(u.school || '')}" maxlength="120">
       ${u.role !== 'student' ? `<label for="sj">Branş</label><input id="sj" value="${esc(u.subject || '')}" maxlength="80"><label for="bi">Tanıtım</label><textarea id="bi" maxlength="1000">${esc(u.bio || '')}</textarea>
       <label for="sl">Profil adresi</label><div class="cp"><span class="note" style="align-self:center">${esc(location.origin)}/#/o/</span><input id="sl" value="${esc(u.slug || '')}" maxlength="60"></div>` : ''}
       <div class="btns"><button class="primary" type="submit">Kaydet</button>${u.role !== 'student' && u.slug ? `<a class="btn" href="#/o/${esc(u.slug)}">Herkese açık profilim</a>` : ''}</div><p class="note" id="m1"></p></form>
       <h2>Şifre değiştir</h2><form class="card" id="wf"><label for="op">Mevcut şifre</label><input id="op" type="password" required autocomplete="current-password"><label for="np">Yeni şifre</label><input id="np" type="password" required minlength="8" autocomplete="new-password"><div class="btns"><button type="submit">Şifreyi değiştir</button></div><p class="note" id="m2"></p></form>`;
+    const thm = document.getElementById('thm'); thm.value = curTheme(); thm.onchange = () => setTheme(thm.value);
+    document.getElementById('lo2').onclick = logout;
     const v = id => (document.getElementById(id) || {}).value;
     document.getElementById('pf').onsubmit = async e => { e.preventDefault(); const m = document.getElementById('m1'); try { const body = { name: v('nm'), school: v('sc') }; if (u.role !== 'student') Object.assign(body, { subject: v('sj'), bio: v('bi'), slug: v('sl') }); await api('/api/me/profile', { method: 'POST', body }); m.style.color = 'var(--green)'; m.textContent = 'Kaydedildi.'; } catch (err) { m.style.color = ''; m.textContent = err.message; } };
     document.getElementById('wf').onsubmit = async e => { e.preventDefault(); const m = document.getElementById('m2'); try { await api('/api/me/profile', { method: 'POST', body: { password: v('op'), new_password: v('np') } }); m.style.color = 'var(--green)'; m.textContent = 'Şifreniz değişti.'; e.target.reset(); } catch (err) { m.style.color = ''; m.textContent = err.message; } };
   }
 
   /* ---------- öğrenci paneli ---------- */
+  // ders satırı: kapak, başlık, ilerleme
+  const thumbBox = (src, cls = 'lthumb') => `<span class="${cls}">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : `<i aria-hidden="true">${icon('video')}</i>`}</span>`;
+  const progBadge = p => !p ? '' : p.done ? `<span class="okmark" title="Tamamlandı">✓${p.score != null ? ` %${p.score}` : ''}</span>` : p.pct ? `<span class="pctxt">%${p.pct}</span>` : '';
+  const lessonRow = (l, i) => `<a class="row lrow" href="/izle/${esc(l.code)}">${thumbBox(l.thumb)}<span class="lmain"><span class="ltitle"><b class="muted">${i + 1}.</b> ${esc(l.title)}</span>${l.progress && !l.progress.done && l.progress.pct ? `<span class="pbar"><i style="width:${l.progress.pct}%"></i></span>` : ''}</span>${progBadge(l.progress) || `<span class="note">${l.quiz ? 'Başla ▶' : 'İzle ▶'}</span>`}</a>`;
   async function viewMyLearning() {
     setSub('Derslerim');
     let d; try { d = await api('/api/me/courses'); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
     const ok = d.courses.filter(x => x.enrollment.status === 'approved'), wait = d.courses.filter(x => x.enrollment.status === 'pending'), other = d.courses.filter(x => !['approved', 'pending'].includes(x.enrollment.status));
-    app.innerHTML = `<h1>Derslerim</h1>
-      ${ok.length ? ok.map(x => `<div class="card mcourse"><div class="aud-head"><div><a href="#/e/${esc(x.course.id)}"><b style="font:800 18px var(--display)">${esc(x.course.title)}</b></a><div class="note">${esc(x.course.teacher ? x.course.teacher.name : '')}</div></div><span class="pill" style="color:var(--green)">Kayıtlı</span></div>
-        <div class="list" style="margin-top:10px">${(x.lessons || []).map((l, i) => { const r = d.results.find(y => y.code === l.code && y.summary); return `<a class="row" href="/izle/${esc(l.code)}"><span><b class="muted">${i + 1}.</b> ${esc(l.title)}</span><span class="note">${r ? `%${r.summary.pct} · ${r.summary.learned}/${r.summary.kazanim} kazanım` : l.quiz ? 'Başla ▶' : 'İzle ▶'}</span></a>`; }).join('') || '<div class="empty">Bu eğitimde henüz izlenebilir ders yok.</div>'}</div></div>`).join('') : `<div class="card"><p>Henüz kayıtlı olduğunuz bir eğitim yok.</p><div class="btns"><a class="btn primary" href="#/">Eğitimlere göz at</a></div></div>`}
-      ${wait.length ? `<h2>Onay bekleyen talepler</h2><div class="list">${wait.map(x => `<a class="row" href="#/e/${esc(x.course.id)}"><span>${esc(x.course.title)} <span class="note">· ${esc(x.course.teacher ? x.course.teacher.name : '')}</span></span><span class="pill" style="color:var(--yel)">${x.enrollment.source === 'purchase' ? 'Ödeme bekliyor' : 'Onay bekliyor'}</span></a>`).join('')}</div>` : ''}
+    const c = d.continue;
+    const cont = c ? `<a class="contcard" href="/izle/${esc(c.code)}">${thumbBox(c.thumb, 'cthumb2')}<span class="cinfo"><span class="ctag">${c.first ? 'Başla' : c.next ? 'Sıradaki ders' : 'Kaldığın yerden devam et'}</span><b>${esc(c.title)}</b><span class="note">${esc(c.course)}</span>${c.progress && !c.progress.done && c.progress.pct ? `<span class="pbar"><i style="width:${c.progress.pct}%"></i></span>` : ''}</span><span class="playbtn" aria-hidden="true">▶</span></a>` : '';
+    app.innerHTML = `<h1>Derslerim</h1>${cont}
+      ${ok.length ? ok.map(x => { const n = (x.lessons || []).length, dn = x.done || 0; return `<div class="card mcourse"><div class="aud-head"><div><a href="#/e/${esc(x.course.id)}"><b style="font:800 18px var(--display)">${esc(x.course.title)}</b></a><div class="note">${esc(x.course.teacher ? x.course.teacher.name : '')}</div></div><span class="pill" style="color:${n && dn === n ? 'var(--green)' : 'var(--muted)'}">${n ? `${dn}/${n} ders` : 'Kayıtlı'}</span></div>
+        ${n ? `<div class="pbar big" title="${dn}/${n} tamamlandı"><i style="width:${Math.round(dn / n * 100)}%"></i></div>` : ''}
+        <div class="list" style="margin-top:10px">${(x.lessons || []).map(lessonRow).join('') || '<div class="empty">Bu eğitimde henüz izlenebilir ders yok.</div>'}</div></div>`; }).join('') : `<div class="card"><p>Henüz kayıtlı olduğunuz bir eğitim yok.</p><div class="btns"><a class="btn primary" href="#/">Eğitimlere göz at</a></div></div>`}
+      ${wait.length ? `<h2>Onay bekleyen talepler</h2><div class="list">${wait.map(x => `<a class="row" href="#/e/${esc(x.course.id)}"><span>${esc(x.course.title)} <span class="note">· ${esc(x.course.teacher ? x.course.teacher.name : '')}</span></span><span class="pill" style="color:var(--yel-t)">${x.enrollment.source === 'purchase' ? 'Ödeme bekliyor' : 'Onay bekliyor'}</span></a>`).join('')}</div>` : ''}
       ${other.length ? `<h2>Diğer</h2><div class="list">${other.map(x => `<a class="row" href="#/e/${esc(x.course.id)}"><span>${esc(x.course.title)}</span><span class="note">${ENR[x.enrollment.status]}</span></a>`).join('')}</div>` : ''}
       ${d.results.length ? `<h2>Sonuçlarım</h2><div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Ders</th><th>Tarih</th><th>Puan</th><th>Kazanım</th></tr></thead><tbody>${d.results.map(r => `<tr><td>${r.code ? `<a href="/izle/${esc(r.code)}">${esc(r.title || '')}</a>` : esc(r.title || '')}</td><td>${fmtDate(r.finished_at || r.started_at)}</td><td>${r.summary ? '%' + r.summary.pct : '<span class="note">yarım</span>'}</td><td>${r.summary ? `${r.summary.learned}/${r.summary.kazanim}` : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
   }
@@ -744,7 +846,8 @@
     } else if (tab === 'proje') {
       const d = await api('/api/admin/projects');
       const opts = sel => `<option value="">— sahipsiz —</option>${d.owners.filter(o => o.status === 'active').map(o => `<option value="${o.id}" ${o.id === sel ? 'selected' : ''}>${esc(o.name)} (${esc(o.email)})</option>`).join('')}`;
-      el.innerHTML = `<p class="note">Platform açılmadan önce üretilen videolar sahipsizdir ve yalnızca yönetici görür. Her videoyu bir öğretmene atayın; öğretmen kendi panelinde görür ve eğitimlerine ekleyebilir.</p><div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Video</th><th>Durum</th><th>Sahibi</th></tr></thead><tbody>${d.projects.map(p => `<tr><td><a href="#/p/${p.id}">${esc(p.title)}</a></td><td>${STATUS[p.status] || p.status}</td><td><select data-own="${p.id}">${opts(p.owner_id)}</select></td></tr>`).join('')}</tbody></table></div>`;
+      el.innerHTML = `<div class="btns" style="margin-top:0"><button id="thb">Eksik kapak görsellerini oluştur</button></div><p class="note">Platform açılmadan önce üretilen videolar sahipsizdir ve yalnızca yönetici görür. Her videoyu bir öğretmene atayın; öğretmen kendi panelinde görür ve eğitimlerine ekleyebilir.</p><div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Video</th><th>Durum</th><th>Sahibi</th></tr></thead><tbody>${d.projects.map(p => `<tr><td><a href="#/p/${p.id}">${esc(p.title)}</a></td><td>${STATUS[p.status] || p.status}</td><td><select data-own="${p.id}">${opts(p.owner_id)}</select></td></tr>`).join('')}</tbody></table></div>`;
+      document.getElementById('thb').onclick = async e => { e.target.disabled = true; try { const r = await api('/api/admin/thumbs', { method: 'POST' }); msg(r.count ? `${r.count} video için kapak hazırlanıyor, birkaç dakika sürer.` : 'Kapağı eksik video yok.'); } catch (err) { msg(err.message); e.target.disabled = false; } };
       el.querySelectorAll('[data-own]').forEach(s => s.onchange = () => act(`/api/admin/projects/${s.dataset.own}/owner`, { owner_id: s.value || null }, 'Sahip güncellendi.'));
     } else if (tab === 'siparis') {
       const os = await api('/api/admin/orders');
