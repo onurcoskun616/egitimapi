@@ -29,7 +29,20 @@ function readBody(req, limit = 2e6) {
 }
 function safeEq(a, b) { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); }
 const now = () => new Date().toISOString();
-async function setStatus(id, status, extra = {}) { return db.update('projects', `id=eq.${q(id)}`, { status, updated_at: now(), ...extra }); }
+// Durum değişince öğretmene telefon bildirimi (onay bekleyen ya da biten işler)
+const STATUS_PUSH = {
+  content_review: ['İçerik hazır', 'onayınızı bekliyor. İnceleyip onaylayın.'],
+  visuals_review: ['Görseller hazır', 'sahneleri çizildi, onayınızı bekliyor.'],
+  delivered: ['Video hazır ✓', 'videosu tamamlandı. İzleyip paylaşabilirsiniz.'],
+  failed: ['Bir sorun oluştu', 'hazırlanırken hata verdi. Sayfadan tekrar deneyebilirsiniz.'],
+};
+let PUSH = { notify: async () => 0 };
+async function setStatus(id, status, extra = {}) {
+  const r = await db.update('projects', `id=eq.${q(id)}`, { status, updated_at: now(), ...extra });
+  const m = STATUS_PUSH[status];
+  if (m && r && r.owner_id) PUSH.notify(r.owner_id, { title: m[0], body: `"${r.title}" ${m[1]}`, url: `/#/p/${id}`, tag: 'p-' + id }).catch(() => {});
+  return r;
+}
 async function nextVersion(id, stage) { const v = await latest(id, stage); return (v ? v.version : 0) + 1; }
 async function latest(id, stage) { return db.one('versions', `project_id=eq.${q(id)}&stage=eq.${stage}&order=version.desc`); }
 async function logUsage(project_id, provider, units, note, detail) { try { await db.insert('usage', { project_id, provider, units, note, detail: detail || null }); } catch (e) { console.error('usage', e.message); } }
@@ -301,6 +314,8 @@ async function thumbUrl(p) {
   try { const url = await storage.signedUrl(p, 6 * 3600); THUMBS.set(p, { url, exp: Date.now() + 5 * 3600e3 }); return url; } catch { return null; }
 }
 const MARKET = { on, db, q, send, readBody, isAdmin, activeLimits, auth, shortId: () => shortId(), now, thumbUrl };
+PUSH = require('./lib/push')({ on, db, q, send, readBody, publicBase });
+MARKET.notify = PUSH.notify;
 require('./lib/market')(MARKET);
 require('./lib/finance')({ on, db, q, send, readBody });
 // APK bağlantısı yalnızca GitHub'daki sürüm gerçekten varsa gösterilir (saatte bir kontrol)

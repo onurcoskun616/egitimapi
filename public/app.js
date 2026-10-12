@@ -159,6 +159,7 @@
       const gline = g ? (g.status === 'queued' ? 'Çalışma başlatılıyor…' : gp ? `${gp.done} / ${gp.total} ${p.status === 'visuals_generating' ? 'sahne hazır' : 'tamamlandı'}` : 'Çalışma sürüyor…') : '';
       const gbar = gp ? `<div class="bar"><i style="width:${Math.round(gp.done / gp.total * 100)}%"></i></div>` : '';
       body = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div style="flex:1"><strong>${STATUS[p.status]}</strong><div class="note">${waitMsg[p.status]} Sayfa kendiliğinden yenilenir.</div>${gline ? `<div class="note"><b>${gline}</b></div>` : ''}${gbar}</div></div>`;
+      if (!document.querySelector('.pushnudge')) setTimeout(() => pushNudge('proje'), 800);
       pollTimer = setTimeout(() => route(), 4000);
     } else if (p.status === 'queued') {
       body = `<div class="card wait"><div class="spin" aria-hidden="true"></div><div><strong>Sırada</strong><div class="note">Bu video bir serinin parçası. Önündeki içerikler hazırlanınca bunun içeriği de kendiliğinden hazırlanmaya başlar; lütfen bekleyiniz. Sayfa kendiliğinden yenilenir.</div></div></div>`;
@@ -717,6 +718,7 @@
     app.innerHTML = `<h1>Profil</h1>
       <div class="card qcard"><div class="qlinks">${qlinks.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}<button type="button" class="btn danger" id="lo2">Çıkış yap</button></div>
       <label for="thm">Görünüm</label><select id="thm"><option value="">Otomatik (telefonun ayarı)</option><option value="light">Açık</option><option value="dark">Koyu</option></select></div>
+      <h2>Bildirimler</h2><div class="card" id="pushc"><p class="note">Yükleniyor…</p></div>
       <h2>Bilgilerim</h2><form class="card" id="pf"><label for="nm">Ad soyad</label><input id="nm" value="${esc(u.name)}" required minlength="3">
       <label>E-posta</label><input value="${esc(u.email)}" disabled>
       <label for="sc">Okul / kurum</label><input id="sc" value="${esc(u.school || '')}" maxlength="120">
@@ -725,6 +727,7 @@
       <div class="btns"><button class="primary" type="submit">Kaydet</button>${u.role !== 'student' && u.slug ? `<a class="btn" href="#/o/${esc(u.slug)}">Herkese açık profilim</a>` : ''}</div><p class="note" id="m1"></p></form>
       <h2>Şifre değiştir</h2><form class="card" id="wf"><label for="op">Mevcut şifre</label><input id="op" type="password" required autocomplete="current-password"><label for="np">Yeni şifre</label><input id="np" type="password" required minlength="8" autocomplete="new-password"><div class="btns"><button type="submit">Şifreyi değiştir</button></div><p class="note" id="m2"></p></form>`;
     const thm = document.getElementById('thm'); thm.value = curTheme(); thm.onchange = () => setTheme(thm.value);
+    pushCard(document.getElementById('pushc'));
     document.getElementById('lo2').onclick = logout;
     const v = id => (document.getElementById(id) || {}).value;
     document.getElementById('pf').onsubmit = async e => { e.preventDefault(); const m = document.getElementById('m1'); try { const body = { name: v('nm'), school: v('sc') }; if (u.role !== 'student') Object.assign(body, { subject: v('sj'), bio: v('bi'), slug: v('sl') }); await api('/api/me/profile', { method: 'POST', body }); m.style.color = 'var(--green)'; m.textContent = 'Kaydedildi.'; } catch (err) { m.style.color = ''; m.textContent = err.message; } };
@@ -742,6 +745,7 @@
     const ok = d.courses.filter(x => x.enrollment.status === 'approved'), wait = d.courses.filter(x => x.enrollment.status === 'pending'), other = d.courses.filter(x => !['approved', 'pending'].includes(x.enrollment.status));
     const c = d.continue;
     const cont = c ? `<a class="contcard" href="/izle/${esc(c.code)}">${thumbBox(c.thumb, 'cthumb2')}<span class="cinfo"><span class="ctag">${c.first ? 'Başla' : c.next ? 'Sıradaki ders' : 'Kaldığın yerden devam et'}</span><b>${esc(c.title)}</b><span class="note">${esc(c.course)}</span>${c.progress && !c.progress.done && c.progress.pct ? `<span class="pbar"><i style="width:${c.progress.pct}%"></i></span>` : ''}</span><span class="playbtn" aria-hidden="true">▶</span></a>` : '';
+    setTimeout(() => pushNudge('ogrenci'), 1500);
     app.innerHTML = `<h1>Derslerim</h1>${cont}
       ${ok.length ? ok.map(x => { const n = (x.lessons || []).length, dn = x.done || 0; return `<div class="card mcourse"><div class="aud-head"><div><a href="#/e/${esc(x.course.id)}"><b style="font:800 18px var(--display)">${esc(x.course.title)}</b></a><div class="note">${esc(x.course.teacher ? x.course.teacher.name : '')}</div></div><span class="pill" style="color:${n && dn === n ? 'var(--green)' : 'var(--muted)'}">${n ? `${dn}/${n} ders` : 'Kayıtlı'}</span></div>
         ${n ? `<div class="pbar big" title="${dn}/${n} tamamlandı"><i style="width:${Math.round(dn / n * 100)}%"></i></div>` : ''}
@@ -979,6 +983,51 @@
       <div class="card" style="margin-top:14px;text-align:center"><p class="note" style="margin-top:0">Telefonunla okut, uygulama sayfası açılsın:</p><div id="qrapp" style="background:#fff;padding:10px;border-radius:12px;width:max-content;margin:0 auto"></div></div></section>`;
     const b = document.getElementById('inst'); if (b) b.onclick = async () => { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); if (r && r.outcome === 'accepted') { installEvt = null; viewApp(); } };
     loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js').then(() => { const el = document.getElementById('qrapp'); if (el && window.QRCode) new window.QRCode(el, { text: location.origin + '/#/uygulama', width: 150, height: 150 }); }).catch(() => {});
+  }
+
+  /* ---------- bildirimler ---------- */
+  const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  async function pushState() {
+    if (!pushSupported()) return isIOS() && !isStandalone() ? 'ios-install' : 'unsupported';
+    if (Notification.permission === 'denied') return 'denied';
+    const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription();
+    return sub ? 'on' : 'off';
+  }
+  async function enablePush(test) {
+    const perm = await Notification.requestPermission(); if (perm !== 'granted') throw new Error('Bildirim izni verilmedi');
+    const { key } = await api('/api/push/key');
+    const reg = await navigator.serviceWorker.ready;
+    const raw = Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
+    await api('/api/push/subscribe', { method: 'POST', body: { subscription: sub.toJSON(), test: !!test } });
+  }
+  async function disablePush() {
+    const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription();
+    if (sub) { await api('/api/push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint } }).catch(() => {}); await sub.unsubscribe(); }
+  }
+  // Profil sayfasındaki bildirim kartı
+  async function pushCard(el) {
+    const st = await pushState().catch(() => 'unsupported');
+    const T = { on: '<b style="color:var(--green)">✓ Bu cihazda bildirimler açık.</b>', off: 'Bu cihazda bildirimler kapalı.', denied: 'Bildirimlere tarayıcı ayarlarından izin verilmemiş. Telefonun ayarlarından bu site/uygulama için bildirimlere izin verin.', unsupported: 'Bu tarayıcı bildirim desteklemiyor.', 'ios-install': 'iPhone\'da bildirim almak için önce uygulamayı ana ekrana ekleyin (Paylaş → Ana Ekrana Ekle), sonra uygulamadan açıp buradan bildirimleri açın.' };
+    const isT = ME.user && ME.user.role !== 'student';
+    el.innerHTML = `<p style="margin-top:0">${isT ? 'İçerik ve görseller onayınıza geldiğinde, video bittiğinde ve yeni katılım talebi olduğunda telefonunuza bildirim gelsin.' : 'Eğitime kabul edildiğinde ve yeni dersler açıldığında telefonuna bildirim gelsin.'}</p><p class="note">${T[st]}</p>
+      <div class="btns">${st === 'off' ? '<button class="primary" id="pon">Bildirimleri aç</button>' : st === 'on' ? '<button id="ptest">Deneme bildirimi gönder</button><button class="danger" id="poff">Kapat</button>' : ''}</div><p class="note err-t" id="pmsg"></p>`;
+    const m = el.querySelector('#pmsg'), run = async (f, b) => { b.disabled = true; try { await f(); pushCard(el); } catch (e) { m.textContent = e.message; b.disabled = false; } };
+    const on = el.querySelector('#pon'); if (on) on.onclick = () => run(() => enablePush(true), on);
+    const off = el.querySelector('#poff'); if (off) off.onclick = () => run(disablePush, off);
+    const tst = el.querySelector('#ptest'); if (tst) tst.onclick = () => run(() => enablePush(true), tst);
+  }
+  // Bağlamsal öneri: bir kez sorulur (öğretmen video başlatınca, öğrenci derslerim'de)
+  async function pushNudge(where) {
+    try {
+      if (!ME.user || lsGet('push_sordu_' + where, '') === '1' || document.querySelector('.pushnudge')) return;
+      if (await pushState() !== 'off') return;
+      const box = document.createElement('div'); box.className = 'card pushnudge';
+      box.innerHTML = `<b>🔔 Bildirim alın</b><p class="note" style="margin:4px 0 0">${where === 'proje' ? 'İçerik hazır olunca beklemenize gerek kalmasın; telefonunuza haber verelim.' : 'Eğitime kabul edildiğinde ve yeni dersler açıldığında haber verelim.'}</p><div class="btns"><button class="primary" id="nyes">Bildirimleri aç</button><button id="nno">Şimdi değil</button></div>`;
+      document.body.appendChild(box);
+      box.querySelector('#nno').onclick = () => { lsSet('push_sordu_' + where, '1'); box.remove(); };
+      box.querySelector('#nyes').onclick = async () => { lsSet('push_sordu_' + where, '1'); try { await enablePush(true); box.innerHTML = '<b style="color:var(--green)">✓ Bildirimler açıldı</b>'; setTimeout(() => box.remove(), 2500); } catch (e) { box.querySelector('.note').textContent = e.message; } };
+    } catch { }
   }
   function alertBox(m) { const el = document.createElement('div'); el.className = 'card err'; el.style.marginTop = '12px'; el.textContent = m; app.appendChild(el); }
 
