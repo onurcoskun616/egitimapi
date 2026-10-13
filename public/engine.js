@@ -49,7 +49,10 @@
   function addStops(g, stops) { (stops || []).forEach(([o, col]) => { o = Math.min(1, Math.max(0, +o || 0)); try { g.addColorStop(o, fixColor(col)); } catch { try { g.addColorStop(o, 'rgba(0,0,0,0)'); } catch { } } }); return g; }
   function lg(x0, y0, x1, y1, stops) { return addStops(c.createLinearGradient(x0, y0, x1, y1), stops); }
   function rg(x, y, r0, r1, stops) { return addStops(c.createRadialGradient(x, y, Math.max(0, r0), x, y, Math.max(0, r1)), stops); }
-  function glow(col, b, fn) { if (sade()) { c.save(); fn(); c.restore(); return; } c.save(); c.shadowColor = col; c.shadowBlur = b; fn(); c.restore(); }
+  // glow(renk, bulanıklık, fn) parlatma; yanlışlıkla glow(x, y, r, renk, alfa) yazılırsa yumuşak hale çizer
+  function glow(col, b, fn) {
+    if (typeof col === 'number') { const [x, y, r, cc, a] = arguments; if (!(r > 0)) return; const g = c.globalAlpha; c.globalAlpha = g * (a == null ? .25 : +a || 0); c.fillStyle = rg(x, y, 0, r, [[0, typeof cc === 'string' ? cc : C.yel], [1, 'rgba(0,0,0,0)']]); c.fillRect(x - r, y - r, r * 2, r * 2); c.globalAlpha = g; return; }
+    if (typeof fn !== 'function') return; if (sade()) { c.save(); fn(); c.restore(); return; } c.save(); c.shadowColor = col; c.shadowBlur = b; fn(); c.restore(); }
   // #rrggbb döndürür; böylece shadeHex(c) + '66' gibi saydamlık eklemeleri de geçerli renk olur
   function shadeHex(h, a) { if (typeof h !== 'string' || h[0] !== '#') return h; let x = h.slice(1); if (x.length === 3 || x.length === 4) x = x.split('').map(ch => ch + ch).join(''); const al = x.length === 8 ? x.slice(6) : ''; const n = parseInt(x.slice(0, 6), 16); if (isNaN(n)) return h; const r = n >> 16, g = (n >> 8) & 255, b = n & 255; a = +a || 0; const f = v => Math.max(0, Math.min(255, Math.round(a < 0 ? v * (1 + a) : v + (255 - v) * a))); return '#' + [f(r), f(g), f(b)].map(v => v.toString(16).padStart(2, '0')).join('') + al; }
   function line(pts, col, w = 4) { c.beginPath(); c.moveTo(...pts[0]); pts.slice(1).forEach(p => c.lineTo(...p)); c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
@@ -505,9 +508,10 @@
     const a = fade(u, Math.max(0, t0 - .6), .3), lab = light ? 'rgba(40,40,60,.75)' : 'rgba(255,255,255,.75)';
     let val; if (m.text) { const n = Math.floor(cl((u - t0) / 1.2) * m.text.length); val = m.text.slice(0, Math.max(1, n)); }
     else { const k = e3(cl((u - t0) / 1.8)); val = (m.prefix || '') + trNum(lerp(m.from, m.to, k), m.dec) + (m.unit ? ' ' + m.unit : ''); }
-    withA(a, () => { txt(m.label || '', x, y, `700 ${Math.round(U * .017)}px ${FM}`, lab);
-      c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 8; txt(val, x, y + U * .062, `800 ${Math.round(U * .056)}px ${FM}`, C.yel); c.restore();
-      if (m.sub) txt(m.sub, x, y + U * .088, `700 ${Math.round(U * .0135)}px ${FM}`, lab); });
+    let vs = Math.round(U * .056); const full = m.text || val; c.font = `800 ${vs}px ${FM}`; const maxW = F.W * .62; const fw = c.measureText(full).width; if (fw > maxW) vs = Math.max(Math.round(U * .03), Math.floor(vs * maxW / fw));
+    withA(a, () => { txt(m.label || '', x, y, `700 ${Math.round(U * .02)}px ${FM}`, lab);
+      c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 8; txt(val, x, y + U * .02 + vs * .82, `800 ${vs}px ${FM}`, C.yel); c.restore();
+      if (m.sub) txt(m.sub, x, y + U * .038 + vs * .9, `700 ${Math.round(U * .017)}px ${FM}`, lab); });
   }
   function deneyBrand(P, D, light) {
     const U = Math.min(F.W, F.H), s = P.series || ''; if (!s) return; const x = F.W * (1 - D.mX), y = F.H * D.mY + U * .02, col = light ? 'rgba(40,40,60,.85)' : '#ffffff';
@@ -552,7 +556,7 @@
     deneyBg(sc.bg || 'indigo'); runScene(sc, u); if (bare) return;
     const light = sc.bg === 'sky';
     deneyMeter(sc, u, D, light); deneyBrand(P, D, light); deneyBox(sc, u, D, light); deneyExtras(sc, u);
-    if (P.note) txt(P.note, F.W / 2, F.H * D.noteY, `700 ${Math.round(Math.min(F.W, F.H) * .015)}px ${FS}`, light ? 'rgba(40,40,60,.7)' : 'rgba(255,255,255,.72)', 'center');
+    if (P.note) txt(P.note, F.W / 2, F.H * D.noteY, `700 ${Math.round(Math.min(F.W, F.H) * (P.note.length > 70 ? .017 : .02))}px ${FS}`, light ? 'rgba(40,40,60,.7)' : 'rgba(255,255,255,.72)', 'center');
   }
   function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; if (sade()) return drawSade(P, L, i, u, t); if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); } else background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); if (P.__bare) return; header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
