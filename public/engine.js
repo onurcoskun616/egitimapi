@@ -8,6 +8,16 @@
   const FD = '"Archivo","Inter Display","Arial Black",sans-serif';
   const FM = '"JetBrains Mono","DejaVu Sans Mono",Menlo,monospace';
   const C = { bg: '#05070e', fg: '#eef1f7', muted: '#8a94ad', dim: '#3a4560', hv: '#ff8a2a', lv: '#3fb0ff', cool: '#2ee6c9', red: '#ff4f4f', yel: '#ffc93c', green: '#3ee0a1', violet: '#b48cff', copper: '#e08a4a', steel: '#8d97ab' };
+  /* Görsel stiller. teknik: koyu, derinlikli (varsayılan). sade: açık krem zemin, düz renk, kalın mürekkep kontur (editoryal anlatım). */
+  const PALETTES = {
+    teknik: Object.assign({}, C, { ink: '#eef1f7', paper: '#0c1222', leaf: '#3ee0a1' }),
+    sade: { bg: '#f3efe4', fg: '#25272c', muted: '#8b8679', dim: '#cfc8b6', hv: '#e8724f', lv: '#2f4b6e', cool: '#4f9c94', red: '#e2624f', yel: '#e7b53c', green: '#2f8f6f', violet: '#8a6fb3', copper: '#c27a45', steel: '#9aa1ab', ink: '#25272c', paper: '#faf8f1', leaf: '#2f8f6f' },
+  };
+  Object.assign(C, PALETTES.teknik);
+  let STYLE = 'teknik';
+  const FS = '"Inter","Noto Sans","DejaVu Sans",system-ui,sans-serif';
+  function setStyle(name) { STYLE = PALETTES[name] ? name : 'teknik'; Object.assign(C, PALETTES[STYLE]); return STYLE; }
+  const sade = () => STYLE === 'sade';
   let c = null; // aktif 2D bağlam
 
   /* ---------- yardımcılar ---------- */
@@ -35,7 +45,7 @@
   function addStops(g, stops) { (stops || []).forEach(([o, col]) => { o = Math.min(1, Math.max(0, +o || 0)); try { g.addColorStop(o, fixColor(col)); } catch { try { g.addColorStop(o, 'rgba(0,0,0,0)'); } catch { } } }); return g; }
   function lg(x0, y0, x1, y1, stops) { return addStops(c.createLinearGradient(x0, y0, x1, y1), stops); }
   function rg(x, y, r0, r1, stops) { return addStops(c.createRadialGradient(x, y, Math.max(0, r0), x, y, Math.max(0, r1)), stops); }
-  function glow(col, b, fn) { c.save(); c.shadowColor = col; c.shadowBlur = b; fn(); c.restore(); }
+  function glow(col, b, fn) { if (sade()) { c.save(); fn(); c.restore(); return; } c.save(); c.shadowColor = col; c.shadowBlur = b; fn(); c.restore(); }
   // #rrggbb döndürür; böylece shadeHex(c) + '66' gibi saydamlık eklemeleri de geçerli renk olur
   function shadeHex(h, a) { if (typeof h !== 'string' || h[0] !== '#') return h; let x = h.slice(1); if (x.length === 3 || x.length === 4) x = x.split('').map(ch => ch + ch).join(''); const al = x.length === 8 ? x.slice(6) : ''; const n = parseInt(x.slice(0, 6), 16); if (isNaN(n)) return h; const r = n >> 16, g = (n >> 8) & 255, b = n & 255; a = +a || 0; const f = v => Math.max(0, Math.min(255, Math.round(a < 0 ? v * (1 + a) : v + (255 - v) * a))); return '#' + [f(r), f(g), f(b)].map(v => v.toString(16).padStart(2, '0')).join('') + al; }
   function line(pts, col, w = 4) { c.beginPath(); c.moveTo(...pts[0]); pts.slice(1).forEach(p => c.lineTo(...p)); c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
@@ -71,24 +81,56 @@
 
   /* ---------- etiketler ---------- */
   function pill(s, x, y, col, o = {}) {
-    const size = o.size || 22, al = o.al || 'center', fill = !!o.fill;
+    const al = o.al || 'center', fill = !!o.fill, size = o.size || (sade() ? 25 : 22);
+    if (sade()) {
+      c.font = `800 ${size}px ${FS}`; const w = c.measureText(s).width + size * 1.4, h = size * 1.75; const x0 = al === 'center' ? x - w / 2 : al === 'left' ? x : x - w;
+      rr(x0, y - h / 2, w, h, h / 2); c.fillStyle = fill ? col : C.paper; c.fill(); c.strokeStyle = fill ? C.ink : col; c.lineWidth = 2.5; c.stroke();
+      txt(s, x0 + w / 2, y + size * .36, `800 ${size}px ${FS}`, fill ? C.paper : col, 'center'); return w;
+    }
     c.font = `800 ${size}px ${FM}`; const w = c.measureText(s).width + size * 1.3, h = size * 1.9; const x0 = al === 'center' ? x - w / 2 : al === 'left' ? x : x - w;
     rr(x0, y - h / 2, w, h, h / 2); c.fillStyle = fill ? col : 'rgba(8,11,20,.88)'; c.fill(); c.strokeStyle = col; c.lineWidth = 2.5; c.stroke();
     txt(s, x0 + w / 2, y + size * .36, `800 ${size}px ${FM}`, fill ? '#05070e' : col, 'center'); return w;
   }
   function callout(s, wx, wy, dx, dy, col, a = 1, sc = 1) {
+    if (sade()) return withA(a, () => { c.save(); c.translate(wx, wy); c.scale(1 / sc, 1 / sc);
+      c.strokeStyle = col; c.lineWidth = 2.5; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(dx * .1, dy * .8, dx, dy); c.stroke();
+      circle(0, 0, 7, col, C.ink, 2); pill(s, dx, dy, col); c.restore(); });
     withA(a, () => { c.save(); c.translate(wx, wy); c.scale(1 / sc, 1 / sc);
       c.strokeStyle = col; c.lineWidth = 2.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(dx, dy); c.stroke();
       c.beginPath(); c.arc(0, 0, 7, 0, Math.PI * 2); c.fillStyle = col; c.fill(); c.beginPath(); c.arc(0, 0, 13, 0, Math.PI * 2); c.strokeStyle = col; c.lineWidth = 2; c.stroke();
       pill(s, dx, dy, col); c.restore(); });
   }
   function flowLine(pts, col, u, dir = 1, w = 8, a = 1) {
+    if (sade()) return withA(a, () => { c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); c.moveTo(...pts[0]); pts.slice(1).forEach(p => c.lineTo(...p));
+      c.strokeStyle = C.ink; c.lineWidth = w + 4; c.stroke(); c.strokeStyle = col; c.lineWidth = w; c.stroke();
+      c.save(); c.setLineDash([w * 1.4, w * 2.2]); c.lineDashOffset = -dir * u * w * 14; c.strokeStyle = C.paper; c.lineWidth = w * .45; c.stroke(); c.restore(); });
     withA(a, () => { c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); c.moveTo(...pts[0]); pts.slice(1).forEach(p => c.lineTo(...p));
       c.strokeStyle = col; c.lineWidth = w; c.globalAlpha *= .55; c.stroke(); c.globalAlpha /= .55;
       c.save(); c.setLineDash([w * 2.6, w * 3]); c.lineDashOffset = -dir * u * w * 22; c.strokeStyle = '#ffffff'; c.lineWidth = w * .5; c.shadowColor = col; c.shadowBlur = w * 2.4; c.stroke(); c.restore(); });
   }
   function pulse(x, y, u, col = C.red, r0 = 30) { const p = (u * 1.2) % 1; c.strokeStyle = col; c.globalAlpha = 1 - p; c.lineWidth = 5; c.beginPath(); c.arc(x, y, r0 + p * 70, 0, Math.PI * 2); c.stroke(); c.globalAlpha = 1; }
   function badgeText(s, x, y, col, size = 54) { glow(col, 26, () => txt(s, x, y, `900 ${size}px ${FD}`, col, 'center')); }
+
+  /* ---------- sade stil yardımcıları ---------- */
+  // ink(fn, dolgu, kalınlık): fn yolu açar (rr/poly/smooth ya da c.beginPath...), önce dolgu sonra mürekkep kontur
+  function ink(fn, fill, w = 4) { fn(); if (fill) { c.fillStyle = fill; c.fill(); } c.strokeStyle = C.ink; c.lineWidth = w; c.lineJoin = 'round'; c.lineCap = 'round'; c.stroke(); }
+  // cam(x, y, z, fn): (x,y) noktasını yerinde tutarak z kat yakınlaştırır (makro yakın çekim, ayrıntıya zum)
+  function cam(x, y, z, fn) { c.save(); c.translate(x - x * z, y - y * z); c.scale(z, z); fn(); c.restore(); }
+  // inset(x, y, w, h, fn, {label, col, from:[x,y]}): küçük ek panel; fn(w,h) panelin merkezini (0,0) alarak çizer
+  function inset(x, y, w, h, fn, o = {}) {
+    c.save(); rr(x, y, w, h, 22); c.fillStyle = C.paper; c.fill(); c.clip(); c.translate(x + w / 2, y + h / 2); fn(w, h); c.restore();
+    rr(x, y, w, h, 22); c.strokeStyle = C.ink; c.lineWidth = 4; c.stroke();
+    if (o.from) { c.strokeStyle = o.col || C.red; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(...o.from); c.quadraticCurveTo(o.from[0], y - 10, x + w / 2, y); c.stroke(); circle(o.from[0], o.from[1], 6, o.col || C.red); }
+    if (o.label) pill(o.label, x + w / 2, y, o.col || C.red, { size: 20 });
+  }
+  // leader(noktalar, renk): işaret çizgisi (3 nokta verilirse eğri)
+  function leader(pts, col, w = 3) { c.strokeStyle = col || C.red; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(...pts[0]); if (pts.length === 3) c.quadraticCurveTo(...pts[1], ...pts[2]); else pts.slice(1).forEach(p => c.lineTo(...p)); c.stroke(); }
+  // seeded(i): her karede aynı 0..1 sayı (parçacık ve nokta dağılımı için; Math.random yerine)
+  const seeded = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  // grow(u, başla, süre): 0..1 yumuşak büyüme (çizgi uzaması, ağ yayılması)
+  const grow = (u, d = 0, l = 1) => e3(cl((u - d) / l));
+  // part(a, b, k, renk, kalınlık): a→b doğru parçasının k oranını çizer
+  function part(a, b, k, col, w = 4) { if (k <= 0) return; line([a, [lerp(a[0], b[0], k), lerp(a[1], b[1], k)]], col, w); }
 
   /* ---------- hazır nesneler ---------- */
   const BODY = [[0, -70], [-6, -150], [22, -200], [120, -232], [262, -246], [362, -338], [470, -382], [640, -382], [762, -332], [884, -256], [1040, -226], [1090, -192], [1102, -132], [1096, -70], [1060, -50], [40, -48]];
@@ -129,7 +171,7 @@
     glow('rgba(255,110,20,.8)', 40, () => { f(-50 * s, 140 * s, 240 * s * fl(1), '#ff5a1f'); f(50 * s, 140 * s, 220 * s * fl(2), '#ff5a1f'); f(0, 170 * s, 300 * s * fl(3), '#ff5a1f'); }); f(0, 110 * s, 200 * s * fl(4), '#ff9b2e'); f(0, 70 * s, 130 * s * fl(5), '#ffd45a'); }
   function hero(fn, u, sc = 1, dy = 0, cy = 800) { const k = 1.04 - .04 * e3(cl(u / 6)); c.save(); c.translate(F.hx + Math.sin(u * .3) * 6, F.hy + (cy - 800 + dy) * F.hs + Math.cos(u * .25) * 4); c.scale(sc * k * F.hs, sc * k * F.hs); fn(); c.restore(); }
 
-  const LIB = { C, W, H, FD, FM, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, ctx: () => c };
+  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, ctx: () => c };
   const LIB_NAMES = Object.keys(LIB);
 
   function compileScene(code) {
@@ -165,8 +207,15 @@
       brandY: 56, chipY: 100, titleX: 56, titleY: 156, titleW: 790, titleMax: 66, titleMin: 34,
       big: { x: 56, y: 878, size: 52 }, cap: { x: 56, y: 910, w: 770, font: 25, lh: 37, lines: 3 }, barY: 1060, footY: 1094 },
   };
+  // Sade stilde yerleşim: ortada mürekkep çerçeveli kart (illüstrasyon), üstte anahtar kelime, altta etiket ve altyazı
+  const SADE = {
+    dikey: { hx: 450, hy: 780, hs: .9, kwY: 400, kwMax: 76, labelY: 1125, capY: 1235, capW: 780, capFont: 40, capLh: 52 },
+    yatay: { hx: 800, hy: 468, hs: .78, kwY: 128, kwMax: 58, labelY: 772, capY: 836, capW: 1240, capFont: 34, capLh: 44 },
+    kare: { hx: 450, hy: 452, hs: .62, kwY: 178, kwMax: 50, labelY: 690, capY: 750, capW: 800, capFont: 30, capLh: 40 },
+    dikey45: { hx: 450, hy: 565, hs: .74, kwY: 240, kwMax: 60, labelY: 848, capY: 920, capW: 800, capFont: 34, capLh: 46 },
+  };
   let F = FORMATS.dikey;
-  function setFormat(name) { F = FORMATS[name] || FORMATS.dikey; return F; }
+  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : b; return F; }
 
   /* ---------- çerçeve ---------- */
   function bgGrid() { c.fillStyle = 'rgba(120,150,210,.12)'; for (let x = 38; x < F.W; x += 76) for (let y = 38; y < F.H; y += 76) { c.fillRect(x - 6, y - 1, 12, 2); c.fillRect(x - 1, y - 6, 2, 12); } }
@@ -196,16 +245,75 @@
     const bw = F.W - 112; c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(56, F.barY, bw, 3); c.fillStyle = C.yel; c.fillRect(56, F.barY, bw * (t / total), 3); c.fillRect(56 + bw * (t / total) - 2, F.barY - 6, 4, 15);
     if (!F.noFoot) { txt((sc.ch || '').toUpperCase(), 56, F.footY, `800 15px ${FM}`, C.muted); txt(`${Math.round(F.W * F.S)}×${Math.round(F.H * F.S)} · 60 FPS`, F.W - 56, F.footY, `800 15px ${FM}`, C.muted, 'right'); }
   }
-  function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); } else background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); if (P.__bare) return; header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
+  /* ---------- sade stil çerçevesi ---------- */
+  const card = () => ({ x: F.hx - 410 * F.hs, y: F.hy - 345 * F.hs, w: 820 * F.hs, h: 690 * F.hs });
+  function runScene(sc, u) {
+    try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); }
+    catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); }
+    c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]);
+  }
+  // Kartın içi: kâğıt zemin + sahne çizimi (kartın dışına taşmaz)
+  function sadeCardContent(sc, u, clipW) {
+    const k = card(); c.save(); rr(k.x, k.y, clipW == null ? k.w : clipW, k.h, 30); c.clip();
+    c.fillStyle = C.paper; c.fillRect(k.x, k.y, k.w, k.h); runScene(sc, u); c.restore();
+  }
+  // Anahtar kelime başlığı: *vurgulu* kelime kırmızı. Birden çok satıra bölünebilir (" / " ya da genişlik)
+  function keyword(s, a, pop) {
+    if (!s) return; const words = []; String(s).toLocaleUpperCase('tr').split(/\s+/).filter(Boolean).forEach(w => { if (/^[·\-–—/|]$/.test(w) && words.length) words[words.length - 1] += ' ' + w; else words.push(w); });
+    let size = F.kwMax; const maxW = Math.min(F.W - 120, 760);
+    const measure = () => { c.font = `900 ${size}px ${FD}`; const lines = []; let cur = []; words.forEach(w => { const t = [...cur, w].join(' ').replace(/\*/g, ''); if (c.measureText(t).width > maxW && cur.length) { lines.push(cur); cur = [w]; } else cur.push(w); }); if (cur.length) lines.push(cur); return lines; };
+    let lines = measure(); while (lines.length > 2 && size > 30) { size -= 4; lines = measure(); }
+    withA(a, () => { c.save(); const sc = .92 + .08 * outB(cl(pop)); c.translate(F.W / 2, F.kwY); c.scale(sc, sc); c.font = `900 ${size}px ${FD}`; c.textBaseline = 'alphabetic';
+      const lh = size * 1.02, y0 = -(lines.length - 1) * lh;
+      lines.forEach((ln, li) => { const parts = ln.map(w => ({ t: w.replace(/\*/g, ''), hl: /^\*.*\*$/.test(w) || /^\*/.test(w) || /\*$/.test(w) })); const full = parts.map(p => p.t).join(' '); let x = -c.measureText(full).width / 2;
+        parts.forEach((p, pi) => { c.fillStyle = p.hl ? C.red : C.ink; c.textAlign = 'left'; c.fillText(p.t, x, y0 + li * lh); x += c.measureText(p.t + (pi < parts.length - 1 ? ' ' : '')).width; }); });
+      c.restore(); });
+  }
+  // Altyazıyı konuşmayla eş zamanlı, kısa parçalar halinde gösterir
+  function chunks(s) { const ws = String(s).split(/\s+/).filter(Boolean), out = []; let cur = ''; ws.forEach(w => { const t = cur ? cur + ' ' + w : w; if ((t.length > 30 && cur) || (cur && /[,;:.!?]$/.test(cur) && cur.length > 12)) { out.push(cur); cur = w; } else cur = t; }); if (cur) out.push(cur); return out; }
+  function sadeCaption(sc, u) {
+    let idx = 0; sc.capT.forEach((x, i) => { if (u >= x) idx = i; }); if (u < sc.capT[0] - .05) return;
+    const s = sc.cap[idx] || '', rate = sc.capR ? sc.capR[idx] : CPS, el = (u - sc.capT[idx]) * rate;
+    const ch = chunks(s); let acc = 0, ci = 0; for (let i = 0; i < ch.length; i++) { if (el >= acc - 2) ci = i; acc += ch[i].length + 1; }
+    let start = 0; for (let i = 0; i < ci; i++) start += ch[i].length + 1; const since = (el - start) / rate;
+    const fnt = `800 ${F.capFont}px ${FS}`; c.font = fnt; const lines = wrap(ch[ci] || '', F.capW).slice(0, 2);
+    withA(cl(since / .18 + .35), () => lines.forEach((ln, i) => txt(ln, F.W / 2, F.capY + i * F.capLh, fnt, C.ink, 'center')));
+  }
+  function sadeOverlay(P, sc, u, t, total) {
+    const k = card();
+    // kart çerçevesi + hafif gölge
+    rr(k.x, k.y, k.w, k.h, 30); c.strokeStyle = C.ink; c.lineWidth = 5; c.stroke();
+    // anahtar kelime: cümleye bağlı (kw dizisi) ya da sahne başında başlık
+    let idx = 0; sc.capT.forEach((x, i) => { if (u >= x) idx = i; });
+    const kws = Array.isArray(sc.kw) ? sc.kw : null; let kw = kws ? kws[idx] : (u < (sc.capT[1] || sc.dur) ? sc.title : '');
+    const st = kws ? sc.capT[idx] : 0; if (kws && !kw && idx > 0 && kws[idx - 1] && u - sc.capT[idx] < .25) kw = kws[idx - 1];
+    if (kw) keyword(kw, fade(u, st, .25), (u - st) / .35);
+    if (sc.label) pill(String(sc.label).toLocaleUpperCase('tr'), F.W / 2, F.labelY, C.ink, { size: 19 });
+    sadeCaption(sc, u);
+    c.fillStyle = C.dim; c.fillRect(F.W / 2 - 60, F.H - 34, 120, 4); c.fillStyle = C.ink; c.fillRect(F.W / 2 - 60, F.H - 34, 120 * (t / total), 4);
+  }
+  function drawSade(P, L, i, u, t, prev) {
+    const sc = L.scenes[i];
+    if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); c.fillStyle = C.paper; c.fillRect(0, 0, F.W, F.H); runScene(sc, u); return; }
+    c.fillStyle = C.bg; c.fillRect(0, 0, F.W, F.H);
+    const k = card(); rr(k.x + 6, k.y + 8, k.w, k.h, 30); c.fillStyle = 'rgba(37,39,44,.08)'; c.fill();
+    if (prev) { // geçiş: önceki sahne, yenisi soldan sağa silinerek gelir
+      sadeCardContent(prev.sc, prev.u); const w = k.w * prev.k; sadeCardContent(sc, u, w);
+      if (prev.k < 1) { c.strokeStyle = C.ink; c.lineWidth = 3; c.beginPath(); c.moveTo(k.x + w, k.y); c.lineTo(k.x + w, k.y + k.h); c.stroke(); }
+    } else sadeCardContent(sc, u);
+    sadeOverlay(P, sc, u, t, L.total);
+  }
+  function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; if (sade()) return drawSade(P, L, i, u, t); if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); } else background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); if (P.__bare) return; header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
   function createPlayer(canvas, bundle) {
-    setFormat(bundle.format); const FF = F;
+    const ST = setStyle(bundle.style); setFormat(bundle.format); const FF = F;
     canvas.width = Math.round(FF.W * FF.S); canvas.height = Math.round(FF.H * FF.S); c = canvas.getContext('2d'); c.setTransform(FF.S, 0, 0, FF.S, 0, 0);
     const L = layout(bundle);
     function render(t) {
-      F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
+      setStyle(ST); F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
       let si = L.scenes.findIndex(s => t >= s.s && t < s.e); if (si < 0) si = L.scenes.length - 1; const u = t - L.scenes[si].s, TR = .6;
       const ox = F.W / 2, oy = F.H / 2, RM = Math.hypot(F.W, F.H) * .62;
+      if (sade()) { if (u < .55 && si > 0) drawSade(bundle, L, si, u, t, { sc: L.scenes[si - 1], u: L.scenes[si - 1].dur - .001, k: e3(u / .55) }); else drawSade(bundle, L, si, u, t); return si; }
       if (u < TR && si > 0) { drawScene(bundle, L, si - 1, L.scenes[si - 1].dur - .001, t); const r = e3(u / TR) * RM; c.save(); c.beginPath(); c.arc(ox, oy, r, 0, Math.PI * 2); c.clip(); drawScene(bundle, L, si, u, t); c.restore();
         glow(C.hv, 40, () => { c.beginPath(); c.arc(ox, oy, r, 0, Math.PI * 2); c.strokeStyle = `rgba(255,138,42,${1 - u / TR})`; c.lineWidth = 18; c.stroke(); }); }
       else drawScene(bundle, L, si, u, t);
@@ -213,13 +321,13 @@
     }
     // Yalnızca illüstrasyon (başlık/altyazı yok): soru seçenekleri için sahne karesi
     function still(k, frac) {
-      F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0);
+      setStyle(ST); F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0);
       const i = L.scenes.findIndex(s => s.k === String(k)); if (i < 0) return null;
       const sc = L.scenes[i]; bundle.__bare = true; try { drawScene(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s); } finally { bundle.__bare = false; }
       return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S };
     }
-    return { render, still, total: L.total, scenes: L.scenes, format: FF, width: canvas.width, height: canvas.height };
+    return { render, still, total: L.total, scenes: L.scenes, format: FF, style: ST, width: canvas.width, height: canvas.height };
   }
 
-  root.EVEngine = { createPlayer, layout, LIB_NAMES, W, H, FORMATS, errors: {} };
+  root.EVEngine = { createPlayer, layout, LIB_NAMES, W, H, FORMATS, STYLES: Object.keys(PALETTES), errors: {} };
 })(typeof window !== 'undefined' ? window : globalThis);

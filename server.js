@@ -148,6 +148,10 @@ async function runVisuals(id, onlyK, feedback, fixes) {
   const prevV = await latest(id, 'visuals');
   await setStatus(id, 'visuals_generating', { error: null });
   const topic = content.data.topic;
+  const pst = await db.one('projects', `id=eq.${q(id)}&select=visual_style`);
+  const sopts = { style: (pst && pst.visual_style) || 'teknik', anchor: content.data.anchor || null };
+  const desc = s => s ? `${s.title} — ${(s.visual && s.visual.subject) || ''} ${(s.visual && s.visual.animation) || ''}`.slice(0, 400) : null;
+  const near = (list, k) => { const i = list.findIndex(x => x.k === k); return { prev: desc(list[i - 1]), next: desc(list[i + 1]) }; };
   const sources = await loadSources(id);
   const srcOf = s => pagesFor(sources, s.src);
   let scenes, changed = null, label = feedback || null;
@@ -156,19 +160,20 @@ async function runVisuals(id, onlyK, feedback, fixes) {
   if (fixList.length) {
     scenes = prevV.data.scenes.map(s => ({ ...s }));
     const targets = fixList.map(f => ({ f, s: scenes.find(x => x.k === f.k) })).filter(x => x.s);
-    const res = await claude.generateSceneCodes(targets.map(({ f, s }) => ({ scene: strip(s), feedback: f.note, prevCode: s.code, srcText: srcOf(s) })), topic, ctx);
+    const res = await claude.generateSceneCodes(targets.map(({ f, s }) => ({ scene: strip(s), feedback: f.note, prevCode: s.code, srcText: srcOf(s), ...near(scenes, s.k) })), topic, ctx, sopts);
     targets.forEach(({ s }, i) => { s.code = res[i].code; });
     await logClaude(id, res.map(r => r.usage), 'denetim düzeltmesi');
     changed = targets.map(x => x.s.k); label = `[denetim önerisi: ${changed.join(', ')}]`;
   } else if (onlyK && prevV) {
     scenes = prevV.data.scenes.map(s => ({ ...s }));
     const s = scenes.find(x => x.k === onlyK);
-    const [r] = await claude.generateSceneCodes([{ scene: strip(s), feedback, prevCode: s.code, srcText: srcOf(s) }], topic, ctx);
+    const [r] = await claude.generateSceneCodes([{ scene: strip(s), feedback, prevCode: s.code, srcText: srcOf(s), ...near(scenes, s.k) }], topic, ctx, sopts);
     s.code = r.code; await logClaude(id, r.usage, 'scene ' + onlyK);
     changed = [onlyK]; label = `[${onlyK}] ${feedback}`;
   } else {
     const jobs = content.data.scenes.map(s => ({ scene: s, feedback, srcText: srcOf(s), prevCode: prevV && feedback ? (prevV.data.scenes.find(x => x.k === s.k) || {}).code : null }));
-    const res = await claude.generateSceneCodes(jobs, topic, ctx);
+    jobs.forEach((j, i) => { j.prev = desc(content.data.scenes[i - 1]); j.next = desc(content.data.scenes[i + 1]); });
+    const res = await claude.generateSceneCodes(jobs, topic, ctx, sopts);
     await logClaude(id, res.map(r => r.usage), 'scenes');
     scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
@@ -280,8 +285,8 @@ async function bundleFor(id, withAudio, format, versionId) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
   const vis = versionId ? await db.one('versions', `id=eq.${q(versionId)}`) : await latest(id, 'visuals');
   if (!vis) return null;
-  const scenes = vis.data.scenes.map(s => ({ k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, code: s.code }));
-  const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', scenes };
+  const scenes = vis.data.scenes.map(s => ({ k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, kw: s.kw, label: s.label, code: s.code }));
+  const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', style: p.visual_style || 'teknik', scenes };
   if (withAudio) {
     const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc`);
     if (a) { (a.alignment.timings || []).forEach((t, i) => scenes[i] && Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; if (a.alignment.cuts && a.alignment.cuts.length) b.audioCuts = a.alignment.cuts; }
@@ -414,7 +419,7 @@ on('POST', '/api/projects', async (req, res) => {
   if (!lim) return send(res, 402, { error: 'Video üretmek için etkin bir paketiniz yok. Paketim sayfasından paket seçin.' });
   if (await monthUsage(req.user.id) >= (lim.limits.videos_per_month || 0)) return send(res, 402, { error: `Bu ayki video hakkınız doldu (${lim.limits.videos_per_month} video). Paketinizi yükseltebilirsiniz.` });
   if ((+b.target_seconds || 90) > (lim.limits.max_seconds || 300)) return send(res, 402, { error: `Paketiniz en fazla ${lim.limits.max_seconds} saniyelik videoya izin veriyor.` });
-  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', status: 'content_generating' });
+  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: b.visual_style === 'sade' ? 'sade' : 'teknik', status: 'content_generating' });
   await saveSources(p.id, b.sources);
   background(p.id, 'content', []);
   send(res, 201, p);

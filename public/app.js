@@ -52,6 +52,7 @@
   /* ---------- liste ---------- */
   // Öğretmen ana sayfası: adım adım yeni video + videolarım
   const FMT_OPTS = [['yatay', 'Yatay 16:9', 'YouTube, akıllı tahta, sunum', '16/9'], ['dikey', 'Dikey 9:16', 'Reels, TikTok, Shorts', '9/16'], ['kare', 'Kare 1:1', 'Instagram ve Facebook gönderisi', '1/1'], ['dikey45', 'Dikey 4:5', 'Instagram ve Facebook akışı', '4/5']];
+  const STY_OPTS = [['teknik', 'Teknik', 'Koyu zemin, derinlikli, ayrıntılı çizim'], ['sade', 'Sade anlatım', 'Açık zemin, düz renk, anahtar kelimeli editoryal anlatım']];
   const DUR_OPTS = [[60, '1 dk'], [90, '1,5 dk'], [150, '2,5 dk'], [240, '4 dk']];
   const SPD_OPTS = [['yavas', 'Yavaş', 'ders dinler gibi'], ['normal', 'Normal', 'önerilen'], ['hizli', 'Hızlı', 'tekrar ve özet']];
   const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
@@ -60,7 +61,7 @@
   async function viewList() {
     setSub('Konu yaz · onayla · video al');
     const P = ME.plan; const quota = P ? `<p class="note">${esc(P.plan)} paketi · bu ay ${ME.used} / ${P.limits.videos_per_month} video · <a href="#/paketim">Paketim</a></p>` : `<div class="card" style="border-color:rgba(255,201,60,.5);margin-bottom:12px">Video üretmek için etkin bir paketiniz yok. <a href="#/paketim">Paket seçin</a>.</div>`;
-    const def = { tone: lsGet('v_tone', ''), fmt: lsGet('v_fmt', 'yatay'), dur: lsGet('v_dur', '150'), spd: lsGet('v_spd', 'normal') };
+    const def = { tone: lsGet('v_tone', ''), fmt: lsGet('v_fmt', 'yatay'), dur: lsGet('v_dur', '150'), spd: lsGet('v_spd', 'normal'), sty: lsGet('v_sty', 'teknik') };
     app.innerHTML = `<div id="guide"></div><div id="waiting"></div>
       <h1>Yeni eğitim videosu</h1>${quota}
       <form class="card wiz" id="nf" novalidate>
@@ -76,6 +77,7 @@
           <label>Anlatım hızı</label><div class="tiles row3">${radios('spd', SPD_OPTS, def.spd, o => `<b>${o[1]}</b><span>${o[2]}</span>`)}</div>
         </section>
         <section class="wstep" data-s="3" hidden>
+          <label>Görsel stil</label><div class="tiles">${radios('sty', STY_OPTS, def.sty, o => `<i class="stprev st-${o[0]}" aria-hidden="true"><b></b><i></i><em></em></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
           <label>Video biçimi</label><div class="tiles">${radios('fmt', FMT_OPTS, def.fmt, o => `<i class="ar" style="aspect-ratio:${o[3]}"></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
           <label>Süre</label><div class="tiles row4">${radios('dur', DUR_OPTS, def.dur, o => `<b>${o[1]}</b>`)}</div>
         </section>
@@ -96,8 +98,8 @@
       step = n; f.querySelectorAll('.wstep').forEach(s => s.hidden = +s.dataset.s !== n);
       f.querySelectorAll('.wsteps li').forEach(li => { const i = +li.dataset.i; li.className = i === n ? 'on' : i < n ? 'done' : ''; });
       document.getElementById('wback').hidden = n === 1; document.getElementById('wnext').hidden = n === 4; document.getElementById('go').hidden = n !== 4; msg.textContent = '';
-      if (n === 4) { const tx = tones.find(x => x.k === val('tone')); const fo = FMT_OPTS.find(o => o[0] === val('fmt')); const du = DUR_OPTS.find(o => String(o[0]) === val('dur')); const sp = SPD_OPTS.find(o => o[0] === val('spd'));
-        document.getElementById('sum').innerHTML = `<b>Özet</b><ul><li>${esc(document.getElementById('t').value)}</li><li>${esc(val('tone') === 'ozel' ? 'Özel anlatım' : tx ? tx.label : '')} · ${esc(sp ? sp[1] : '')} hız</li><li>${esc(fo ? fo[1] : '')} · ${esc(du ? du[1] : '')}</li></ul>`; }
+      if (n === 4) { const tx = tones.find(x => x.k === val('tone')); const fo = FMT_OPTS.find(o => o[0] === val('fmt')); const du = DUR_OPTS.find(o => String(o[0]) === val('dur')); const sp = SPD_OPTS.find(o => o[0] === val('spd')); const sy = STY_OPTS.find(o => o[0] === val('sty'));
+        document.getElementById('sum').innerHTML = `<b>Özet</b><ul><li>${esc(document.getElementById('t').value)}</li><li>${esc(val('tone') === 'ozel' ? 'Özel anlatım' : tx ? tx.label : '')} · ${esc(sp ? sp[1] : '')} hız</li><li>${esc(fo ? fo[1] : '')} · ${esc(du ? du[1] : '')} · ${esc(sy ? sy[1] : '')} stil</li></ul>`; }
       f.scrollIntoView({ block: 'start', behavior: 'smooth' });
     };
     const check = n => {
@@ -114,8 +116,8 @@
       try {
         const files = [...(document.getElementById('src').files || [])];
         const sources = files.length ? await extractAll(files, msg) : [];
-        ['tone', 'fmt', 'dur', 'spd'].forEach(k => lsSet('v_' + k, val(k)));
-        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), sources } });
+        ['tone', 'fmt', 'dur', 'spd', 'sty'].forEach(k => lsSet('v_' + k, val(k)));
+        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), visual_style: val('sty'), sources } });
         location.hash = '#/p/' + p.id;
       } catch (err) { msg.textContent = err.message; busy(btn, false); }
     };
