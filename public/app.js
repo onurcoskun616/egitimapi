@@ -110,8 +110,9 @@
       if (n === 2) { if (!val('tone')) return 'Bir anlatım dili seçin'; if (val('tone') === 'ozel' && document.getElementById('tno').value.trim().length < 3) return 'Anlatım dilini kısaca tarif edin'; }
       return '';
     };
-    const syncCine = () => { const on = val('sty') === 'sinema'; document.getElementById('cmWrap').hidden = !on;
-      if (on && !ME.cine) document.getElementById('cmNote').innerHTML = '<b>Görsel servisi henüz bağlı değil.</b> İçeriği hazırlayıp onaylayabilirsiniz; görseller servis bağlandıktan sonra üretilir.'; };
+    // görsel servisi bağlı değilse sinematik seçenek pasif (seçilirse görsel adımında takılırdı)
+    if (!ME.cine) { const r = f.querySelector('input[name="sty"][value="sinema"]'); if (r) { if (r.checked) f.querySelector('input[name="sty"][value="teknik"]').checked = true; r.disabled = true; const t = r.closest('.tile'); t.classList.add('off'); t.title = 'Görsel servisi bağlanınca açılır'; const sp = t.querySelector('span'); if (sp) sp.textContent = 'Yakında: görsel servisi bağlanınca açılır'; } }
+    const syncCine = () => { const on = val('sty') === 'sinema'; document.getElementById('cmWrap').hidden = !on; };
     f.querySelectorAll('input[name="sty"]').forEach(r => r.addEventListener('change', () => { syncCine();
       if (val('sty') === 'sinema') { const fm = f.querySelector('input[name="fmt"][value="dikey"]'), du = f.querySelector('input[name="dur"][value="60"]'); if (fm) fm.checked = true; if (du) du.checked = true; } })); syncCine();
     document.getElementById('wnext').onclick = () => { const e = check(step); if (e) { msg.textContent = e; return; } show(step + 1); };

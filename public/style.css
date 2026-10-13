@@ -238,3 +238,4 @@ label{font-weight:700;letter-spacing:.06em}
 .stprev.st-sade em{position:absolute;left:56%;top:38%;width:14px;height:14px;border:3px solid #25272c;border-radius:50%;background:#e2624f}
 
 .cinepair{display:flex;gap:6px}.cinepair img{flex:1;min-width:0;max-height:340px;object-fit:cover;border-radius:10px}
+.tile.off{opacity:.5;cursor:not-allowed}.tile.off input{pointer-events:none}

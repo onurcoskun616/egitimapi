@@ -458,6 +458,7 @@ on('POST', '/api/projects', async (req, res) => {
   let tone = String(b.tone || '');
   if (tone === 'ozel') tone = 'ozel:' + String(b.tone_note || '').trim().slice(0, 300);
   if (!(TONES[tone] || (tone.startsWith('ozel:') && tone.length > 8))) return send(res, 400, { error: 'Anlatım dilini seçin (özelse kısaca tarif edin)' });
+  if (b.visual_style === 'sinema' && !images.enabled()) return send(res, 400, { error: 'Sinematik stil için görsel servisi henüz bağlı değil. Teknik ya da Sade anlatım stilini seçin.' });
   const lim = await activeLimits(req.user);
   if (!lim) return send(res, 402, { error: 'Video üretmek için etkin bir paketiniz yok. Paketim sayfasından paket seçin.' });
   if (await monthUsage(req.user.id) >= (lim.limits.videos_per_month || 0)) return send(res, 402, { error: `Bu ayki video hakkınız doldu (${lim.limits.videos_per_month} video). Paketinizi yükseltebilirsiniz.` });
