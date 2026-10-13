@@ -81,7 +81,7 @@
           <label>Görsel stil</label><div class="tiles">${radios('sty', STY_OPTS, def.sty, o => `<i class="stprev st-${o[0]}" aria-hidden="true"><b></b><i></i><em></em></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
           <div id="dnWrap" hidden><label for="dser">Seri adı <span class="muted opt">(sağ üstte ve kapanışta görünür)</span></label><input id="dser" maxlength="30" value="${esc(lsGet('v_dser', 'Ya Olsaydı'))}">
             <label for="dnext">Sıradaki bölüm <span class="muted opt">(isteğe bağlı; boş bırakılırsa önerilir)</span></label><input id="dnext" maxlength="80" placeholder="Ya bütün buzullar erimiş olsaydı?">
-            <p class="note">Konuyu "Ya … olsaydı?" sorusu gibi yazın: “Ya Dünya'yı saran ipi 1 metre uzatsaydık?”. Sosyal medya için en uygun biçim: Dikey 9:16, 1 dk.</p></div>
+            <p class="note">Konuyu "Ya … olsaydı?" sorusu gibi yazın: “Ya Dünya'yı saran ipi 1 metre uzatsaydık?”. Zamanla biriken olaylarda (“Ya bir yıl hiç durmadan yağmur yağsaydı?”) video tek bir mekânda zaman atlamalı anlatılır: tarih tabelası, yükselen su, yağmur/kar/sis. Sosyal medya için en uygun biçim: Dikey 9:16, 1 dk.</p></div>
           <div id="cmWrap" hidden><label>Sinematik kalıp</label><div class="tiles row3">${radios('cm', CINE_OPTS, def.cm, o => `<b>${o[1]}</b><span>${o[2]}</span>`)}</div>
             <p class="note" id="cmNote">Her sahne için gerçekçi görsel üretilir (video başına yaklaşık 0,15–0,40 $ ek görsel maliyeti). Sosyal medya için en uygun biçim: Dikey 9:16, 1 dk.</p></div>
           <label>Video biçimi</label><div class="tiles">${radios('fmt', FMT_OPTS, def.fmt, o => `<i class="ar" style="aspect-ratio:${o[3]}"></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>

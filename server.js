@@ -179,7 +179,7 @@ async function runVisuals(id, onlyK, feedback, fixes) {
     await logClaude(id, res.map(r => r.usage), 'scenes');
     scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
-  const extra = sopts.style === 'deney' ? { note: content.data.note || null, next: content.data.next || null } : {};
+  const extra = sopts.style === 'deney' ? { note: content.data.note || null, next: content.data.next || null, ask: content.data.ask || null, anchor: content.data.anchor || null } : {};
   const v = await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes, ...extra }, feedback: label });
   await setStatus(id, 'visuals_review');
   startAudit(id, v, changed, prevV).catch(e => console.error('denetim', e));
@@ -328,11 +328,11 @@ async function bundleFor(id, withAudio, format, versionId) {
   const scenes = await Promise.all(vis.data.scenes.map(async s => cine
     ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, role: s.role, hook: s.hook, hl: s.hl, card: s.card, count: s.count, answer: s.answer, cta: s.cta, cam: s.cam, fx: s.fx, img2_at: s.img2_at,
         img: s.img_path ? await thumbUrl(s.img_path) : null, img2: s.img2_path ? await thumbUrl(s.img2_path) : null }
-    : p.visual_style === 'deney' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, hl: s.hl, meter: s.meter, bg: s.bg, count: s.count, answer: s.answer, code: s.code }
+    : p.visual_style === 'deney' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, hl: s.hl, meter: s.meter, bg: s.bg, count: s.count, answer: s.answer, date: s.date, fx: s.fx, water: s.water, dark: s.dark, code: s.code }
     : { k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, kw: s.kw, label: s.label, code: s.code }));
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', style: p.visual_style || 'teknik', scenes };
   if (cine) b.hud = vis.data.hud || null;
-  if (p.visual_style === 'deney') { const so = p.style_opts || {}; b.series = so.series === '' ? null : (so.series || 'Ya Olsaydı'); b.next = so.next || vis.data.next || null; b.note = vis.data.note || null; }
+  if (p.visual_style === 'deney') { const so = p.style_opts || {}; b.series = so.series === '' ? null : (so.series || 'Ya Olsaydı'); b.next = so.next || vis.data.next || null; b.note = vis.data.note || null; b.ask = vis.data.ask || null; }
   if (withAudio) {
     const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc`);
     if (a) { (a.alignment.timings || []).forEach((t, i) => scenes[i] && Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; if (a.alignment.cuts && a.alignment.cuts.length) b.audioCuts = a.alignment.cuts; }
