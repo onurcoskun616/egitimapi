@@ -83,7 +83,8 @@
   function pill(s, x, y, col, o = {}) {
     const al = o.al || 'center', fill = !!o.fill, size = o.size || (sade() ? 25 : 22);
     if (sade()) {
-      c.font = `800 ${size}px ${FS}`; const w = c.measureText(s).width + size * 1.4, h = size * 1.75; const x0 = al === 'center' ? x - w / 2 : al === 'left' ? x : x - w;
+      c.font = `800 ${size}px ${FS}`; const w = c.measureText(s).width + size * 1.4, h = size * 1.75; let x0 = al === 'center' ? x - w / 2 : al === 'left' ? x : x - w;
+      if (!o.free) { const d = keepIn(x0, y - h / 2, w, h); x0 += d[0]; y += d[1]; }
       rr(x0, y - h / 2, w, h, h / 2); c.fillStyle = fill ? col : C.paper; c.fill(); c.strokeStyle = fill ? C.ink : col; c.lineWidth = 2.5; c.stroke();
       txt(s, x0 + w / 2, y + size * .36, `800 ${size}px ${FS}`, fill ? C.paper : col, 'center'); return w;
     }
@@ -93,8 +94,9 @@
   }
   function callout(s, wx, wy, dx, dy, col, a = 1, sc = 1) {
     if (sade()) return withA(a, () => { c.save(); c.translate(wx, wy); c.scale(1 / sc, 1 / sc);
+      c.font = `800 25px ${FS}`; const pw = c.measureText(s).width + 35, ph = 44, d = keepIn(dx - pw / 2, dy - ph / 2, pw, ph); dx += d[0]; dy += d[1];
       c.strokeStyle = col; c.lineWidth = 2.5; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(dx * .1, dy * .8, dx, dy); c.stroke();
-      circle(0, 0, 7, col, C.ink, 2); pill(s, dx, dy, col); c.restore(); });
+      circle(0, 0, 7, col, C.ink, 2); pill(s, dx, dy, col, { free: true }); c.restore(); });
     withA(a, () => { c.save(); c.translate(wx, wy); c.scale(1 / sc, 1 / sc);
       c.strokeStyle = col; c.lineWidth = 2.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(dx, dy); c.stroke();
       c.beginPath(); c.arc(0, 0, 7, 0, Math.PI * 2); c.fillStyle = col; c.fill(); c.beginPath(); c.arc(0, 0, 13, 0, Math.PI * 2); c.strokeStyle = col; c.lineWidth = 2; c.stroke();
@@ -115,9 +117,19 @@
   // ink(fn, dolgu, kalınlık): fn yolu açar (rr/poly/smooth ya da c.beginPath...), önce dolgu sonra mürekkep kontur
   function ink(fn, fill, w = 4) { fn(); if (fill) { c.fillStyle = fill; c.fill(); } c.strokeStyle = C.ink; c.lineWidth = w; c.lineJoin = 'round'; c.lineCap = 'round'; c.stroke(); }
   // cam(x, y, z, fn): (x,y) noktasını yerinde tutarak z kat yakınlaştırır (makro yakın çekim, ayrıntıya zum)
+  // keepIn(x, y, w, h): kutu kartın (görünür alanın) dışına taşıyorsa yerel koordinatta gereken kaydırmayı verir
+  let SAFE = null;
+  function keepIn(x, y, w, h) {
+    if (!SAFE || !sade()) return [0, 0]; const m = c.getTransform(); if (Math.abs(m.b) > 1e-6 || Math.abs(m.c) > 1e-6 || !m.a || !m.d) return [0, 0];
+    const X0 = m.a * x + m.e, Y0 = m.d * y + m.f, W = m.a * w, H = m.d * h; let dx = 0, dy = 0;
+    if (W < SAFE.w) { if (X0 < SAFE.x) dx = SAFE.x - X0; else if (X0 + W > SAFE.x + SAFE.w) dx = SAFE.x + SAFE.w - X0 - W; }
+    if (H < SAFE.h) { if (Y0 < SAFE.y) dy = SAFE.y - Y0; else if (Y0 + H > SAFE.y + SAFE.h) dy = SAFE.y + SAFE.h - Y0 - H; }
+    return [dx / m.a, dy / m.d];
+  }
   function cam(x, y, z, fn) { c.save(); c.translate(x - x * z, y - y * z); c.scale(z, z); fn(); c.restore(); }
   // inset(x, y, w, h, fn, {label, col, from:[x,y]}): küçük ek panel; fn(w,h) panelin merkezini (0,0) alarak çizer
   function inset(x, y, w, h, fn, o = {}) {
+    const d = keepIn(x, y - 24, w, h + 24); x += d[0]; y += d[1];
     c.save(); rr(x, y, w, h, 22); c.fillStyle = C.paper; c.fill(); c.clip(); c.translate(x + w / 2, y + h / 2); fn(w, h); c.restore();
     rr(x, y, w, h, 22); c.strokeStyle = C.ink; c.lineWidth = 4; c.stroke();
     if (o.from) { c.strokeStyle = o.col || C.red; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(...o.from); c.quadraticCurveTo(o.from[0], y - 10, x + w / 2, y); c.stroke(); circle(o.from[0], o.from[1], 6, o.col || C.red); }
@@ -255,7 +267,7 @@
   // Kartın içi: kâğıt zemin + sahne çizimi (kartın dışına taşmaz)
   function sadeCardContent(sc, u, clipW) {
     const k = card(); c.save(); rr(k.x, k.y, clipW == null ? k.w : clipW, k.h, 30); c.clip();
-    c.fillStyle = C.paper; c.fillRect(k.x, k.y, k.w, k.h); runScene(sc, u); c.restore();
+    c.fillStyle = C.paper; c.fillRect(k.x, k.y, k.w, k.h); const S = F.S, m = 16; SAFE = { x: (k.x + m) * S, y: (k.y + m) * S, w: (k.w - 2 * m) * S, h: (k.h - 2 * m) * S }; runScene(sc, u); SAFE = null; c.restore();
   }
   // Anahtar kelime başlığı: *vurgulu* kelime kırmızı. Birden çok satıra bölünebilir (" / " ya da genişlik)
   function keyword(s, a, pop) {
@@ -294,7 +306,7 @@
   }
   function drawSade(P, L, i, u, t, prev) {
     const sc = L.scenes[i];
-    if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); c.fillStyle = C.paper; c.fillRect(0, 0, F.W, F.H); runScene(sc, u); return; }
+    if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); c.fillStyle = C.paper; c.fillRect(0, 0, F.W, F.H); SAFE = { x: 12 * F.S, y: 12 * F.S, w: (F.W - 24) * F.S, h: (F.H - 24) * F.S }; runScene(sc, u); SAFE = null; return; }
     c.fillStyle = C.bg; c.fillRect(0, 0, F.W, F.H);
     const k = card(); rr(k.x + 6, k.y + 8, k.w, k.h, 30); c.fillStyle = 'rgba(37,39,44,.08)'; c.fill();
     if (prev) { // geçiş: önceki sahne, yenisi soldan sağa silinerek gelir
