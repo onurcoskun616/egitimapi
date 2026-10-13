@@ -9,6 +9,7 @@
   window.setup = async (bundle) => {
     await Promise.all([document.fonts.load('900 40px Archivo'), document.fonts.load('800 30px "JetBrains Mono"'), document.fonts.load('800 30px Inter')]).catch(() => {});
     await document.fonts.ready;
+    if (EVEngine.preload) await EVEngine.preload(bundle);
     window.P = EVEngine.createPlayer(document.getElementById('cv'), bundle);
     return window.P.total;
   };

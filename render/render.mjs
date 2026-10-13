@@ -23,6 +23,11 @@ async function main() {
     if (Array.isArray(bundle.audioCuts) && bundle.audioCuts.length) { const o = path.join(here, 'audio_paced.wav'); await pace(audioIn, bundle.audioCuts, o); audioIn = o; }
   }
 
+  // Sinematik stil: anlatımın altına hafif, konuşmada kısılan ambiyans zemini (telifsiz, burada sentezlenir)
+  if (bundle.audioUrl && bundle.style === 'sinema' && process.env.AMBIENT !== '0') {
+    try { const o = path.join(here, 'audio_bed.wav'); await ambient(audioIn, o); audioIn = o; } catch (e) { console.log('Ambiyans eklenemedi:', e.message); }
+  }
+
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 560, height: 980 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
@@ -97,6 +102,18 @@ async function pace(input, cuts, output) {
   f += `${parts.join('')}concat=n=${parts.length}:v=0:a=1[out]`;
   await new Promise((ok, no) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', input, '-filter_complex', f, '-map', '[out]', '-ar', '44100', output], { stdio: 'inherit' }).on('close', c => c === 0 ? ok() : no(new Error('ses temposu ffmpeg ' + c))));
   console.log(`Anlatım temposu: ${cuts.length} durak, +${cuts.reduce((s, c) => s + c.gap, 0).toFixed(1)} sn`);
+}
+
+async function ambient(input, output) {
+  const dur = await new Promise((ok) => { let o = ''; const p = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', input]); p.stdout.on('data', d => o += d); p.on('close', () => ok(+o || 60)); });
+  const D = (dur + 3).toFixed(2), st = Math.max(0, dur + 3 - 3).toFixed(2);
+  const f = `anoisesrc=c=brown:a=0.5:d=${D}:r=44100,lowpass=f=300,highpass=f=35[n];` +
+    `sine=f=55:d=${D}:r=44100,volume=0.35,tremolo=f=0.13:d=0.6[s1];sine=f=82.41:d=${D}:r=44100,volume=0.22,tremolo=f=0.11:d=0.7[s2];sine=f=110:d=${D}:r=44100,volume=0.08,tremolo=f=0.17:d=0.8[s3];` +
+    `[n][s1][s2][s3]amix=inputs=4:normalize=0,volume=0.16,afade=t=in:d=2.5,afade=t=out:st=${st}:d=3[bed];` +
+    `[0:a]aformat=sample_rates=44100:channel_layouts=mono,asplit=2[v1][v2];[bed][v2]sidechaincompress=threshold=0.02:ratio=5:attack=30:release=600[duck];` +
+    `[v1][duck]amix=inputs=2:normalize=0:duration=longest[out]`;
+  await new Promise((ok, no) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', input, '-filter_complex', f, '-map', '[out]', '-ar', '44100', '-ac', '1', output], { stdio: 'inherit' }).on('close', c => c === 0 ? ok() : no(new Error('ambiyans ffmpeg ' + c))));
+  console.log('Ambiyans zemini eklendi');
 }
 
 const MAX_BYTES = 46 * 1048576;

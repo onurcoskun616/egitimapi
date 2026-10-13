@@ -12,6 +12,7 @@ const { pagesFor, sourcesBlock } = require('./lib/sources');
 const quiz = require('./lib/quiz');
 const pub = require('./lib/publish');
 const audit = require('./lib/audit');
+const images = require('./lib/images');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -148,7 +149,8 @@ async function runVisuals(id, onlyK, feedback, fixes) {
   const prevV = await latest(id, 'visuals');
   await setStatus(id, 'visuals_generating', { error: null });
   const topic = content.data.topic;
-  const pst = await db.one('projects', `id=eq.${q(id)}&select=visual_style`);
+  const pst = await db.one('projects', `id=eq.${q(id)}&select=visual_style,format`);
+  if (pst && pst.visual_style === 'sinema') return runCineVisuals(id, content, prevV, onlyK, feedback, pst.format || 'dikey');
   const sopts = { style: (pst && pst.visual_style) || 'teknik', anchor: content.data.anchor || null };
   const desc = s => s ? `${s.title} — ${(s.visual && s.visual.subject) || ''} ${(s.visual && s.visual.animation) || ''}`.slice(0, 400) : null;
   const near = (list, k) => { const i = list.findIndex(x => x.k === k); return { prev: desc(list[i - 1]), next: desc(list[i + 1]) }; };
@@ -180,6 +182,42 @@ async function runVisuals(id, onlyK, feedback, fixes) {
   const v = await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes }, feedback: label });
   await setStatus(id, 'visuals_review');
   startAudit(id, v, changed, prevV).catch(e => console.error('denetim', e));
+}
+
+// Sinematik stil: sahne kodu yerine her sahne için gerçekçi görsel üretilir (fal.ai); yazı ve efektleri motor çizer
+async function runCineVisuals(id, content, prevV, onlyK, feedback, format) {
+  if (!images.enabled()) throw new Error("Sinematik stil için görsel servisi bağlı değil: Render'da FAL_KEY ortam değişkenini tanımlayın.");
+  const d = content.data, look = d.look || '', ctx = ctxFor(id, 'visuals');
+  let scenes, targets, label = feedback || null;
+  if (onlyK && prevV) {
+    scenes = prevV.data.scenes.map(s => ({ ...s }));
+    const t = scenes.find(x => x.k === onlyK); if (!t) throw new Error('Sahne bulunamadı');
+    if (feedback) { const r = await claude.reviseImagePrompt(t, look, feedback, ctx); t.img = r.img; t.img2 = r.img2; await logClaude(id, r.usage, 'scene ' + onlyK); }
+    targets = [t]; label = `[${onlyK}] ${feedback || 'yeniden üretildi'}`;
+  } else {
+    // içerik onayından gelen alanlar esas; önceki görseller (aynı tarif) yeniden kullanılır, yalnızca değişenler üretilir
+    scenes = d.scenes.map(s => ({ ...s }));
+    const old = prevV && !feedback ? Object.fromEntries(prevV.data.scenes.map(s => [s.k, s])) : {};
+    targets = scenes.filter(s => { const o = old[s.k]; if (o && o.img === s.img && o.img2 === s.img2 && o.img_path && prevV.data.format === format) { s.img_path = o.img_path; s.img2_path = o.img2_path || null; return false; } return true; });
+  }
+  const ver = await nextVersion(id, 'visuals');
+  let usd = 0, done = 0; const warn = [];
+  const seedOf = k => (parseInt(crypto.createHash('md5').update(id + ':' + k + ':' + ver).digest('hex').slice(0, 7), 16));
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(3, targets.length) }, async () => {
+    while (i < targets.length) {
+      const s = targets[i++];
+      const r = await images.sceneImages(s, look, format, seedOf(s.k));
+      const base = `images/${id}/${s.k}-v${ver}`;
+      await storage.upload(base + '.jpg', r.main.buf, 'image/jpeg'); s.img_path = base + '.jpg';
+      if (r.after) { await storage.upload(base + 'b.jpg', r.after.buf, 'image/jpeg'); s.img2_path = base + 'b.jpg'; } else s.img2_path = null;
+      if (r.afterError) warn.push(`${s.k}. sahnedeki değişim görseli üretilemedi: ${r.afterError}`);
+      usd += r.usd; done++;
+    }
+  }));
+  if (targets.length) await logUsage(id, 'fal', targets.length, onlyK ? 'görsel ' + onlyK : 'görseller', { usd: +usd.toFixed(4), scenes: targets.map(s => s.k) });
+  await db.insert('versions', { project_id: id, stage: 'visuals', version: ver, data: { topic: d.topic, look, hud: d.hud || null, motif: d.motif || null, format, scenes }, feedback: label });
+  await setStatus(id, 'visuals_review', warn.length ? { error: warn.join(' ').slice(0, 600) } : {});
 }
 
 /* ---------- teknik denetim ---------- */
@@ -285,8 +323,13 @@ async function bundleFor(id, withAudio, format, versionId) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
   const vis = versionId ? await db.one('versions', `id=eq.${q(versionId)}`) : await latest(id, 'visuals');
   if (!vis) return null;
-  const scenes = vis.data.scenes.map(s => ({ k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, kw: s.kw, label: s.label, code: s.code }));
+  const cine = p.visual_style === 'sinema';
+  const scenes = await Promise.all(vis.data.scenes.map(async s => cine
+    ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, role: s.role, hook: s.hook, hl: s.hl, card: s.card, count: s.count, answer: s.answer, cta: s.cta, cam: s.cam, fx: s.fx, img2_at: s.img2_at,
+        img: s.img_path ? await thumbUrl(s.img_path) : null, img2: s.img2_path ? await thumbUrl(s.img2_path) : null }
+    : { k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, kw: s.kw, label: s.label, code: s.code }));
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', style: p.visual_style || 'teknik', scenes };
+  if (cine) b.hud = vis.data.hud || null;
   if (withAudio) {
     const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc`);
     if (a) { (a.alignment.timings || []).forEach((t, i) => scenes[i] && Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; if (a.alignment.cuts && a.alignment.cuts.length) b.audioCuts = a.alignment.cuts; }
@@ -363,7 +406,7 @@ on('GET', '/api/me', async (req, res) => {
   const u = req.user; if (!u) return send(res, 200, { user: null, ok: false });
   const out = { user: u, ok: (u.role === 'teacher' && u.status === 'active') || isAdmin(u) };
   if (out.ok) {
-    out.plan = await activeLimits(u); out.used = await monthUsage(u.id);
+    out.plan = await activeLimits(u); out.used = await monthUsage(u.id); out.cine = images.enabled();
     const cs = await db.select('courses', `teacher_id=eq.${q(u.id)}&select=id`);
     out.pending = cs.length ? await db.count('enrollments', `course_id=in.(${cs.map(c => c.id).join(',')})&status=eq.pending&source=neq.purchase`) : 0;
   }
@@ -419,7 +462,7 @@ on('POST', '/api/projects', async (req, res) => {
   if (!lim) return send(res, 402, { error: 'Video üretmek için etkin bir paketiniz yok. Paketim sayfasından paket seçin.' });
   if (await monthUsage(req.user.id) >= (lim.limits.videos_per_month || 0)) return send(res, 402, { error: `Bu ayki video hakkınız doldu (${lim.limits.videos_per_month} video). Paketinizi yükseltebilirsiniz.` });
   if ((+b.target_seconds || 90) > (lim.limits.max_seconds || 300)) return send(res, 402, { error: `Paketiniz en fazla ${lim.limits.max_seconds} saniyelik videoya izin veriyor.` });
-  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: b.visual_style === 'sade' ? 'sade' : 'teknik', status: 'content_generating' });
+  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: ['sade', 'sinema'].includes(b.visual_style) ? b.visual_style : 'teknik', cine_mode: b.visual_style === 'sinema' ? (['soru', 'algi', 'anlatim'].includes(b.cine_mode) ? b.cine_mode : 'anlatim') : null, status: 'content_generating' });
   await saveSources(p.id, b.sources);
   background(p.id, 'content', []);
   send(res, 201, p);
@@ -446,6 +489,8 @@ on('POST', '/api/projects/:id/sources', async (req, res, { id }) => {
 });
 on('GET', '/api/projects/:id/audit', async (req, res, { id }) => {
   const v = await latest(id, 'visuals'); if (!v) return send(res, 404, { error: 'Görsel yok' });
+  const pv = await db.one('projects', `id=eq.${q(id)}&select=visual_style,error`);
+  if (pv && pv.visual_style === 'sinema') return send(res, 200, { cine: true, version: v.version, warn: pv.error || null, scenes: await Promise.all(v.data.scenes.map(async s => ({ k: s.k, title: s.title, img: s.img_path ? await thumbUrl(s.img_path) : null, img2: s.img2_path ? await thumbUrl(s.img2_path) : null, change: s.img2 ? s.cap[s.img2_at] || '' : null }))) });
   const a = v.audit || null; let progress = null;
   if (a && a.status === 'running' && a.task_id) { const t = await db.one('gen_tasks', `id=eq.${q(a.task_id)}&select=status,progress,created_at`); progress = t && t.progress; if (t && t.status === 'failed') a.status = 'failed'; }
   const scenes = {};
@@ -454,6 +499,7 @@ on('GET', '/api/projects/:id/audit', async (req, res, { id }) => {
 });
 on('POST', '/api/projects/:id/audit', async (req, res, { id }) => {
   if (!await guard(res, id, ['visuals_review', 'delivered'], false)) return;
+  const pv = await db.one('projects', `id=eq.${q(id)}&select=visual_style`); if (pv && pv.visual_style === 'sinema') return send(res, 400, { error: 'Sinematik videolarda teknik denetim yok; görselleri önizlemede kontrol edin.' });
   const v = await latest(id, 'visuals'); await startAudit(id, v, null, null); send(res, 202, { ok: true });
 });
 on('POST', '/api/projects/:id/visuals/fix', async (req, res, { id }) => {

@@ -228,7 +228,13 @@ label{font-weight:700;letter-spacing:.06em}
 .stprev.st-teknik b{position:absolute;left:14%;top:30%;width:44%;height:40%;border-radius:6px;background:linear-gradient(#59627a,#262c3c)}
 .stprev.st-teknik i{position:absolute;left:58%;top:48%;width:30%;height:4px;background:#ff8a2a;box-shadow:0 0 10px #ff8a2a}
 .stprev.st-teknik em{position:absolute;right:8%;top:20%;width:14px;height:14px;border-radius:50%;background:#3fb0ff;box-shadow:0 0 12px #3fb0ff}
+.stprev.st-sinema{background:radial-gradient(circle at 50% 62%,#c98a45 0,#5a3a1e 28%,#140d07 70%)}
+.stprev.st-sinema b{position:absolute;left:18%;top:12%;width:64%;height:9px;border-radius:3px;background:#fff;box-shadow:0 13px 0 -2px #fff}
+.stprev.st-sinema i{position:absolute;left:30%;top:66%;width:40%;height:6px;border-radius:3px;background:#8fd3ff}
+.stprev.st-sinema em{position:absolute;left:44%;top:42%;width:12%;height:16%;border-radius:50% 50% 40% 40%;background:#ffd28a;box-shadow:0 0 14px #ffb347}
 .stprev.st-sade{background:#f3efe4}
 .stprev.st-sade b{position:absolute;left:22%;top:14%;width:56%;height:72%;border:3px solid #25272c;border-radius:9px;background:#faf8f1}
 .stprev.st-sade i{position:absolute;left:32%;top:40%;width:18%;height:30%;border:3px solid #25272c;border-radius:4px;background:#e7b53c}
 .stprev.st-sade em{position:absolute;left:56%;top:38%;width:14px;height:14px;border:3px solid #25272c;border-radius:50%;background:#e2624f}
+
+.cinepair{display:flex;gap:6px}.cinepair img{flex:1;min-width:0;max-height:340px;object-fit:cover;border-radius:10px}

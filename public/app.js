@@ -52,7 +52,8 @@
   /* ---------- liste ---------- */
   // Öğretmen ana sayfası: adım adım yeni video + videolarım
   const FMT_OPTS = [['yatay', 'Yatay 16:9', 'YouTube, akıllı tahta, sunum', '16/9'], ['dikey', 'Dikey 9:16', 'Reels, TikTok, Shorts', '9/16'], ['kare', 'Kare 1:1', 'Instagram ve Facebook gönderisi', '1/1'], ['dikey45', 'Dikey 4:5', 'Instagram ve Facebook akışı', '4/5']];
-  const STY_OPTS = [['teknik', 'Teknik', 'Koyu zemin, derinlikli, ayrıntılı çizim'], ['sade', 'Sade anlatım', 'Açık zemin, düz renk, anahtar kelimeli editoryal anlatım']];
+  const STY_OPTS = [['teknik', 'Teknik', 'Koyu zemin, derinlikli, ayrıntılı çizim'], ['sade', 'Sade anlatım', 'Açık zemin, düz renk, anahtar kelimeli editoryal anlatım'], ['sinema', 'Sinematik', 'Gerçekçi görseller, kelime kelime altyazı (Reels/Shorts)']];
+  const CINE_OPTS = [['soru', 'Soru‑cevap', 'Soru kartı, 3‑2‑1 geri sayım, cevap'], ['algi', 'Dikkat / algı oyunu', 'Gizli motif, sonunda bilimsel açıklama'], ['anlatim', 'Sinematik anlatım', 'Konuyu gerçekçi sahnelerle anlatır']];
   const DUR_OPTS = [[60, '1 dk'], [90, '1,5 dk'], [150, '2,5 dk'], [240, '4 dk']];
   const SPD_OPTS = [['yavas', 'Yavaş', 'ders dinler gibi'], ['normal', 'Normal', 'önerilen'], ['hizli', 'Hızlı', 'tekrar ve özet']];
   const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
@@ -61,7 +62,7 @@
   async function viewList() {
     setSub('Konu yaz · onayla · video al');
     const P = ME.plan; const quota = P ? `<p class="note">${esc(P.plan)} paketi · bu ay ${ME.used} / ${P.limits.videos_per_month} video · <a href="#/paketim">Paketim</a></p>` : `<div class="card" style="border-color:rgba(255,201,60,.5);margin-bottom:12px">Video üretmek için etkin bir paketiniz yok. <a href="#/paketim">Paket seçin</a>.</div>`;
-    const def = { tone: lsGet('v_tone', ''), fmt: lsGet('v_fmt', 'yatay'), dur: lsGet('v_dur', '150'), spd: lsGet('v_spd', 'normal'), sty: lsGet('v_sty', 'teknik') };
+    const def = { tone: lsGet('v_tone', ''), fmt: lsGet('v_fmt', 'yatay'), dur: lsGet('v_dur', '150'), spd: lsGet('v_spd', 'normal'), sty: lsGet('v_sty', 'teknik'), cm: lsGet('v_cm', 'soru') };
     app.innerHTML = `<div id="guide"></div><div id="waiting"></div>
       <h1>Yeni eğitim videosu</h1>${quota}
       <form class="card wiz" id="nf" novalidate>
@@ -78,6 +79,8 @@
         </section>
         <section class="wstep" data-s="3" hidden>
           <label>Görsel stil</label><div class="tiles">${radios('sty', STY_OPTS, def.sty, o => `<i class="stprev st-${o[0]}" aria-hidden="true"><b></b><i></i><em></em></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
+          <div id="cmWrap" hidden><label>Sinematik kalıp</label><div class="tiles row3">${radios('cm', CINE_OPTS, def.cm, o => `<b>${o[1]}</b><span>${o[2]}</span>`)}</div>
+            <p class="note" id="cmNote">Her sahne için gerçekçi görsel üretilir (video başına yaklaşık 0,15–0,40 $ ek görsel maliyeti). Sosyal medya için en uygun biçim: Dikey 9:16, 1 dk.</p></div>
           <label>Video biçimi</label><div class="tiles">${radios('fmt', FMT_OPTS, def.fmt, o => `<i class="ar" style="aspect-ratio:${o[3]}"></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
           <label>Süre</label><div class="tiles row4">${radios('dur', DUR_OPTS, def.dur, o => `<b>${o[1]}</b>`)}</div>
         </section>
@@ -98,8 +101,8 @@
       step = n; f.querySelectorAll('.wstep').forEach(s => s.hidden = +s.dataset.s !== n);
       f.querySelectorAll('.wsteps li').forEach(li => { const i = +li.dataset.i; li.className = i === n ? 'on' : i < n ? 'done' : ''; });
       document.getElementById('wback').hidden = n === 1; document.getElementById('wnext').hidden = n === 4; document.getElementById('go').hidden = n !== 4; msg.textContent = '';
-      if (n === 4) { const tx = tones.find(x => x.k === val('tone')); const fo = FMT_OPTS.find(o => o[0] === val('fmt')); const du = DUR_OPTS.find(o => String(o[0]) === val('dur')); const sp = SPD_OPTS.find(o => o[0] === val('spd')); const sy = STY_OPTS.find(o => o[0] === val('sty'));
-        document.getElementById('sum').innerHTML = `<b>Özet</b><ul><li>${esc(document.getElementById('t').value)}</li><li>${esc(val('tone') === 'ozel' ? 'Özel anlatım' : tx ? tx.label : '')} · ${esc(sp ? sp[1] : '')} hız</li><li>${esc(fo ? fo[1] : '')} · ${esc(du ? du[1] : '')} · ${esc(sy ? sy[1] : '')} stil</li></ul>`; }
+      if (n === 4) { const tx = tones.find(x => x.k === val('tone')); const fo = FMT_OPTS.find(o => o[0] === val('fmt')); const du = DUR_OPTS.find(o => String(o[0]) === val('dur')); const sp = SPD_OPTS.find(o => o[0] === val('spd')); const sy = STY_OPTS.find(o => o[0] === val('sty')); const cmo = val('sty') === 'sinema' ? CINE_OPTS.find(o => o[0] === val('cm')) : null;
+        document.getElementById('sum').innerHTML = `<b>Özet</b><ul><li>${esc(document.getElementById('t').value)}</li><li>${esc(val('tone') === 'ozel' ? 'Özel anlatım' : tx ? tx.label : '')} · ${esc(sp ? sp[1] : '')} hız</li><li>${esc(fo ? fo[1] : '')} · ${esc(du ? du[1] : '')} · ${esc(sy ? sy[1] : '')} stil${cmo ? ' · ' + esc(cmo[1]) : ''}</li></ul>`; }
       f.scrollIntoView({ block: 'start', behavior: 'smooth' });
     };
     const check = n => {
@@ -107,6 +110,10 @@
       if (n === 2) { if (!val('tone')) return 'Bir anlatım dili seçin'; if (val('tone') === 'ozel' && document.getElementById('tno').value.trim().length < 3) return 'Anlatım dilini kısaca tarif edin'; }
       return '';
     };
+    const syncCine = () => { const on = val('sty') === 'sinema'; document.getElementById('cmWrap').hidden = !on;
+      if (on && !ME.cine) document.getElementById('cmNote').innerHTML = '<b>Görsel servisi henüz bağlı değil.</b> İçeriği hazırlayıp onaylayabilirsiniz; görseller servis bağlandıktan sonra üretilir.'; };
+    f.querySelectorAll('input[name="sty"]').forEach(r => r.addEventListener('change', () => { syncCine();
+      if (val('sty') === 'sinema') { const fm = f.querySelector('input[name="fmt"][value="dikey"]'), du = f.querySelector('input[name="dur"][value="60"]'); if (fm) fm.checked = true; if (du) du.checked = true; } })); syncCine();
     document.getElementById('wnext').onclick = () => { const e = check(step); if (e) { msg.textContent = e; return; } show(step + 1); };
     document.getElementById('wback').onclick = () => show(step - 1);
     f.querySelectorAll('.wsteps li').forEach(li => li.onclick = () => { const i = +li.dataset.i; for (let k = 1; k < i; k++) { const e = check(k); if (e) { show(k); msg.textContent = e; return; } } show(i); });
@@ -116,8 +123,8 @@
       try {
         const files = [...(document.getElementById('src').files || [])];
         const sources = files.length ? await extractAll(files, msg) : [];
-        ['tone', 'fmt', 'dur', 'spd', 'sty'].forEach(k => lsSet('v_' + k, val(k)));
-        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), visual_style: val('sty'), sources } });
+        ['tone', 'fmt', 'dur', 'spd', 'sty', 'cm'].forEach(k => lsSet('v_' + k, val(k)));
+        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), visual_style: val('sty'), cine_mode: val('cm'), sources } });
         location.hash = '#/p/' + p.id;
       } catch (err) { msg.textContent = err.message; busy(btn, false); }
     };
@@ -450,6 +457,11 @@
     const el = document.getElementById('audit'); if (!el) return;
     let a; try { a = await api(`/api/projects/${id}/audit`); } catch (e) { return; }
     if (!document.getElementById('audit')) return;
+    if (a.cine) {
+      el.innerHTML = `<h2>Sahne görselleri</h2>${a.warn ? `<div class="card" style="border-color:rgba(255,201,60,.5)">${esc(a.warn)}</div>` : ''}<p class="note">Beğenmediğiniz görseli aşağıdaki düzeltme kutusundan sahne seçip ne istediğinizi yazarak yeniden ürettirebilirsiniz (ör. "daha aydınlık olsun, masada saat de olsun").</p>
+        <div class="aud-grid">${a.scenes.map(x => `<div class="aud-scene"><div class="aud-head"><b>${esc(x.k)} · ${esc(x.title)}</b></div><div class="cinepair">${x.img ? `<img loading="lazy" src="${esc(x.img)}" alt="Sahne ${esc(x.k)} görseli">` : '<div class="noimg">Görsel yok</div>'}${x.img2 ? `<img loading="lazy" src="${esc(x.img2)}" alt="Sahne ${esc(x.k)} değişim sonrası">` : ''}</div>${x.img2 ? `<p class="note">Sağdaki görsele geçiş: “${esc(x.change)}” cümlesinde.</p>` : ''}</div>`).join('')}</div>`;
+      return;
+    }
     const rows = a.titles.map(t => ({ ...t, r: a.scenes[t.k] }));
     const done = rows.filter(x => x.r);
     const cnt = s => done.filter(x => x.r.severity === s).length;
@@ -891,7 +903,7 @@
         <div><b>${TL(S.avgVideo)}</b><span>teslim edilen video başına</span></div>
         <div><b>${TL(S.avgMin)}</b><span>video dakikası başına</span></div>
       </div>
-      <p class="note">Maliyet dağılımı: Claude ${TL(S.byProvider.claude)} · ElevenLabs ${TL(S.byProvider.eleven)} · GitHub Actions ${TL(S.byProvider.actions)}. ${C.claude_billing === 'subscription' ? `Claude şu an <b>abonelikle</b> hesaplanıyor (değişken maliyete eklenmedi). API'ye geçilse bu dönem yaklaşık <b>${TL(S.claudeApiTry)}</b> tutardı.` : 'Claude <b>API fiyatıyla</b> hesaplanıyor (ANTHROPIC_API_KEY ile çalışınca ödenecek tutar).'}${S.estimated ? ' Eski kayıtlarda girdi/çıktı ayrımı olmadığı için Claude tutarının bir kısmı tahminidir.' : ''} Video başı tutara içerik ve görsel düzeltmeleri, denetim, sorular ve başarısız denemeler dahildir.</p>
+      <p class="note">Maliyet dağılımı: Claude ${TL(S.byProvider.claude)} · ElevenLabs ${TL(S.byProvider.eleven)} · Görseller (fal.ai) ${TL(S.byProvider.images || 0)} · GitHub Actions ${TL(S.byProvider.actions)}. ${C.claude_billing === 'subscription' ? `Claude şu an <b>abonelikle</b> hesaplanıyor (değişken maliyete eklenmedi). API'ye geçilse bu dönem yaklaşık <b>${TL(S.claudeApiTry)}</b> tutardı.` : 'Claude <b>API fiyatıyla</b> hesaplanıyor (ANTHROPIC_API_KEY ile çalışınca ödenecek tutar).'}${S.estimated ? ' Eski kayıtlarda girdi/çıktı ayrımı olmadığı için Claude tutarının bir kısmı tahminidir.' : ''} Video başı tutara içerik ve görsel düzeltmeleri, denetim, sorular ve başarısız denemeler dahildir.</p>
 
       <h2>Paketler kârlı mı?</h2><p class="note">Öğretmen paketini sonuna kadar kullanırsa (her ay tüm video hakkı, her video en uzun sürede) oluşacak değişken maliyet. Önerilen en düşük fiyat bu maliyetin 3 katıdır. Claude her zaman API fiyatıyla hesaplanır (video dakikası başına ${TL(S.avgMinApi)}), çünkü başka öğretmenler için üretim API anahtarıyla yapılır.</p>
       <div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Paket</th><th>Aylık fiyat</th><th>Hak</th><th>En kötü maliyet</th><th>Fark</th><th>Önerilen en düşük fiyat</th><th>Durum</th></tr></thead><tbody>${d.planCheck.map(x => `<tr><td><b>${esc(x.name)}</b>${x.active ? '' : ' <span class="note">(kapalı)</span>'}</td><td>${TL(x.price)}</td><td>${x.videos} video × ${Math.round(x.max_seconds / 60 * 10) / 10} dk</td><td>${TL(x.worst)}</td><td style="color:${x.margin_worst < 0 ? 'var(--red)' : 'inherit'}">${TL(x.margin_worst)}</td><td>${TL(x.min_price)}</td><td>${verdict(x)}</td></tr>`).join('')}</tbody></table></div>
