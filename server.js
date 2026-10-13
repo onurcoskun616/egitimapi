@@ -179,7 +179,8 @@ async function runVisuals(id, onlyK, feedback, fixes) {
     await logClaude(id, res.map(r => r.usage), 'scenes');
     scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
-  const v = await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes }, feedback: label });
+  const extra = sopts.style === 'deney' ? { note: content.data.note || null, next: content.data.next || null } : {};
+  const v = await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes, ...extra }, feedback: label });
   await setStatus(id, 'visuals_review');
   startAudit(id, v, changed, prevV).catch(e => console.error('denetim', e));
 }
@@ -327,9 +328,11 @@ async function bundleFor(id, withAudio, format, versionId) {
   const scenes = await Promise.all(vis.data.scenes.map(async s => cine
     ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, role: s.role, hook: s.hook, hl: s.hl, card: s.card, count: s.count, answer: s.answer, cta: s.cta, cam: s.cam, fx: s.fx, img2_at: s.img2_at,
         img: s.img_path ? await thumbUrl(s.img_path) : null, img2: s.img2_path ? await thumbUrl(s.img2_path) : null }
+    : p.visual_style === 'deney' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, hl: s.hl, meter: s.meter, bg: s.bg, count: s.count, answer: s.answer, code: s.code }
     : { k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, kw: s.kw, label: s.label, code: s.code }));
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', style: p.visual_style || 'teknik', scenes };
   if (cine) b.hud = vis.data.hud || null;
+  if (p.visual_style === 'deney') { const so = p.style_opts || {}; b.series = so.series === '' ? null : (so.series || 'Ya Olsaydı'); b.next = so.next || vis.data.next || null; b.note = vis.data.note || null; }
   if (withAudio) {
     const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc`);
     if (a) { (a.alignment.timings || []).forEach((t, i) => scenes[i] && Object.assign(scenes[i], t)); b.audioUrl = await storage.signedUrl(a.path, 4 * 3600); b.audioDuration = a.duration_s; if (a.alignment.cuts && a.alignment.cuts.length) b.audioCuts = a.alignment.cuts; }
@@ -463,7 +466,7 @@ on('POST', '/api/projects', async (req, res) => {
   if (!lim) return send(res, 402, { error: 'Video üretmek için etkin bir paketiniz yok. Paketim sayfasından paket seçin.' });
   if (await monthUsage(req.user.id) >= (lim.limits.videos_per_month || 0)) return send(res, 402, { error: `Bu ayki video hakkınız doldu (${lim.limits.videos_per_month} video). Paketinizi yükseltebilirsiniz.` });
   if ((+b.target_seconds || 90) > (lim.limits.max_seconds || 300)) return send(res, 402, { error: `Paketiniz en fazla ${lim.limits.max_seconds} saniyelik videoya izin veriyor.` });
-  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: ['sade', 'sinema'].includes(b.visual_style) ? b.visual_style : 'teknik', cine_mode: b.visual_style === 'sinema' ? (['soru', 'algi', 'anlatim'].includes(b.cine_mode) ? b.cine_mode : 'anlatim') : null, status: 'content_generating' });
+  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: ['sade', 'sinema', 'deney'].includes(b.visual_style) ? b.visual_style : 'teknik', style_opts: b.visual_style === 'deney' ? { series: String(b.series == null ? 'Ya Olsaydı' : b.series).trim().slice(0, 30), next: String(b.next_topic || '').trim().slice(0, 80) || null } : null, cine_mode: b.visual_style === 'sinema' ? (['soru', 'algi', 'anlatim'].includes(b.cine_mode) ? b.cine_mode : 'anlatim') : null, status: 'content_generating' });
   await saveSources(p.id, b.sources);
   background(p.id, 'content', []);
   send(res, 201, p);

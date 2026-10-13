@@ -14,12 +14,14 @@
     sade: { bg: '#f3efe4', fg: '#25272c', muted: '#8b8679', dim: '#cfc8b6', hv: '#e8724f', lv: '#2f4b6e', cool: '#4f9c94', red: '#e2624f', yel: '#e7b53c', green: '#2f8f6f', violet: '#8a6fb3', copper: '#c27a45', steel: '#9aa1ab', ink: '#25272c', paper: '#faf8f1', leaf: '#2f8f6f' },
   };
   PALETTES.sinema = Object.assign({}, PALETTES.teknik, { bg: '#000000', hl: '#8fd3ff' });
+  PALETTES.deney = Object.assign({}, PALETTES.teknik, { bg: '#2a2380', fg: '#ffffff', yel: '#ffc93c', cool: '#4fd8e8', muted: '#b7b3e6', dim: '#5a54a8', paper: '#2a2380', ink: '#ffffff' });
   Object.assign(C, PALETTES.teknik);
   let STYLE = 'teknik';
   const FS = '"Inter","Noto Sans","DejaVu Sans",system-ui,sans-serif';
   function setStyle(name) { STYLE = PALETTES[name] ? name : 'teknik'; Object.assign(C, PALETTES[STYLE]); return STYLE; }
   const sade = () => STYLE === 'sade';
   const cine = () => STYLE === 'sinema';
+  const deney = () => STYLE === 'deney';
   let c = null; // aktif 2D bağlam
 
   /* ---------- yardımcılar ---------- */
@@ -185,7 +187,7 @@
     glow('rgba(255,110,20,.8)', 40, () => { f(-50 * s, 140 * s, 240 * s * fl(1), '#ff5a1f'); f(50 * s, 140 * s, 220 * s * fl(2), '#ff5a1f'); f(0, 170 * s, 300 * s * fl(3), '#ff5a1f'); }); f(0, 110 * s, 200 * s * fl(4), '#ff9b2e'); f(0, 70 * s, 130 * s * fl(5), '#ffd45a'); }
   function hero(fn, u, sc = 1, dy = 0, cy = 800) { const k = 1.04 - .04 * e3(cl(u / 6)); c.save(); c.translate(F.hx + Math.sin(u * .3) * 6, F.hy + (cy - 800 + dy) * F.hs + Math.cos(u * .25) * 4); c.scale(sc * k * F.hs, sc * k * F.hs); fn(); c.restore(); }
 
-  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, ctx: () => c };
+  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, globe, ring, ball, sun, ctx: () => c };
   const LIB_NAMES = Object.keys(LIB);
 
   function compileScene(code) {
@@ -200,6 +202,7 @@
     scenes.forEach(s => {
       if (!s.capT) { let tt = LEAD; s.capT = s.cap.map(x => { const st = tt; tt += x.length / CPS + GAP; return st; }); s.dur = Math.max(s.minDur || 6, Math.ceil((tt + .6) * 2) / 2); s.capR = s.cap.map(() => CPS); }
     });
+    if (bundle.style === 'deney' && (bundle.next || bundle.series) && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: 3.2, outro: true, code: '' });
     let acc = 0; scenes.forEach(s => { s.s = acc; acc += s.dur; s.e = acc; s.fn = compileScene(s.code || ''); });
     return { scenes, total: acc };
   }
@@ -229,7 +232,7 @@
     dikey45: { hx: 450, hy: 565, hs: .74, kwY: 240, kwMax: 60, labelY: 848, capY: 920, capW: 800, capFont: 34, capLh: 46 },
   };
   let F = FORMATS.dikey;
-  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : b; return F; }
+  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : deney() ? Object.assign({}, b, DENEY[name] || DENEY.dikey) : b; return F; }
 
   /* ---------- çerçeve ---------- */
   function bgGrid() { c.fillStyle = 'rgba(120,150,210,.12)'; for (let x = 38; x < F.W; x += 76) for (let y = 38; y < F.H; y += 76) { c.fillRect(x - 6, y - 1, 12, 2); c.fillRect(x - 1, y - 6, 2, 12); } }
@@ -262,7 +265,7 @@
   /* ---------- sade stil çerçevesi ---------- */
   const card = () => ({ x: F.hx - 410 * F.hs, y: F.hy - 345 * F.hs, w: 820 * F.hs, h: 690 * F.hs });
   function runScene(sc, u) {
-    try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); }
+    try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k, bg: sc.bg || 'indigo' }); }
     catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); }
     c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]);
   }
@@ -445,6 +448,112 @@
     cineText(sc, u, Lc, P); cineCaption(sc, u, Lc);
     c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(0, F.H - 4, F.W, 4); c.fillStyle = 'rgba(143,211,255,.9)'; c.fillRect(0, F.H - 4, F.W * (t / L.total), 4);
   }
+
+  /* ---------- "Ya olsaydı" (düşünce deneyi) stili ---------- */
+  // Nesne yardımcıları (sahne kodu da kullanır)
+  function globe(x, y, r, u = 0, o = {}) {
+    c.save(); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.closePath();
+    c.fillStyle = rg(x - r * .3, y - r * .35, r * .1, r * 1.1, [[0, '#4f9cf0'], [.6, '#2361c4'], [1, '#0f2f73']]); c.fill(); c.clip();
+    const sp = (o.spin == null ? .06 : o.spin) * u * r * 2;
+    for (let i = 0; i < 24; i++) { // kıtalar: tohumlu yumuşak lekeler, dönerek kayar
+      const bx = ((seeded(i + 3) * r * 4 + sp) % (r * 4)) - r * 2, by = (seeded(i + 9) - .5) * r * 1.6, rr0 = r * (.14 + .24 * seeded(i + 17));
+      const pts = []; for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2, rad = rr0 * (.65 + .55 * seeded(i * 13 + k)); pts.push([x + bx + Math.cos(a) * rad * 1.3, y + by + Math.sin(a) * rad]); }
+      smooth(pts); c.fillStyle = seeded(i + 40) > .75 ? '#c9b26a' : '#3f9c4a'; c.fill();
+    }
+    c.fillStyle = 'rgba(255,255,255,.75)'; c.beginPath(); c.ellipse(x, y - r * .97, r * .5, r * .1, 0, 0, Math.PI * 2); c.fill(); c.beginPath(); c.ellipse(x, y + r * .98, r * .45, r * .08, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = rg(x - r * .45, y - r * .5, 0, r * 1.5, [[0, 'rgba(255,255,255,.28)'], [.45, 'rgba(255,255,255,0)'], [.75, 'rgba(0,0,30,.15)'], [1, 'rgba(0,0,30,.6)']]); c.fillRect(x - r, y - r, r * 2, r * 2);
+    c.restore();
+    c.save(); c.beginPath(); c.arc(x, y, r + 3, 0, Math.PI * 2); c.strokeStyle = 'rgba(140,200,255,.35)'; c.lineWidth = 6; c.stroke(); c.restore();
+  }
+  function ring(x, y, rx, ry, col, w = 6, part = 'full', o = {}) {
+    c.save(); c.beginPath(); if (part === 'back') c.ellipse(x, y, rx, ry, 0, Math.PI, Math.PI * 2); else if (part === 'front') c.ellipse(x, y, rx, ry, 0, 0, Math.PI); else c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    if (o.dash) c.setLineDash(o.dash); c.lineCap = 'round'; c.strokeStyle = col || C.yel; c.lineWidth = w; if (part !== 'back') { c.shadowColor = col || C.yel; c.shadowBlur = 10; } c.stroke(); c.restore();
+  }
+  function ball(x, y, r, kind = 'basket') {
+    c.save(); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
+    const base = kind === 'tennis' ? ['#e8f25a', '#b4c42a'] : kind === 'foot' ? ['#ffffff', '#c8cbd4'] : ['#f08a3a', '#b4511a'];
+    c.fillStyle = rg(x - r * .35, y - r * .35, r * .1, r * 1.1, [[0, base[0]], [1, base[1]]]); c.fill(); c.clip();
+    c.lineWidth = Math.max(1.5, r * .05);
+    if (kind === 'basket') { c.strokeStyle = '#2a1408'; c.beginPath(); c.moveTo(x - r, y); c.lineTo(x + r, y); c.moveTo(x, y - r); c.lineTo(x, y + r); c.stroke(); c.beginPath(); c.ellipse(x - r * .9, y, r * .55, r, 0, -Math.PI / 2, Math.PI / 2); c.stroke(); c.beginPath(); c.ellipse(x + r * .9, y, r * .55, r, 0, Math.PI / 2, Math.PI * 1.5); c.stroke(); }
+    if (kind === 'tennis') { c.strokeStyle = '#ffffff'; c.lineWidth = r * .09; c.beginPath(); c.arc(x - r * 1.05, y, r * .8, -1, 1); c.stroke(); c.beginPath(); c.arc(x + r * 1.05, y, r * .8, Math.PI - 1, Math.PI + 1); c.stroke(); }
+    if (kind === 'foot') { c.fillStyle = '#222'; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const px = x + Math.cos(a) * r * .72, py = y + Math.sin(a) * r * .72; const pts = []; for (let k = 0; k < 5; k++) { const b = k / 5 * Math.PI * 2; pts.push([px + Math.cos(b) * r * .2, py + Math.sin(b) * r * .2]); } poly(pts); c.fill(); } const pts = []; for (let k = 0; k < 5; k++) { const b = k / 5 * Math.PI * 2 - Math.PI / 2; pts.push([x + Math.cos(b) * r * .26, y + Math.sin(b) * r * .26]); } poly(pts); c.fill(); }
+    c.fillStyle = rg(x - r * .4, y - r * .45, 0, r * 1.4, [[0, 'rgba(255,255,255,.25)'], [.5, 'rgba(255,255,255,0)'], [1, 'rgba(0,0,0,.35)']]); c.fillRect(x - r, y - r, r * 2, r * 2); c.restore();
+  }
+  function sun(x, y, r, u = 0) {
+    c.save(); const p = 1 + .03 * Math.sin(u * 2);
+    c.fillStyle = rg(x, y, r * .8, r * 1.9 * p, [[0, 'rgba(255,190,80,.55)'], [1, 'rgba(255,150,60,0)']]); c.fillRect(x - r * 2, y - r * 2, r * 4, r * 4);
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = rg(x - r * .2, y - r * .2, r * .1, r, [[0, '#fff6c8'], [.6, '#ffd35a'], [1, '#f39a2a']]); c.fill();
+    c.restore();
+  }
+  const DENEY = {
+    dikey: { hx: 450, hy: 840, hs: .95, mX: .05, mY: .045, boxY: .108, boxW: .9, noteY: .925 },
+    yatay: { hx: 800, hy: 575, hs: .6, mX: .035, mY: .07, boxY: .19, boxW: .62, noteY: .965 },
+    kare: { hx: 450, hy: 570, hs: .58, mX: .05, mY: .06, boxY: .19, boxW: .9, noteY: .965 },
+    dikey45: { hx: 450, hy: 650, hs: .72, mX: .05, mY: .055, boxY: .125, boxW: .9, noteY: .94 },
+  };
+  const trNum = (v, dec) => { const s = Math.abs(v).toFixed(dec).split('.'); s[0] = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.'); return (v < 0 ? '−' : '') + s.join(','); };
+  function deneyBg(bg) {
+    if (bg === 'sky') { const hz = F.hy + (-200) * F.hs; c.fillStyle = lg(0, 0, 0, hz, [[0, '#9ec3df'], [1, '#e9eef0']]); c.fillRect(0, 0, F.W, hz);
+      c.fillStyle = lg(0, hz, 0, F.H, [[0, '#e9d6a6'], [1, '#d4b47c']]); c.fillRect(0, hz, F.W, F.H - hz);
+      c.fillStyle = 'rgba(150,110,60,.18)'; for (let i = 0; i < 220; i++) { const yy = hz + Math.pow(seeded(i + 5), 1.6) * (F.H - hz), sz = 1 + (yy - hz) / (F.H - hz) * 3; c.fillRect(seeded(i + 11) * F.W, yy, sz * 2, sz * .7); }
+      c.fillStyle = lg(0, hz - 30, 0, hz + 30, [[0, 'rgba(255,255,255,0)'], [.5, 'rgba(255,255,255,.35)'], [1, 'rgba(255,255,255,0)']]); c.fillRect(0, hz - 30, F.W, 60); return; }
+    const [a, b] = bg === 'night' ? ['#2a2a6e', '#0b0b2a'] : ['#4b3cc6', '#221a6c'];
+    c.fillStyle = rg(F.W / 2, F.H * .5, 0, Math.hypot(F.W, F.H) * .6, [[0, a], [1, b]]); c.fillRect(0, 0, F.W, F.H);
+  }
+  function deneyMeter(sc, u, D, light) {
+    const m = sc.meter; if (!m) return; const U = Math.min(F.W, F.H), x = F.W * D.mX, y = F.H * D.mY, t0 = sc.capT[m.at || 0] != null ? sc.capT[m.at || 0] : 0;
+    const a = fade(u, Math.max(0, t0 - .6), .3), lab = light ? 'rgba(40,40,60,.75)' : 'rgba(255,255,255,.75)';
+    let val; if (m.text) { const n = Math.floor(cl((u - t0) / 1.2) * m.text.length); val = m.text.slice(0, Math.max(1, n)); }
+    else { const k = e3(cl((u - t0) / 1.8)); val = (m.prefix || '') + trNum(lerp(m.from, m.to, k), m.dec) + (m.unit ? ' ' + m.unit : ''); }
+    withA(a, () => { txt(m.label || '', x, y, `700 ${Math.round(U * .017)}px ${FM}`, lab);
+      c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 8; txt(val, x, y + U * .062, `800 ${Math.round(U * .056)}px ${FM}`, C.yel); c.restore();
+      if (m.sub) txt(m.sub, x, y + U * .088, `700 ${Math.round(U * .0135)}px ${FM}`, lab); });
+  }
+  function deneyBrand(P, D, light) {
+    const U = Math.min(F.W, F.H), s = P.series || ''; if (!s) return; const x = F.W * (1 - D.mX), y = F.H * D.mY + U * .02, col = light ? 'rgba(40,40,60,.85)' : '#ffffff';
+    const f = `700 ${Math.round(U * .02)}px ${FS}`; c.font = f; const w = c.measureText(s).width;
+    txt(s, x, y, f, col, 'right'); seriesGlyph(x - w - U * .025, y - U * .008, U * .018, light ? '#6a5a20' : C.yel);
+  }
+  function seriesGlyph(x, y, r, col) { c.save(); c.strokeStyle = col; c.lineWidth = Math.max(1.5, r * .14); c.lineCap = 'round'; c.beginPath(); c.moveTo(x, y + r); c.lineTo(x, y - r * .1);
+    [[-1, -.9], [-.55, -1.15], [0, -1.25], [.55, -1.15], [1, -.9]].forEach(([dx, dy]) => { c.moveTo(x, y - r * .1); c.quadraticCurveTo(x + dx * r * .3, y - r * .5, x + dx * r, y + dy * r); }); c.stroke(); c.restore(); }
+  function deneyBox(sc, u, D, light, override) {
+    const U = Math.min(F.W, F.H); let idx = -1; sc.capT.forEach((x, i) => { if (u >= x - .05) idx = i; });
+    const s = override || (idx >= 0 ? sc.cap[idx] : ''); if (!s || (!override && sc.count === idx)) return;
+    const rate = sc.capR && idx >= 0 ? sc.capR[idx] : CPS, el = override ? 1e9 : (u - sc.capT[idx]) * rate;
+    const size = Math.round(U * .038), f = `800 ${size}px ${FS}`, W2 = F.W * D.boxW, pad = size * .6, lh = size * 1.28; c.font = f;
+    const lines = wrap(s, W2 - pad * 2).slice(0, 4), h = lines.length * lh + pad * 1.3, x0 = F.W / 2 - W2 / 2, y0 = F.H * D.boxY;
+    const hl = new Set((sc.hl || []).flatMap(h => String(h).split(/\s+/)).map(norm).filter(Boolean));
+    const a = override ? 1 : fade(u, sc.capT[idx] - .1, .2);
+    withA(a, () => { rr(x0, y0, W2, h, size * .45); c.fillStyle = light ? 'rgba(70,72,95,.82)' : 'rgba(32,28,88,.78)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.08)'; c.lineWidth = 2; c.stroke();
+      let ci = 0; c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+      lines.forEach((ln, li) => { const ws = ln.split(' '), sp = c.measureText(' ').width, tw = c.measureText(ln).width; let x = F.W / 2 - tw / 2; const yy = y0 + pad * .65 + lh * (li + .78);
+        ws.forEach(w => { const on = ci <= el; ci += w.length + 1; c.font = f; c.fillStyle = hl.has(norm(w)) ? C.yel : '#ffffff'; c.globalAlpha = (on ? 1 : .32) * a; c.fillText(w, x, yy); x += c.measureText(w).width + sp; }); });
+      c.globalAlpha = a; });
+  }
+  function deneyExtras(sc, u) {
+    const U = Math.min(F.W, F.H), T = sc.capT;
+    if (sc.count != null && T[sc.count] != null) { const t0 = T[sc.count], t1 = T[sc.count + 1] != null ? T[sc.count + 1] : sc.dur - .2, seg = (t1 - t0) / 3;
+      if (u >= t0 && u < t1) { const n = Math.min(2, Math.floor((u - t0) / seg)), p = ((u - t0) - n * seg) / seg, size = Math.round(U * .2);
+        withA(Math.min(1, p * 6, (1 - p) * 4 + .2), () => { c.save(); c.translate(F.W / 2, F.hy); const k = .85 + .15 * outB(cl(p * 4)); c.scale(k, k); c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 20; txt(String(3 - n), 0, size * .35, `900 ${size}px ${FD}`, C.yel, 'center'); c.restore(); }); } }
+  }
+  function deneyOutro(P, u) {
+    const U = Math.min(F.W, F.H), D = DENEY[P.format] || DENEY.dikey; deneyBg('indigo');
+    if (P.next) { const size = Math.round(U * .038), f = `800 ${size}px ${FS}`, W2 = F.W * D.boxW, pad = size * .6, lh = size * 1.28; c.font = f;
+      const lines = wrap('Sıradaki: ' + P.next, W2 - pad * 2).slice(0, 3), h = lines.length * lh + pad * 1.3, x0 = F.W / 2 - W2 / 2, y0 = F.H * D.boxY;
+      withA(fade(u, .1, .3), () => { rr(x0, y0, W2, h, size * .45); c.fillStyle = 'rgba(32,28,88,.78)'; c.fill(); let first = true;
+        lines.forEach((ln, li) => { const tw = c.measureText(ln).width; let x = F.W / 2 - tw / 2; const yy = y0 + pad * .65 + lh * (li + .78);
+          ln.split(' ').forEach(w => { c.font = f; c.fillStyle = first && /^Sıradaki/.test(w) ? '#ffffff' : C.yel; if (/^Sıradaki/.test(w)) first = false; c.textAlign = 'left'; c.fillText(w, x, yy); x += c.measureText(w + ' ').width; }); }); }); }
+    if (P.series) withA(fade(u, .4, .4), () => { const s = Math.round(U * .06), f = `800 ${s}px ${FS}`; c.font = f; const w = c.measureText(P.series).width, gx = F.W / 2 - w / 2 - s * .5;
+      seriesGlyph(gx - s * .3, F.hy + s * .05, s * .62, C.yel); txt(P.series, gx + s * .45, F.hy + s * .35, f, '#ffffff', 'left'); });
+  }
+  function drawDeney(P, L, i, u, t, bare) {
+    const sc = L.scenes[i], D = DENEY[P.format] || DENEY.dikey;
+    if (sc.outro) return deneyOutro(P, u);
+    deneyBg(sc.bg || 'indigo'); runScene(sc, u); if (bare) return;
+    const light = sc.bg === 'sky';
+    deneyMeter(sc, u, D, light); deneyBrand(P, D, light); deneyBox(sc, u, D, light); deneyExtras(sc, u);
+    if (P.note) txt(P.note, F.W / 2, F.H * D.noteY, `700 ${Math.round(Math.min(F.W, F.H) * .015)}px ${FS}`, light ? 'rgba(40,40,60,.7)' : 'rgba(255,255,255,.72)', 'center');
+  }
   function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; if (sade()) return drawSade(P, L, i, u, t); if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); } else background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); if (P.__bare) return; header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
   function createPlayer(canvas, bundle) {
@@ -455,6 +564,7 @@
       setStyle(ST); F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
       let si = L.scenes.findIndex(s => t >= s.s && t < s.e); if (si < 0) si = L.scenes.length - 1; const u = t - L.scenes[si].s, TR = .6;
       const ox = F.W / 2, oy = F.H / 2, RM = Math.hypot(F.W, F.H) * .62;
+      if (deney()) { drawDeney(bundle, L, si, u, t); if (u < .4 && si > 0) withA(1 - e3(u / .4), () => drawDeney(bundle, L, si - 1, L.scenes[si - 1].dur - .4 + u, t)); return si; }
       if (cine()) { drawCine(bundle, L, si, u, t); if (u < .5 && si > 0) withA(1 - e3(u / .5), () => drawCine(bundle, L, si - 1, L.scenes[si - 1].dur - .5 + u, t)); return si; }
       if (sade()) { if (u < .55 && si > 0) drawSade(bundle, L, si, u, t, { sc: L.scenes[si - 1], u: L.scenes[si - 1].dur - .001, k: e3(u / .55) }); else drawSade(bundle, L, si, u, t); return si; }
       if (u < TR && si > 0) { drawScene(bundle, L, si - 1, L.scenes[si - 1].dur - .001, t); const r = e3(u / TR) * RM; c.save(); c.beginPath(); c.arc(ox, oy, r, 0, Math.PI * 2); c.clip(); drawScene(bundle, L, si, u, t); c.restore();
@@ -466,7 +576,8 @@
     function still(k, frac) {
       setStyle(ST); F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0);
       const i = L.scenes.findIndex(s => s.k === String(k)); if (i < 0) return null;
-      const sc = L.scenes[i]; if (cine()) { drawCine(bundle, L, i, sc.dur * (frac == null ? .5 : frac), sc.s, true); return { x: 0, y: 0, w: F.W * F.S, h: F.H * F.S }; }
+      const sc = L.scenes[i]; if (deney()) { drawDeney(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
+      if (cine()) { drawCine(bundle, L, i, sc.dur * (frac == null ? .5 : frac), sc.s, true); return { x: 0, y: 0, w: F.W * F.S, h: F.H * F.S }; }
       bundle.__bare = true; try { drawScene(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s); } finally { bundle.__bare = false; }
       return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S };
     }

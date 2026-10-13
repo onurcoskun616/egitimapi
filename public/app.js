@@ -52,7 +52,7 @@
   /* ---------- liste ---------- */
   // Öğretmen ana sayfası: adım adım yeni video + videolarım
   const FMT_OPTS = [['yatay', 'Yatay 16:9', 'YouTube, akıllı tahta, sunum', '16/9'], ['dikey', 'Dikey 9:16', 'Reels, TikTok, Shorts', '9/16'], ['kare', 'Kare 1:1', 'Instagram ve Facebook gönderisi', '1/1'], ['dikey45', 'Dikey 4:5', 'Instagram ve Facebook akışı', '4/5']];
-  const STY_OPTS = [['teknik', 'Teknik', 'Koyu zemin, derinlikli, ayrıntılı çizim'], ['sade', 'Sade anlatım', 'Açık zemin, düz renk, anahtar kelimeli editoryal anlatım'], ['sinema', 'Sinematik', 'Gerçekçi görseller, kelime kelime altyazı (Reels/Shorts)']];
+  const STY_OPTS = [['teknik', 'Teknik', 'Koyu zemin, derinlikli, ayrıntılı çizim'], ['sade', 'Sade anlatım', 'Açık zemin, düz renk, anahtar kelimeli editoryal anlatım'], ['deney', 'Ya olsaydı', 'Düşünce deneyi: canlı sayaç, hesapla kanıt, seri kapanışı'], ['sinema', 'Sinematik', 'Gerçekçi görseller, kelime kelime altyazı (Reels/Shorts)']];
   const CINE_OPTS = [['soru', 'Soru‑cevap', 'Soru kartı, 3‑2‑1 geri sayım, cevap'], ['algi', 'Dikkat / algı oyunu', 'Gizli motif, sonunda bilimsel açıklama'], ['anlatim', 'Sinematik anlatım', 'Konuyu gerçekçi sahnelerle anlatır']];
   const DUR_OPTS = [[60, '1 dk'], [90, '1,5 dk'], [150, '2,5 dk'], [240, '4 dk']];
   const SPD_OPTS = [['yavas', 'Yavaş', 'ders dinler gibi'], ['normal', 'Normal', 'önerilen'], ['hizli', 'Hızlı', 'tekrar ve özet']];
@@ -79,6 +79,9 @@
         </section>
         <section class="wstep" data-s="3" hidden>
           <label>Görsel stil</label><div class="tiles">${radios('sty', STY_OPTS, def.sty, o => `<i class="stprev st-${o[0]}" aria-hidden="true"><b></b><i></i><em></em></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
+          <div id="dnWrap" hidden><label for="dser">Seri adı <span class="muted opt">(sağ üstte ve kapanışta görünür)</span></label><input id="dser" maxlength="30" value="${esc(lsGet('v_dser', 'Ya Olsaydı'))}">
+            <label for="dnext">Sıradaki bölüm <span class="muted opt">(isteğe bağlı; boş bırakılırsa önerilir)</span></label><input id="dnext" maxlength="80" placeholder="Ya bütün buzullar erimiş olsaydı?">
+            <p class="note">Konuyu "Ya … olsaydı?" sorusu gibi yazın: “Ya Dünya'yı saran ipi 1 metre uzatsaydık?”. Sosyal medya için en uygun biçim: Dikey 9:16, 1 dk.</p></div>
           <div id="cmWrap" hidden><label>Sinematik kalıp</label><div class="tiles row3">${radios('cm', CINE_OPTS, def.cm, o => `<b>${o[1]}</b><span>${o[2]}</span>`)}</div>
             <p class="note" id="cmNote">Her sahne için gerçekçi görsel üretilir (video başına yaklaşık 0,15–0,40 $ ek görsel maliyeti). Sosyal medya için en uygun biçim: Dikey 9:16, 1 dk.</p></div>
           <label>Video biçimi</label><div class="tiles">${radios('fmt', FMT_OPTS, def.fmt, o => `<i class="ar" style="aspect-ratio:${o[3]}"></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
@@ -112,9 +115,9 @@
     };
     // görsel servisi bağlı değilse sinematik seçenek pasif (seçilirse görsel adımında takılırdı)
     if (!ME.cine) { const r = f.querySelector('input[name="sty"][value="sinema"]'); if (r) { if (r.checked) f.querySelector('input[name="sty"][value="teknik"]').checked = true; r.disabled = true; const t = r.closest('.tile'); t.classList.add('off'); t.title = 'Görsel servisi bağlanınca açılır'; const sp = t.querySelector('span'); if (sp) sp.textContent = 'Yakında: görsel servisi bağlanınca açılır'; } }
-    const syncCine = () => { const on = val('sty') === 'sinema'; document.getElementById('cmWrap').hidden = !on; };
+    const syncCine = () => { const on = val('sty') === 'sinema'; document.getElementById('cmWrap').hidden = !on; document.getElementById('dnWrap').hidden = val('sty') !== 'deney'; };
     f.querySelectorAll('input[name="sty"]').forEach(r => r.addEventListener('change', () => { syncCine();
-      if (val('sty') === 'sinema') { const fm = f.querySelector('input[name="fmt"][value="dikey"]'), du = f.querySelector('input[name="dur"][value="60"]'); if (fm) fm.checked = true; if (du) du.checked = true; } })); syncCine();
+      if (val('sty') === 'sinema' || val('sty') === 'deney') { const fm = f.querySelector('input[name="fmt"][value="dikey"]'), du = f.querySelector('input[name="dur"][value="60"]'); if (fm) fm.checked = true; if (du) du.checked = true; } })); syncCine();
     document.getElementById('wnext').onclick = () => { const e = check(step); if (e) { msg.textContent = e; return; } show(step + 1); };
     document.getElementById('wback').onclick = () => show(step - 1);
     f.querySelectorAll('.wsteps li').forEach(li => li.onclick = () => { const i = +li.dataset.i; for (let k = 1; k < i; k++) { const e = check(k); if (e) { show(k); msg.textContent = e; return; } } show(i); });
@@ -124,8 +127,8 @@
       try {
         const files = [...(document.getElementById('src').files || [])];
         const sources = files.length ? await extractAll(files, msg) : [];
-        ['tone', 'fmt', 'dur', 'spd', 'sty', 'cm'].forEach(k => lsSet('v_' + k, val(k)));
-        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), visual_style: val('sty'), cine_mode: val('cm'), sources } });
+        ['tone', 'fmt', 'dur', 'spd', 'sty', 'cm'].forEach(k => lsSet('v_' + k, val(k))); lsSet('v_dser', document.getElementById('dser').value);
+        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), visual_style: val('sty'), cine_mode: val('cm'), series: document.getElementById('dser').value, next_topic: document.getElementById('dnext').value, sources } });
         location.hash = '#/p/' + p.id;
       } catch (err) { msg.textContent = err.message; busy(btn, false); }
     };
