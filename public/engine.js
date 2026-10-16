@@ -58,7 +58,10 @@
     if (typeof fn !== 'function') return; if (sade()) { c.save(); fn(); c.restore(); return; } c.save(); c.shadowColor = col; c.shadowBlur = b; fn(); c.restore(); }
   // #rrggbb döndürür; böylece shadeHex(c) + '66' gibi saydamlık eklemeleri de geçerli renk olur
   function shadeHex(h, a) { if (typeof h !== 'string' || h[0] !== '#') return h; let x = h.slice(1); if (x.length === 3 || x.length === 4) x = x.split('').map(ch => ch + ch).join(''); const al = x.length === 8 ? x.slice(6) : ''; const n = parseInt(x.slice(0, 6), 16); if (isNaN(n)) return h; const r = n >> 16, g = (n >> 8) & 255, b = n & 255; a = +a || 0; const f = v => Math.max(0, Math.min(255, Math.round(a < 0 ? v * (1 + a) : v + (255 - v) * a))); return '#' + [f(r), f(g), f(b)].map(v => v.toString(16).padStart(2, '0')).join('') + al; }
-  function line(pts, col, w = 4) { c.beginPath(); c.moveTo(...pts[0]); pts.slice(1).forEach(p => c.lineTo(...p)); c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
+  function line(pts, col, w = 4) {
+    if (typeof pts === 'number') { const a = arguments; return line([[a[0], a[1]], [a[2], a[3]]], typeof a[4] === 'string' ? a[4] : (c.strokeStyle || '#1f1f24'), typeof a[5] === 'number' ? a[5] : (c.lineWidth || 4)); } // line(x1, y1, x2, y2, renk, kalınlık) yazımı da kabul
+    if (!Array.isArray(pts) || pts.length < 2 || !Array.isArray(pts[0])) return;
+    c.beginPath(); c.moveTo(...pts[0]); pts.slice(1).forEach(p => c.lineTo(...p)); c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
   function circle(x, y, r, fill, stroke, w = 3) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.lineWidth = w; c.stroke(); } }
   function arrow(x1, y1, x2, y2, col, w = 6, head = 24) { const a = Math.atan2(y2 - y1, x2 - x1); c.strokeStyle = col; c.fillStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2 - Math.cos(a) * head * .5, y2 - Math.sin(a) * head * .5); c.stroke(); c.beginPath(); c.moveTo(x2, y2); c.lineTo(x2 - Math.cos(a - .45) * head, y2 - Math.sin(a - .45) * head); c.lineTo(x2 - Math.cos(a + .45) * head, y2 - Math.sin(a + .45) * head); c.closePath(); c.fill(); }
 
