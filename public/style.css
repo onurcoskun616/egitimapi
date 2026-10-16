@@ -232,6 +232,10 @@ label{font-weight:700;letter-spacing:.06em}
 .stprev.st-sinema b{position:absolute;left:18%;top:12%;width:64%;height:9px;border-radius:3px;background:#fff;box-shadow:0 13px 0 -2px #fff}
 .stprev.st-sinema i{position:absolute;left:30%;top:66%;width:40%;height:6px;border-radius:3px;background:#8fd3ff}
 .stprev.st-sinema em{position:absolute;left:44%;top:42%;width:12%;height:16%;border-radius:50% 50% 40% 40%;background:#ffd28a;box-shadow:0 0 14px #ffb347}
+.stprev.st-tarih{background:radial-gradient(circle at 50% 45%,#fff,#e9e6de 80%)}
+.stprev.st-tarih b{position:absolute;left:22%;top:9%;width:56%;height:12px;border-radius:3px;background:#ffd23f;box-shadow:0 0 0 2px #1f1f24}
+.stprev.st-tarih i{position:absolute;left:40%;top:32%;width:20%;aspect-ratio:1;border-radius:50%;background:#fff;border:3px solid #1f1f24}
+.stprev.st-tarih em{position:absolute;left:39%;top:58%;width:22%;height:30%;background:#9a6a3c;border:3px solid #1f1f24;clip-path:polygon(15% 0,85% 0,100% 100%,0 100%)}
 .stprev.st-deney{background:radial-gradient(circle at 50% 55%,#4b3cc6,#221a6c 75%)}
 .stprev.st-deney b{position:absolute;left:8%;top:10%;width:30%;height:9px;border-radius:2px;background:#ffc93c}
 .stprev.st-deney i{position:absolute;left:36%;top:38%;width:28%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 35%,#4f9cf0,#123a8a)}

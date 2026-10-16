@@ -151,7 +151,7 @@ async function runVisuals(id, onlyK, feedback, fixes) {
   const topic = content.data.topic;
   const pst = await db.one('projects', `id=eq.${q(id)}&select=visual_style,format`);
   if (pst && pst.visual_style === 'sinema') return runCineVisuals(id, content, prevV, onlyK, feedback, pst.format || 'dikey');
-  const sopts = { style: (pst && pst.visual_style) || 'teknik', anchor: content.data.anchor || null };
+  const sopts = { style: (pst && pst.visual_style) || 'teknik', anchor: content.data.anchor || null, cast: content.data.cast || null };
   const desc = s => s ? `${s.title} — ${(s.visual && s.visual.subject) || ''} ${(s.visual && s.visual.animation) || ''}`.slice(0, 400) : null;
   const near = (list, k) => { const i = list.findIndex(x => x.k === k); return { prev: desc(list[i - 1]), next: desc(list[i + 1]) }; };
   const sources = await loadSources(id);
@@ -179,7 +179,7 @@ async function runVisuals(id, onlyK, feedback, fixes) {
     await logClaude(id, res.map(r => r.usage), 'scenes');
     scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
-  const extra = sopts.style === 'deney' ? { note: content.data.note || null, next: content.data.next || null, ask: content.data.ask || null, anchor: content.data.anchor || null } : {};
+  const extra = sopts.style === 'tarih' ? { cast: content.data.cast || [], next: content.data.next || null, ask: content.data.ask || null } : sopts.style === 'deney' ? { note: content.data.note || null, next: content.data.next || null, ask: content.data.ask || null, anchor: content.data.anchor || null } : {};
   const v = await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes, ...extra }, feedback: label });
   await setStatus(id, 'visuals_review');
   startAudit(id, v, changed, prevV).catch(e => console.error('denetim', e));
@@ -328,10 +328,12 @@ async function bundleFor(id, withAudio, format, versionId) {
   const scenes = await Promise.all(vis.data.scenes.map(async s => cine
     ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, role: s.role, hook: s.hook, hl: s.hl, card: s.card, count: s.count, answer: s.answer, cta: s.cta, cam: s.cam, fx: s.fx, img2_at: s.img2_at,
         img: s.img_path ? await thumbUrl(s.img_path) : null, img2: s.img2_path ? await thumbUrl(s.img2_path) : null }
+    : p.visual_style === 'tarih' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, head: s.head, hl: s.hl, bg: s.bg, era: s.era, code: s.code }
     : p.visual_style === 'deney' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, hl: s.hl, meter: s.meter, bg: s.bg, count: s.count, answer: s.answer, date: s.date, fx: s.fx, water: s.water, dark: s.dark, code: s.code }
     : { k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, kw: s.kw, label: s.label, code: s.code }));
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', style: p.visual_style || 'teknik', scenes };
   if (cine) b.hud = vis.data.hud || null;
+  if (p.visual_style === 'tarih') { const so = p.style_opts || {}; b.cast = vis.data.cast || []; b.series = so.series || null; b.episode = so.episode || null; b.next = vis.data.next || so.next || null; b.ask = vis.data.ask || null; }
   if (p.visual_style === 'deney') { const so = p.style_opts || {}; b.series = so.series === '' ? null : (so.series || 'Ya Olsaydı'); b.next = so.next || vis.data.next || null; b.note = vis.data.note || null; b.ask = vis.data.ask || null; }
   if (withAudio) {
     const a = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc`);
@@ -466,7 +468,7 @@ on('POST', '/api/projects', async (req, res) => {
   if (!lim) return send(res, 402, { error: 'Video üretmek için etkin bir paketiniz yok. Paketim sayfasından paket seçin.' });
   if (await monthUsage(req.user.id) >= (lim.limits.videos_per_month || 0)) return send(res, 402, { error: `Bu ayki video hakkınız doldu (${lim.limits.videos_per_month} video). Paketinizi yükseltebilirsiniz.` });
   if ((+b.target_seconds || 90) > (lim.limits.max_seconds || 300)) return send(res, 402, { error: `Paketiniz en fazla ${lim.limits.max_seconds} saniyelik videoya izin veriyor.` });
-  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: ['sade', 'sinema', 'deney'].includes(b.visual_style) ? b.visual_style : 'teknik', style_opts: b.visual_style === 'deney' ? { series: String(b.series == null ? 'Ya Olsaydı' : b.series).trim().slice(0, 30), next: String(b.next_topic || '').trim().slice(0, 80) || null } : null, cine_mode: b.visual_style === 'sinema' ? (['soru', 'algi', 'anlatim'].includes(b.cine_mode) ? b.cine_mode : 'anlatim') : null, status: 'content_generating' });
+  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: ['sade', 'sinema', 'deney', 'tarih'].includes(b.visual_style) ? b.visual_style : 'teknik', style_opts: b.visual_style === 'deney' ? { series: String(b.series == null ? 'Ya Olsaydı' : b.series).trim().slice(0, 30), next: String(b.next_topic || '').trim().slice(0, 80) || null } : b.visual_style === 'tarih' ? { series: String(b.series_t || '').trim().slice(0, 30) || null, episode: String(b.episode || '').trim().slice(0, 20) || null, next: String(b.next_topic_t || '').trim().slice(0, 80) || null } : null, cine_mode: b.visual_style === 'sinema' ? (['soru', 'algi', 'anlatim'].includes(b.cine_mode) ? b.cine_mode : 'anlatim') : null, status: 'content_generating' });
   await saveSources(p.id, b.sources);
   background(p.id, 'content', []);
   send(res, 201, p);

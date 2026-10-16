@@ -14,14 +14,17 @@
     sade: { bg: '#f3efe4', fg: '#25272c', muted: '#8b8679', dim: '#cfc8b6', hv: '#e8724f', lv: '#2f4b6e', cool: '#4f9c94', red: '#e2624f', yel: '#e7b53c', green: '#2f8f6f', violet: '#8a6fb3', copper: '#c27a45', steel: '#9aa1ab', ink: '#25272c', paper: '#faf8f1', leaf: '#2f8f6f' },
   };
   PALETTES.sinema = Object.assign({}, PALETTES.teknik, { bg: '#000000', hl: '#8fd3ff' });
+  PALETTES.tarih = Object.assign({}, PALETTES.teknik, { bg: '#f4f2ec', fg: '#1f1f24', ink: '#1f1f24', paper: '#f4f2ec', muted: '#7a756a', dim: '#cfc9bc', yel: '#ffd23f', red: '#e0322f', lv: '#2f74c9', cool: '#3aa0d8', green: '#4d9a3c', hv: '#f08a24', copper: '#b8743d', steel: '#9aa1ab', leaf: '#4d9a3c', violet: '#7d5bb5' });
   PALETTES.deney = Object.assign({}, PALETTES.teknik, { bg: '#2a2380', fg: '#ffffff', yel: '#ffc93c', cool: '#4fd8e8', muted: '#b7b3e6', dim: '#5a54a8', paper: '#2a2380', ink: '#ffffff' });
   Object.assign(C, PALETTES.teknik);
   let STYLE = 'teknik';
   const FS = '"Inter","Noto Sans","DejaVu Sans",system-ui,sans-serif';
+  const FC = '"Lilita One","Archivo","Arial Black",sans-serif'; // çizgi roman başlık fontu (Türkçe karakterli)
   function setStyle(name) { STYLE = PALETTES[name] ? name : 'teknik'; Object.assign(C, PALETTES[STYLE]); return STYLE; }
   const sade = () => STYLE === 'sade';
   const cine = () => STYLE === 'sinema';
   const deney = () => STYLE === 'deney';
+  const tarih = () => STYLE === 'tarih';
   let c = null; // aktif 2D bağlam
 
   /* ---------- yardımcılar ---------- */
@@ -190,7 +193,7 @@
     glow('rgba(255,110,20,.8)', 40, () => { f(-50 * s, 140 * s, 240 * s * fl(1), '#ff5a1f'); f(50 * s, 140 * s, 220 * s * fl(2), '#ff5a1f'); f(0, 170 * s, 300 * s * fl(3), '#ff5a1f'); }); f(0, 110 * s, 200 * s * fl(4), '#ff9b2e'); f(0, 70 * s, 130 * s * fl(5), '#ffd45a'); }
   function hero(fn, u, sc = 1, dy = 0, cy = 800) { const k = 1.04 - .04 * e3(cl(u / 6)); c.save(); c.translate(F.hx + Math.sin(u * .3) * 6, F.hy + (cy - 800 + dy) * F.hs + Math.cos(u * .25) * 4); c.scale(sc * k * F.hs, sc * k * F.hs); fn(); c.restore(); }
 
-  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, globe, ring, ball, sun, ctx: () => c };
+  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, globe, ring, ball, sun, person, cast, tag, crossX, qmark, tablet, sack, pot, wheat, scroll, reed, pyramid, palm, river, region, sea, comic, FC, ctx: () => c };
   const LIB_NAMES = Object.keys(LIB);
 
   function compileScene(code) {
@@ -205,6 +208,7 @@
     scenes.forEach(s => {
       if (!s.capT) { let tt = LEAD; s.capT = s.cap.map(x => { const st = tt; tt += x.length / CPS + GAP; return st; }); s.dur = Math.max(s.minDur || 6, Math.ceil((tt + .6) * 2) / 2); s.capR = s.cap.map(() => CPS); }
     });
+    if (bundle.style === 'tarih' && (bundle.next || bundle.ask) && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: 4, outro: true, code: '' });
     if (bundle.style === 'deney' && (bundle.next || bundle.series || bundle.ask) && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: bundle.ask ? 4.5 : 3.2, outro: true, code: '' });
     let acc = 0; scenes.forEach(s => { s.s = acc; acc += s.dur; s.e = acc; s.fn = compileScene(s.code || ''); });
     return { scenes, total: acc };
@@ -235,7 +239,7 @@
     dikey45: { hx: 450, hy: 565, hs: .74, kwY: 240, kwMax: 60, labelY: 848, capY: 920, capW: 800, capFont: 34, capLh: 46 },
   };
   let F = FORMATS.dikey;
-  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : deney() ? Object.assign({}, b, DENEY[name] || DENEY.dikey) : b; return F; }
+  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : deney() ? Object.assign({}, b, DENEY[name] || DENEY.dikey) : tarih() ? Object.assign({}, b, TARIH[name] || TARIH.dikey) : b; return F; }
 
   /* ---------- çerçeve ---------- */
   function bgGrid() { c.fillStyle = 'rgba(120,150,210,.12)'; for (let x = 38; x < F.W; x += 76) for (let y = 38; y < F.H; y += 76) { c.fillRect(x - 6, y - 1, 12, 2); c.fillRect(x - 1, y - 6, 2, 12); } }
@@ -586,16 +590,183 @@
     deneyMeter(sc, u, D, light); deneyBrand(P, D, light); deneyBox(sc, u, D, light); deneyExtras(sc, u);
     if (P.note) { c.save(); c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 6; txt(P.note, F.W / 2, F.H * D.noteY, `700 ${Math.round(Math.min(F.W, F.H) * (P.note.length > 70 ? .017 : .02))}px ${FS}`, 'rgba(255,255,255,.85)', 'center'); c.restore(); }
   }
+
+  /* ---------- "Çizgi tarih" stili: düz çizgi karakterler, çizgi roman başlıkları, harita ve basit nesneler ---------- */
+  let CAST = {};
+  function cast(id) { return CAST[id] || { name: String(id || '').toUpperCase() }; }
+  // comic(yazı, x, y, boyut, renk): kalın konturlu çizgi roman yazısı (harfler hafif oynak)
+  function comic(str, x, y, size, col, o = {}) {
+    str = String(str); c.save(); c.font = `400 ${size}px ${FC}`; c.textBaseline = 'alphabetic'; c.lineJoin = 'round';
+    const chars = [...str], ws = chars.map(ch => c.measureText(ch).width), tw = ws.reduce((a, b) => a + b, 0) + (chars.length - 1) * size * .02;
+    let cx = o.al === 'left' ? x : o.al === 'right' ? x - tw : x - tw / 2;
+    chars.forEach((ch, i) => { const r = (seeded(i * 7 + str.length) - .5) * .09, dy = (seeded(i * 3 + 1) - .5) * size * .06;
+      c.save(); c.translate(cx + ws[i] / 2, y + dy); c.rotate(r); c.strokeStyle = o.stroke || '#1f1f24'; c.lineWidth = size * .2; c.textAlign = 'center'; c.strokeText(ch, 0, 0); c.fillStyle = col || C.yel; c.fillText(ch, 0, 0); c.restore(); cx += ws[i] + size * .02; });
+    c.restore(); return tw;
+  }
+  // person(x, y, kim, {pose, mood, talk, look, scale, flip}) — y = ayakların bastığı yer. kim: cast('id') ya da {outfit, color, hat, hatColor, beard, hair, hairColor, skin}
+  function person(x, y, who, o = {}) {
+    who = typeof who === 'string' ? cast(who) : (who || {}); const u = o.u != null ? o.u : PU; const S = (o.scale || 1) * 1.3, K = '#1f1f24';
+    c.save(); c.translate(x, y + Math.sin(u * 2.2 + x) * 1.5 * S); c.scale(S * (o.flip ? -1 : 1), S); c.lineCap = 'round'; c.lineJoin = 'round';
+    const robe = who.color || '#efe6d2', outfit = who.outfit || 'tunik', pose = o.pose || 'idle';
+    // bacaklar
+    const walk = o.walk ? Math.sin(u * 7) * 14 : 0; c.strokeStyle = K; c.lineWidth = 5;
+    c.beginPath(); c.moveTo(-14, -110); c.lineTo(-18 - walk, 0); c.moveTo(14, -110); c.lineTo(18 + walk, 0); c.stroke();
+    c.beginPath(); c.moveTo(-18 - walk, 0); c.lineTo(-30 - walk, 0); c.moveTo(18 + walk, 0); c.lineTo(30 + walk, 0); c.stroke();
+    // gövde (giysi)
+    const len = outfit === 'cuppe' ? -40 : outfit === 'zirh' ? -95 : outfit === 'modern' ? -100 : -70;
+    c.beginPath(); c.moveTo(-26, -205); c.lineTo(26, -205); c.lineTo(outfit === 'cuppe' ? 46 : 36, len); c.lineTo(outfit === 'cuppe' ? -46 : -36, len); c.closePath();
+    c.fillStyle = outfit === 'zirh' ? '#9aa1ab' : robe; c.fill(); c.strokeStyle = K; c.lineWidth = 4; c.stroke();
+    if (outfit === 'zirh') { c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 2; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(-30 + i * 4, -180 + i * 22); c.lineTo(30 - i * 4, -180 + i * 22); c.stroke(); } }
+    if (who.belt !== false) { c.strokeStyle = who.beltColor || '#8a5a32'; c.lineWidth = 6; c.beginPath(); c.moveTo(-30, -140); c.lineTo(30, -140); c.stroke(); }
+    if (outfit === 'tunik' || outfit === 'cuppe') { c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 2; c.beginPath(); c.moveTo(-8, -130); c.lineTo(-12, len + 6); c.moveTo(10, -130); c.lineTo(14, len + 6); c.stroke(); }
+    // kollar
+    c.strokeStyle = K; c.lineWidth = 5; const sh = [-24, -195], sr = [24, -195];
+    const arm = (s0, e, h) => { c.beginPath(); c.moveTo(...s0); c.lineTo(...e); c.lineTo(...h); c.stroke(); c.beginPath(); c.arc(h[0], h[1], 5, 0, Math.PI * 2); c.fillStyle = '#fff'; c.fill(); c.stroke(); };
+    const wv = Math.sin(u * 9) * 18;
+    if (pose === 'up' || pose === 'cheer') { arm(sh, [-50, -230], [-62, -270]); arm(sr, [50, -230], [62, -270 + (pose === 'cheer' ? wv * .5 : 0)]); }
+    else if (pose === 'point') { arm(sh, [-40, -160], [-44, -125]); arm(sr, [60, -200], [100, -205]); }
+    else if (pose === 'wave') { arm(sh, [-40, -160], [-44, -125]); arm(sr, [52, -225], [62 + wv, -262]); }
+    else if (pose === 'shrug') { arm(sh, [-52, -175], [-74, -195]); arm(sr, [52, -175], [74, -195]); }
+    else if (pose === 'hold') { arm(sh, [-40, -165], [-22, -150]); arm(sr, [40, -165], [22, -150]); }
+    else if (pose === 'think') { arm(sh, [-40, -160], [-44, -125]); arm(sr, [42, -170], [18, -232]); }
+    else { arm(sh, [-38, -160], [-42, -122]); arm(sr, [38, -160], [42, -122]); }
+    // baş
+    const hy = -255, R = 46;
+    if (who.hair === 'long') { c.fillStyle = who.hairColor || '#3b2414'; c.beginPath(); c.ellipse(0, hy + 18, R + 8, R + 20, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = K; c.lineWidth = 3; c.stroke(); }
+    c.beginPath(); c.arc(0, hy, R, 0, Math.PI * 2); c.fillStyle = who.skin || '#ffffff'; c.fill(); c.strokeStyle = K; c.lineWidth = 4; c.stroke();
+    if (who.hair === 'short' || who.hair === 'bun') { c.fillStyle = who.hairColor || '#3b2414'; c.beginPath(); c.arc(0, hy, R, Math.PI * 1.05, Math.PI * 1.95); c.quadraticCurveTo(0, hy - R * .55, -R * .98, hy - 8); c.fill(); if (who.hair === 'bun') { c.beginPath(); c.arc(0, hy - R - 8, 15, 0, Math.PI * 2); c.fill(); } }
+    if (who.hair === 'blond') { c.fillStyle = who.hairColor || '#f2b84b'; c.beginPath(); c.moveTo(-R, hy - 6); for (let i = 0; i <= 8; i++) { const a = Math.PI + i / 8 * Math.PI; c.lineTo(Math.cos(a) * (R + 14 + (i % 2) * 8), hy + Math.sin(a) * (R + 14 + (i % 2) * 8)); } c.closePath(); c.fill(); c.strokeStyle = K; c.lineWidth = 3; c.stroke(); }
+    // yüz
+    const mood = o.mood || 'neutral', blink = ((u + seeded(x | 0) * 3) % 3.4) < .12, lx = o.look === 'left' ? -6 : o.look === 'right' ? 6 : 0;
+    c.fillStyle = K; c.strokeStyle = K;
+    if (blink) { c.lineWidth = 3; c.beginPath(); c.moveTo(-20 + lx, hy - 4); c.lineTo(-10 + lx, hy - 4); c.moveTo(10 + lx, hy - 4); c.lineTo(20 + lx, hy - 4); c.stroke(); }
+    else { const er = mood === 'surprised' ? 7 : 5; [-15, 15].forEach(ex => { c.beginPath(); c.arc(ex + lx, hy - 4, er, 0, Math.PI * 2); c.fill(); }); }
+    c.lineWidth = 3; c.beginPath();
+    if (mood === 'angry') { c.moveTo(-24, hy - 20); c.lineTo(-8, hy - 14); c.moveTo(24, hy - 20); c.lineTo(8, hy - 14); }
+    else if (mood === 'sad' || mood === 'worried') { c.moveTo(-24, hy - 14); c.lineTo(-8, hy - 20); c.moveTo(24, hy - 14); c.lineTo(8, hy - 20); }
+    else if (mood === 'surprised') { c.moveTo(-23, hy - 22); c.quadraticCurveTo(-15, hy - 28, -7, hy - 22); c.moveTo(23, hy - 22); c.quadraticCurveTo(15, hy - 28, 7, hy - 22); }
+    else { c.moveTo(-22, hy - 18); c.lineTo(-9, hy - 18); c.moveTo(22, hy - 18); c.lineTo(9, hy - 18); }
+    c.stroke();
+    const open = o.talk ? Math.abs(Math.sin(u * 11)) : 0; c.lineWidth = 3; c.beginPath();
+    if (mood === 'surprised' || open > .5) { c.ellipse(lx * .5, hy + 20, 7, 5 + open * 5, 0, 0, Math.PI * 2); c.fill(); }
+    else if (mood === 'happy') { c.arc(lx * .5, hy + 10, 14, .2 * Math.PI, .8 * Math.PI); c.stroke(); }
+    else if (mood === 'sad' || mood === 'angry' || mood === 'worried') { c.arc(lx * .5, hy + 28, 11, 1.2 * Math.PI, 1.8 * Math.PI); c.stroke(); }
+    else { c.moveTo(-8 + lx * .5, hy + 20); c.lineTo(8 + lx * .5, hy + 20); c.stroke(); }
+    // sakal / bıyık
+    if (who.beard === 'mustache' || who.beard === 'full') { c.fillStyle = who.hairColor || '#2a1a10'; c.beginPath(); c.ellipse(-8, hy + 12, 10, 4, -.2, 0, Math.PI * 2); c.ellipse(8, hy + 12, 10, 4, .2, 0, Math.PI * 2); c.fill(); }
+    if (who.beard === 'goatee' || who.beard === 'full') { c.fillStyle = who.hairColor || '#2a1a10'; c.beginPath(); c.moveTo(-10, hy + 30); c.lineTo(10, hy + 30); c.lineTo(0, hy + (who.beard === 'full' ? 62 : 52)); c.closePath(); c.fill(); }
+    // başlık
+    const hc = who.hatColor || '#c0392b', hat = who.hat;
+    if (hat === 'bant') { c.fillStyle = hc; c.beginPath(); c.moveTo(-R, hy - 22); c.quadraticCurveTo(0, hy - 38, R, hy - 22); c.lineTo(R - 2, hy - 10); c.quadraticCurveTo(0, hy - 26, -R + 2, hy - 10); c.closePath(); c.fill(); c.strokeStyle = K; c.lineWidth = 2.5; c.stroke(); }
+    else if (hat === 'sarik') { c.fillStyle = hc === '#c0392b' ? '#f4efe2' : hc; c.beginPath(); c.ellipse(0, hy - 34, R + 10, 30, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = K; c.lineWidth = 3; c.stroke(); c.beginPath(); c.moveTo(-R, hy - 30); c.quadraticCurveTo(0, hy - 10, R, hy - 40); c.stroke(); }
+    else if (hat === 'tac') { c.fillStyle = '#ffcf2e'; c.beginPath(); c.moveTo(-34, hy - 30); c.lineTo(-34, hy - 70); c.lineTo(-17, hy - 50); c.lineTo(0, hy - 78); c.lineTo(17, hy - 50); c.lineTo(34, hy - 70); c.lineTo(34, hy - 30); c.closePath(); c.fill(); c.strokeStyle = K; c.lineWidth = 3; c.stroke(); }
+    else if (hat === 'migfer') { c.fillStyle = '#a8aeb8'; c.beginPath(); c.arc(0, hy - 6, R + 4, Math.PI, 0); c.closePath(); c.fill(); c.strokeStyle = K; c.lineWidth = 3; c.stroke(); c.fillRect(-4, hy - R - 18, 8, 16); }
+    else if (hat === 'fes') { c.fillStyle = '#c0392b'; c.beginPath(); c.moveTo(-26, hy - 36); c.lineTo(-20, hy - 82); c.lineTo(20, hy - 82); c.lineTo(26, hy - 36); c.closePath(); c.fill(); c.strokeStyle = K; c.lineWidth = 3; c.stroke(); line([[0, hy - 82], [16, hy - 64]], '#1f1f24', 3); }
+    else if (hat === 'kavuk') { c.fillStyle = '#f4efe2'; c.beginPath(); c.ellipse(0, hy - 48, 34, 44, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = K; c.lineWidth = 3; c.stroke(); c.fillStyle = hc; c.beginPath(); c.ellipse(0, hy - 30, R + 4, 12, 0, 0, Math.PI * 2); c.fill(); c.stroke(); }
+    else if (hat === 'kep') { c.fillStyle = hc; c.beginPath(); c.arc(0, hy - 14, R, Math.PI, 0); c.closePath(); c.fill(); c.strokeStyle = K; c.lineWidth = 3; c.stroke(); c.fillRect(-R - 22, hy - 18, R + 22, 8); }
+    c.restore();
+    if (o.label) tag(o.label, x + (o.labelDx != null ? o.labelDx : 70) * S, y - 350 * S, x + 26 * S * (o.labelDx < 0 ? -1 : 1), y - 300 * S, o.labelCol);
+  }
+  let PU = 0; // person() için güncel sahne zamanı
+  // tag(yazı, x, y, hedefX, hedefY, renk): sarı etiket + hedefi gösteren ok
+  function tag(s, x, y, tx, ty, col) {
+    c.save(); c.font = `400 26px ${FC}`; const w = c.measureText(s).width + 28, h = 40;
+    if (tx != null) { arrow(x, y + h / 2 - 4, tx, ty, '#1f1f24', 7, 22); arrow(x, y + h / 2 - 4, tx, ty, col || C.yel, 4, 16); }
+    rr(x - w / 2, y - h / 2, w, h, 8); c.fillStyle = col || C.yel; c.fill(); c.strokeStyle = '#1f1f24'; c.lineWidth = 3.5; c.stroke();
+    c.fillStyle = '#1f1f24'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(s, x, y + 2); c.restore();
+  }
+  function crossX(x, y, s = 120, a = 1) { withA(a, () => { c.save(); c.lineCap = 'round'; const k = cl(a * 1.2); [[[-1, -1], [1, 1]], [[1, -1], [-1, 1]]].forEach(([p, q], i) => { const e = cl(k * 2 - i); if (e <= 0) return; const ax = x + p[0] * s, ay = y + p[1] * s, bx = lerp(ax, x + q[0] * s, e), by = lerp(ay, y + q[1] * s, e); c.strokeStyle = '#1f1f24'; c.lineWidth = s * .2; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke(); c.strokeStyle = C.red; c.lineWidth = s * .13; c.stroke(); }); c.restore(); }); }
+  function qmark(x, y, s = 60, col) { comic('?', x, y + s * .35, s, col || C.red); }
+  function tablet(x, y, w = 160, h = 200, o = {}) {
+    c.save(); rr(x - w / 2, y - h / 2, w, h, w * .14); c.fillStyle = o.color || '#c98f5a'; c.fill(); c.strokeStyle = '#1f1f24'; c.lineWidth = 4; c.stroke();
+    if (o.marks !== false) { const rows = o.rows || 5, cols = 4, k = o.k == null ? 1 : o.k, tot = rows * cols; let n = 0; c.strokeStyle = '#4a2c14'; c.fillStyle = '#4a2c14'; c.lineWidth = 2.5;
+      for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { if (n++ >= tot * k) break; const px = x - w / 2 + w * (.2 + q * .2), py = y - h / 2 + h * (.16 + r * (.7 / rows)), t = Math.floor(seeded(r * 9 + q) * 3);
+        c.beginPath(); c.moveTo(px - 6, py); c.lineTo(px + 6, py); c.moveTo(px, py); c.lineTo(px, py + 14); if (t === 1) { c.moveTo(px + 9, py + 3); c.lineTo(px + 17, py + 3); } c.stroke(); c.beginPath(); c.moveTo(px - 4, py - 3); c.lineTo(px + 4, py - 3); c.lineTo(px, py + 3); c.fill(); } }
+    c.restore();
+  }
+  function sack(x, y, s = 1, label) { c.save(); c.translate(x, y); c.scale(s, s); c.beginPath(); c.moveTo(-34, 0); c.quadraticCurveTo(-48, -50, -22, -78); c.lineTo(22, -78); c.quadraticCurveTo(48, -50, 34, 0); c.closePath(); c.fillStyle = '#d9b77a'; c.fill(); c.strokeStyle = '#1f1f24'; c.lineWidth = 3.5; c.stroke();
+    c.beginPath(); c.moveTo(-22, -78); c.lineTo(-30, -96); c.lineTo(30, -96); c.lineTo(22, -78); c.fill(); c.stroke(); line([[-24, -80], [24, -80]], '#8a5a32', 5); wheat(0, -18, .5); c.restore(); if (label) tag(label, x, y - 125 * s); }
+  function pot(x, y, s = 1, col) { c.save(); c.translate(x, y); c.scale(s, s); c.beginPath(); c.moveTo(-22, -100); c.lineTo(22, -100); c.lineTo(18, -86); c.quadraticCurveTo(60, -60, 40, -14); c.quadraticCurveTo(0, 8, -40, -14); c.quadraticCurveTo(-60, -60, -18, -86); c.closePath(); c.fillStyle = col || '#b8743d'; c.fill(); c.strokeStyle = '#1f1f24'; c.lineWidth = 3.5; c.stroke(); line([[-40, -50], [40, -50]], 'rgba(0,0,0,.25)', 3); c.restore(); }
+  function wheat(x, y, s = 1) { c.save(); c.translate(x, y); c.scale(s, s); line([[0, 40], [0, -60]], '#a07a2a', 4); for (let i = 0; i < 5; i++) { [-1, 1].forEach(d => { c.beginPath(); c.ellipse(d * 9, -50 + i * 16, 7, 12, d * .5, 0, Math.PI * 2); c.fillStyle = '#e3b74a'; c.fill(); c.strokeStyle = '#1f1f24'; c.lineWidth = 2; c.stroke(); }); } c.restore(); }
+  function scroll(x, y, w = 200, h = 140, o = {}) { c.save(); rr(x - w / 2, y - h / 2, w, h, 6); c.fillStyle = '#f3e3bf'; c.fill(); c.strokeStyle = '#1f1f24'; c.lineWidth = 3.5; c.stroke(); [-1, 1].forEach(d => { c.beginPath(); c.ellipse(x, y + d * h / 2, w / 2 + 8, 12, 0, 0, Math.PI * 2); c.fillStyle = '#e2c995'; c.fill(); c.stroke(); });
+    if (o.lines !== false) for (let i = 0; i < 4; i++) line([[x - w * .38, y - h * .25 + i * h * .17], [x + w * (.38 - seeded(i) * .2), y - h * .25 + i * h * .17]], 'rgba(60,40,20,.55)', 3); c.restore(); }
+  function reed(x, y, len = 220, ang = -1.1) { c.save(); c.translate(x, y); c.rotate(ang); line([[0, 0], [len, 0]], '#1f1f24', 9); line([[0, 0], [len, 0]], '#c9a24a', 5); c.beginPath(); c.moveTo(len, -4); c.lineTo(len + 18, 0); c.lineTo(len, 4); c.fillStyle = '#1f1f24'; c.fill(); c.restore(); }
+  function pyramid(x, y, s = 1) { c.save(); c.translate(x, y); c.scale(s, s); c.beginPath(); c.moveTo(-120, 0); c.lineTo(0, -110); c.lineTo(120, 0); c.closePath(); c.fillStyle = '#d8b47a'; c.fill(); c.strokeStyle = 'rgba(31,31,36,.6)'; c.lineWidth = 2.5; c.stroke(); for (let i = 1; i < 5; i++) line([[-120 + i * 24, -i * 22], [120 - i * 24, -i * 22]], 'rgba(31,31,36,.3)', 2); c.beginPath(); c.moveTo(0, -110); c.lineTo(120, 0); c.lineTo(30, 0); c.closePath(); c.fillStyle = 'rgba(0,0,0,.12)'; c.fill(); c.restore(); }
+  function palm(x, y, s = 1) { c.save(); c.translate(x, y); c.scale(s, s); c.strokeStyle = '#7a5a34'; c.lineWidth = 9; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(10, -60, 4, -120); c.stroke(); c.fillStyle = '#3f8f3a'; for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i - 2.5) * .55; c.beginPath(); c.moveTo(4, -120); c.quadraticCurveTo(4 + Math.cos(a) * 50, -120 + Math.sin(a) * 50 - 18, 4 + Math.cos(a) * 80, -120 + Math.sin(a) * 60 + 20); c.quadraticCurveTo(4 + Math.cos(a) * 40, -120 + Math.sin(a) * 30, 4, -120); c.fill(); } c.restore(); }
+  // Harita: sea(noktalar) deniz, river(noktalar, ad) nehir, region(x, y, rx, ry, renk, ad) bölge
+  function sea(pts, col) { smooth(pts); c.fillStyle = col || '#3f86d9'; c.fill(); c.strokeStyle = '#1f1f24'; c.lineWidth = 3; c.stroke(); }
+  function river(pts, name, k = 1) { c.save(); c.lineCap = 'round'; c.lineJoin = 'round'; const n = Math.max(2, Math.ceil(pts.length * cl(k))); const P = pts.slice(0, n); c.beginPath(); c.moveTo(...P[0]); P.slice(1).forEach(p => c.lineTo(...p)); c.strokeStyle = '#1f1f24'; c.lineWidth = 13; c.stroke(); c.strokeStyle = '#3f86d9'; c.lineWidth = 8; c.stroke(); c.restore(); if (name && k >= 1) { const m = pts[Math.floor(pts.length / 2)]; mapLabel(name, m[0] + 34, m[1]); } }
+  function region(x, y, rx, ry, col, name, a = 1) { withA(a, () => { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fillStyle = col || 'rgba(255,205,60,.75)'; c.fill(); c.strokeStyle = '#1f1f24'; c.lineWidth = 3; c.stroke(); if (name) mapLabel(name, x, y); }); }
+  function mapLabel(s, x, y) { c.save(); c.font = `800 20px ${FS}`; const w = c.measureText(s).width + 16; rr(x - w / 2, y - 14, w, 28, 5); c.fillStyle = '#1f1f24'; c.fill(); c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(s, x, y + 1); c.restore(); }
+
+  const TARIH = {
+    dikey: { hx: 450, hy: 610, hs: 1.02, headY: .105, capY: .665, tagY: .77 },
+    yatay: { hx: 800, hy: 460, hs: .72, headY: .12, capY: .86, tagY: .95 },
+    kare: { hx: 450, hy: 460, hs: .64, headY: .115, capY: .86, tagY: .955 },
+    dikey45: { hx: 450, hy: 500, hs: .76, headY: .09, capY: .8, tagY: .9 },
+  };
+  function tarihBg(bg, u) {
+    const gY = F.hy + 250 * F.hs; // zemin çizgisi (hero y = +250)
+    if (bg === 'brick') { c.fillStyle = '#e3c48f'; c.fillRect(0, 0, F.W, gY); c.strokeStyle = 'rgba(120,80,40,.35)'; c.lineWidth = 2; const bh = 34 * F.hs * 1.2, bw = 90 * F.hs * 1.2;
+      for (let r = 0, y = 0; y < gY; r++, y += bh) { c.beginPath(); c.moveTo(0, y); c.lineTo(F.W, y); c.stroke(); for (let x = (r % 2) * bw / 2; x < F.W; x += bw) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + bh); c.stroke(); } }
+      c.fillStyle = '#b98d55'; c.fillRect(0, gY, F.W, F.H - gY); }
+    else if (bg === 'desert' || bg === 'field') { c.fillStyle = lg(0, 0, 0, gY, [[0, '#7fb6e6'], [1, '#d9ecf7']]); c.fillRect(0, 0, F.W, gY);
+      const sx = F.W * .78, sy = F.H * .2, p = 1 + .05 * Math.sin(u * 2); circle(sx, sy, 46 * p, '#ffd23f', '#f0b020', 4); c.strokeStyle = '#ffcf2e'; c.lineWidth = 5; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + u * .2; c.beginPath(); c.moveTo(sx + Math.cos(a) * 62, sy + Math.sin(a) * 62); c.lineTo(sx + Math.cos(a) * 84, sy + Math.sin(a) * 84); c.stroke(); }
+      if (bg === 'desert') { c.save(); c.translate(F.hx, F.hy); c.scale(F.hs, F.hs); pyramid(-230, 250 - 40, 1.1); palm(-380, 250 - 30, .9); palm(330, 250 - 30, 1); palm(170, 250 - 34, .7); c.restore();
+        c.fillStyle = '#3f86d9'; c.fillRect(0, gY - 26 * F.hs, F.W, 26 * F.hs); c.fillStyle = '#e3c48f'; c.fillRect(0, gY, F.W, F.H - gY); }
+      else { c.fillStyle = '#7cbf55'; c.beginPath(); c.moveTo(0, gY - 40); c.quadraticCurveTo(F.W * .3, gY - 110, F.W * .6, gY - 50); c.quadraticCurveTo(F.W * .85, gY - 10, F.W, gY - 60); c.lineTo(F.W, F.H); c.lineTo(0, F.H); c.fill(); c.fillStyle = '#5aa63d'; c.fillRect(0, gY, F.W, F.H - gY); } }
+    else if (bg === 'night') { c.fillStyle = lg(0, 0, 0, F.H, [[0, '#14183a'], [1, '#2b2e55']]); c.fillRect(0, 0, F.W, F.H); for (let i = 0; i < 60; i++) { c.fillStyle = `rgba(255,255,255,${.4 + .5 * Math.abs(Math.sin(u + i))})`; c.fillRect(seeded(i) * F.W, seeded(i + 30) * gY * .9, 2.5, 2.5); } c.fillStyle = '#3a3555'; c.fillRect(0, gY, F.W, F.H - gY); }
+    else { c.fillStyle = rg(F.W / 2, F.H * .4, 0, Math.hypot(F.W, F.H) * .62, [[0, '#ffffff'], [.6, '#f1efe9'], [1, '#c9c6bf']]); c.fillRect(0, 0, F.W, F.H); }
+  }
+  function tarihHead(sc, u, Lt) {
+    const T = sc.capT; let idx = -1; T.forEach((x, i) => { if (u >= x - .25) idx = i; });
+    const hs = Array.isArray(sc.head) ? sc.head : [sc.title]; let i = Math.max(0, idx); while (i > 0 && !hs[i]) i--; const h = hs[i]; if (!h) return;
+    const st = i === 0 ? 0 : T[i] - .25, p = cl((u - st) / .3), red = /^~/.test(h), s = String(h).replace(/^~/, '').toLocaleUpperCase('tr');
+    let size = Math.round(Math.min(F.W, F.H) * .085); c.font = `400 ${size}px ${FC}`; while (c.measureText(s).width > F.W * .86 && size > 30) { size -= 3; c.font = `400 ${size}px ${FC}`; }
+    withA(cl(p * 2), () => { c.save(); c.translate(F.W / 2, F.H * Lt.headY); const k = .7 + .3 * outB(p); c.scale(k, k); comic(s, 0, 0, size, red ? C.red : C.yel); c.restore(); });
+  }
+  function tarihCaption(sc, u, Lt) {
+    let idx = -1; sc.capT.forEach((x, i) => { if (u >= x - .05) idx = i; }); if (idx < 0) return;
+    const s = sc.cap[idx] || '', rate = sc.capR ? sc.capR[idx] : CPS, el = (u - sc.capT[idx]) * rate;
+    const gs = wordGroups(s); let acc = 0, gi = 0, gStart = 0; for (let i = 0; i < gs.length; i++) { if (el >= acc - 1) { gi = i; gStart = acc; } acc += gs[i].join(' ').length + 1; }
+    const end = sc.capT[idx] + s.length / rate + .4, nx = sc.capT[idx + 1]; if (u > end + .5 && (nx == null || u < nx)) return;
+    const hl = new Set((sc.hl || []).flatMap(h => String(h).split(/\s+/)).map(norm).filter(Boolean));
+    const size = Math.round(Math.min(F.W, F.H) * .045), f = `800 ${size}px ${FS}`; c.font = f;
+    const words = gs[gi], sp = c.measureText(' ').width, ws = words.map(w => c.measureText(w).width), tw = ws.reduce((a, b) => a + b, 0) + sp * (words.length - 1);
+    const pop = cl((el - gStart) / rate / .12), y = F.H * Lt.capY; let x = F.W / 2 - tw / 2;
+    c.save(); c.textAlign = 'left'; c.lineJoin = 'round'; words.forEach((w, i) => { c.font = f; c.lineWidth = size * .22; c.strokeStyle = 'rgba(25,25,30,.9)'; c.strokeText(w, x, y + (1 - pop) * 5); c.fillStyle = hl.has(norm(w)) ? C.yel : '#ffffff'; c.fillText(w, x, y + (1 - pop) * 5); x += ws[i] + sp; }); c.restore();
+  }
+  function tarihTag(P, sc, i, u, Lt) {
+    const s = sc.era || (i === 0 && P.series ? `${P.series}${P.episode ? ' · ' + P.episode : ''}` : ''); if (!s) return;
+    const U = Math.min(F.W, F.H), f = `800 ${Math.round(U * .025)}px ${FS}`; c.font = f; const w = c.measureText(s.toLocaleUpperCase('tr')).width + U * .035, h = U * .046, x = F.W / 2 - w / 2, y = F.H * Lt.tagY;
+    withA(fade(u, .3, .4), () => { rr(x, y, w, h, 5); c.fillStyle = sc.era ? '#1f1f24' : C.yel; c.fill(); if (!sc.era) { c.strokeStyle = '#1f1f24'; c.lineWidth = 2; c.stroke(); } txt(s.toLocaleUpperCase('tr'), F.W / 2, y + h * .68, f, sc.era ? '#ffffff' : '#1f1f24', 'center'); });
+  }
+  function tarihOutro(P, u) {
+    const U = Math.min(F.W, F.H), Lt = TARIH[P.format] || TARIH.dikey; tarihBg('paper', u);
+    withA(fade(u, .1, .3), () => comic('SIRADAKİ BÖLÜM', F.W / 2, F.H * Lt.headY, Math.round(U * .07), C.yel));
+    if (P.next) withA(fade(u, .4, .4), () => { const size = Math.round(U * .05); c.font = `800 ${size}px ${FS}`; wrap(P.next, F.W * .82).slice(0, 3).forEach((l, i) => { c.save(); c.lineJoin = 'round'; c.font = `800 ${size}px ${FS}`; c.textAlign = 'center'; c.lineWidth = size * .2; c.strokeStyle = '#1f1f24'; c.strokeText(l, F.W / 2, F.H * Lt.headY + U * .1 + i * size * 1.2); c.fillStyle = '#ffffff'; c.fillText(l, F.W / 2, F.H * Lt.headY + U * .1 + i * size * 1.2); c.restore(); }); });
+    const ids = Object.keys(CAST).slice(0, 3); c.save(); c.translate(F.hx, F.hy); c.scale(F.hs, F.hs); PU = u;
+    (ids.length ? ids : [null]).forEach((id, i, a) => person((i - (a.length - 1) / 2) * 230, 250, id ? cast(id) : {}, { pose: i === 0 ? 'wave' : 'idle', mood: 'happy', scale: i === 0 ? 1.05 : .8 })); c.restore();
+    if (P.ask) withA(fade(u, .8, .4), () => { const size = Math.round(U * .034); txt(P.ask, F.W / 2, F.H * Lt.capY + size, `800 ${size}px ${FS}`, '#1f1f24', 'center'); });
+  }
+  function drawTarih(P, L, i, u, t, bare) {
+    const sc = L.scenes[i], Lt = TARIH[P.format] || TARIH.dikey; PU = u;
+    if (sc.outro) return tarihOutro(P, u);
+    tarihBg(sc.bg || 'paper', u); runScene(sc, u); if (bare) return;
+    tarihHead(sc, u, Lt); tarihCaption(sc, u, Lt); tarihTag(P, sc, i, u, Lt);
+  }
   function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; if (sade()) return drawSade(P, L, i, u, t); if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); } else background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); if (P.__bare) return; header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
   function createPlayer(canvas, bundle) {
-    const ST = setStyle(bundle.style); setFormat(bundle.format); const FF = F;
+    if (bundle.style === 'tarih' && typeof document !== 'undefined' && document.fonts) document.fonts.load('400 40px "Lilita One"').catch(() => {});
+    const ST = setStyle(bundle.style); setFormat(bundle.format); const FF = F; const CS = {}; (bundle.cast || []).forEach(x => { if (x && x.id) CS[x.id] = x; }); CAST = CS;
     canvas.width = Math.round(FF.W * FF.S); canvas.height = Math.round(FF.H * FF.S); c = canvas.getContext('2d'); c.setTransform(FF.S, 0, 0, FF.S, 0, 0);
     const L = layout(bundle);
     function render(t) {
-      setStyle(ST); F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
+      setStyle(ST); F = FF; CAST = CS; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
       let si = L.scenes.findIndex(s => t >= s.s && t < s.e); if (si < 0) si = L.scenes.length - 1; const u = t - L.scenes[si].s, TR = .6;
       const ox = F.W / 2, oy = F.H / 2, RM = Math.hypot(F.W, F.H) * .62;
+      if (tarih()) { drawTarih(bundle, L, si, u, t); if (u < .35 && si > 0) withA(1 - e3(u / .35), () => drawTarih(bundle, L, si - 1, L.scenes[si - 1].dur - .35 + u, t)); return si; }
       if (deney()) { drawDeney(bundle, L, si, u, t); if (u < .4 && si > 0) withA(1 - e3(u / .4), () => drawDeney(bundle, L, si - 1, L.scenes[si - 1].dur - .4 + u, t)); return si; }
       if (cine()) { drawCine(bundle, L, si, u, t); if (u < .5 && si > 0) withA(1 - e3(u / .5), () => drawCine(bundle, L, si - 1, L.scenes[si - 1].dur - .5 + u, t)); return si; }
       if (sade()) { if (u < .55 && si > 0) drawSade(bundle, L, si, u, t, { sc: L.scenes[si - 1], u: L.scenes[si - 1].dur - .001, k: e3(u / .55) }); else drawSade(bundle, L, si, u, t); return si; }
@@ -606,9 +777,10 @@
     }
     // Yalnızca illüstrasyon (başlık/altyazı yok): soru seçenekleri için sahne karesi
     function still(k, frac) {
-      setStyle(ST); F = FF; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0);
+      setStyle(ST); F = FF; CAST = CS; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0);
       const i = L.scenes.findIndex(s => s.k === String(k)); if (i < 0) return null;
-      const sc = L.scenes[i]; if (deney()) { drawDeney(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
+      const sc = L.scenes[i]; if (tarih()) { drawTarih(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
+      if (deney()) { drawDeney(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
       if (cine()) { drawCine(bundle, L, i, sc.dur * (frac == null ? .5 : frac), sc.s, true); return { x: 0, y: 0, w: F.W * F.S, h: F.H * F.S }; }
       bundle.__bare = true; try { drawScene(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s); } finally { bundle.__bare = false; }
       return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S };
