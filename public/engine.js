@@ -135,7 +135,7 @@
   // keepIn(x, y, w, h): kutu kartın (görünür alanın) dışına taşıyorsa yerel koordinatta gereken kaydırmayı verir
   let SAFE = null;
   function keepIn(x, y, w, h) {
-    if (!SAFE || !sade()) return [0, 0]; const m = c.getTransform(); if (Math.abs(m.b) > 1e-6 || Math.abs(m.c) > 1e-6 || !m.a || !m.d) return [0, 0];
+    if (!SAFE) return [0, 0]; const m = c.getTransform(); if (Math.abs(m.b) > 1e-6 || Math.abs(m.c) > 1e-6 || !m.a || !m.d) return [0, 0];
     const X0 = m.a * x + m.e, Y0 = m.d * y + m.f, W = m.a * w, H = m.d * h; let dx = 0, dy = 0;
     if (W < SAFE.w) { if (X0 < SAFE.x) dx = SAFE.x - X0; else if (X0 + W > SAFE.x + SAFE.w) dx = SAFE.x + SAFE.w - X0 - W; }
     if (H < SAFE.h) { if (Y0 < SAFE.y) dy = SAFE.y - Y0; else if (Y0 + H > SAFE.y + SAFE.h) dy = SAFE.y + SAFE.h - Y0 - H; }
@@ -764,16 +764,16 @@
   /* ---------- "Nasıl çalışır" stili: koyu stüdyo, röntgen/kesit çizimler, hızlı çekimler, sayaç, eğik vurgu etiketleri ---------- */
   // mlabel(yazı, x, y, hedefX, hedefY): daktilo yazılı küçük parça etiketi + ince işaret çizgisi + hedef noktası
   function mlabel(s, x, y, tx, ty, a = 1) {
-    withA(a, () => { c.save(); c.font = `800 22px ${FM}`; const w = c.measureText(s).width + 20, h = 34;
+    withA(a, () => { c.save(); c.font = `800 22px ${FM}`; const w = c.measureText(s).width + 20, h = 34; const d = keepIn(x - w / 2, y - h / 2, w, h); x += d[0]; y += d[1];
       if (tx != null) { c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y + (ty > y ? h / 2 : -h / 2)); c.lineTo(tx, ty); c.stroke(); c.beginPath(); c.arc(tx, ty, 6, 0, Math.PI * 2); c.strokeStyle = '#5fd3ff'; c.lineWidth = 2.5; c.stroke(); }
       rr(x - w / 2, y - h / 2, w, h, 3); c.fillStyle = '#0d0e12'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1.5; c.stroke();
       c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(s, x, y + 1); c.restore(); });
   }
   const NASIL = {
-    dikey: { hx: 450, hy: 730, hs: 1.0, mX: .055, mY: .05, capY: .705, stY: .46, tagY: .05 },
-    yatay: { hx: 800, hy: 450, hs: .78, mX: .035, mY: .08, capY: .9, stY: .5, tagY: .07 },
-    kare: { hx: 450, hy: 450, hs: .68, mX: .05, mY: .07, capY: .9, stY: .5, tagY: .065 },
-    dikey45: { hx: 450, hy: 540, hs: .78, mX: .05, mY: .06, capY: .84, stY: .48, tagY: .06 },
+    dikey: { hx: 450, hy: 720, hs: 1.0, mX: .055, mY: .05, capY: .715, stY: .655, tagY: .05 },
+    yatay: { hx: 800, hy: 450, hs: .78, mX: .035, mY: .08, capY: .9, stY: .74, tagY: .07 },
+    kare: { hx: 450, hy: 450, hs: .68, mX: .05, mY: .07, capY: .9, stY: .74, tagY: .065 },
+    dikey45: { hx: 450, hy: 540, hs: .78, mX: .05, mY: .06, capY: .84, stY: .7, tagY: .06 },
   };
   function nasilBg() {
     c.fillStyle = rg(F.W / 2, F.H * .42, 0, Math.hypot(F.W, F.H) * .62, [[0, '#3a3d45'], [.55, '#1f2127'], [1, '#0e0f13']]); c.fillRect(0, 0, F.W, F.H);
@@ -792,14 +792,14 @@
   function sticker(st, u, Ln, t0) {
     const U = Math.min(F.W, F.H), p = cl((u - t0) / .22), k = p < 1 ? .4 + .75 * outB(p) : 1, txt0 = String(st.text || '').toLocaleUpperCase('tr');
     const cols = { blue: ['#2f7df6', '#ffffff'], yellow: ['#ffd23f', '#16181d'], red: ['#e8463a', '#ffffff'], green: ['#3ec27a', '#16181d'] }, [bgc, fgc] = cols[st.col] || cols[st.kind === 'burst' ? 'yellow' : 'blue'];
-    const size = Math.round(U * .07), x = F.W / 2 + (st.dx || 0) * F.W, y = F.H * Ln.stY + (st.dy || 0) * F.H, rot = st.kind === 'burst' ? -.12 : -.07;
+    const size = Math.round(U * .056), x = F.W / 2 + (st.dx || 0) * F.W, y = F.H * Ln.stY + (st.dy || 0) * F.H, rot = st.kind === 'burst' ? -.12 : -.07;
     c.save(); c.translate(x, y); c.rotate(rot); c.scale(k, k); c.font = `900 ${size}px ${FD}`; const w = c.measureText(txt0).width;
     if (st.kind === 'burst') { const R = Math.max(w * .62, size * 1.4), n = 14; c.beginPath(); for (let i = 0; i < n * 2; i++) { const a = i / (n * 2) * Math.PI * 2, r = i % 2 ? R * .78 : R; c.lineTo(Math.cos(a) * r * 1.15, Math.sin(a) * r * .8); } c.closePath(); c.fillStyle = bgc; c.fill(); c.strokeStyle = '#111'; c.lineWidth = 6; c.stroke(); }
     else { rr(-w / 2 - size * .35, -size * .72, w + size * .7, size * 1.3, 6); c.fillStyle = bgc; c.fill(); c.strokeStyle = '#111'; c.lineWidth = 5; c.stroke(); }
     c.fillStyle = fgc; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt0, 0, size * .04); c.restore();
   }
   function nasilStickers(sc, u, Ln) {
-    (sc.stick || []).forEach((st, j) => { const t0 = sc.capT[st.at] != null ? sc.capT[st.at] + (st.delay || .25) : null; if (t0 == null || u < t0) return; const t1 = sc.capT[st.at + 1] != null ? sc.capT[st.at + 1] : sc.dur; if (u > t1 - .05) return; sticker(st, u, Ln, t0); });
+    (sc.stick || []).forEach((st, j) => { const t0 = sc.capT[st.at] != null ? sc.capT[st.at] + (st.delay || .25) : null; if (t0 == null || u < t0) return; const t1 = Math.min(sc.capT[st.at + 1] != null ? sc.capT[st.at + 1] : sc.dur, t0 + 1.8); if (u > t1) return; withA(1 - cl((u - (t1 - .2)) / .2), () => sticker(st, u, Ln, t0)); });
   }
   function nasilCaption(sc, u, Ln) {
     let idx = -1; sc.capT.forEach((x, i) => { if (u >= x - .05) idx = i; }); if (idx < 0) return;
@@ -828,7 +828,7 @@
   }
   function drawNasil(P, L, i, u, t, bare) {
     const sc = L.scenes[i], Ln = NASIL[P.format] || NASIL.dikey, U = Math.min(F.W, F.H);
-    nasilBg(); runScene(sc, u); if (bare) return;
+    nasilBg(); SAFE = { x: 14 * F.S, y: 14 * F.S, w: (F.W - 28) * F.S, h: (F.H - 28) * F.S }; runScene(sc, u); SAFE = null; if (bare) return;
     if (sc.label) txt(String(sc.label).toLocaleUpperCase('tr').split('').join(' '), F.W * (1 - Ln.mX), F.H * Ln.tagY, `700 ${Math.round(U * .016)}px ${FM}`, 'rgba(255,255,255,.6)', 'right');
     if (P.handle && i === L.scenes.length - 1) txt('● ' + P.handle, F.W / 2, F.H * Ln.tagY, `700 ${Math.round(U * .02)}px ${FS}`, '#ffffff', 'center');
     if (i === 0 && (P.title || P.topic)) nasilIntro(P, sc, u, Ln); else nasilMeter(sc, u, Ln);
