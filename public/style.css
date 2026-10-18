@@ -232,6 +232,10 @@ label{font-weight:700;letter-spacing:.06em}
 .stprev.st-sinema b{position:absolute;left:18%;top:12%;width:64%;height:9px;border-radius:3px;background:#fff;box-shadow:0 13px 0 -2px #fff}
 .stprev.st-sinema i{position:absolute;left:30%;top:66%;width:40%;height:6px;border-radius:3px;background:#8fd3ff}
 .stprev.st-sinema em{position:absolute;left:44%;top:42%;width:12%;height:16%;border-radius:50% 50% 40% 40%;background:#ffd28a;box-shadow:0 0 14px #ffb347}
+.stprev.st-nasil{background:radial-gradient(circle at 50% 50%,#3a3d45,#121318 80%)}
+.stprev.st-nasil b{position:absolute;left:8%;top:10%;width:26%;height:12px;border-radius:2px;background:#fff}
+.stprev.st-nasil i{position:absolute;left:34%;top:30%;width:32%;aspect-ratio:1;border-radius:50%;border:4px solid #aab3c4;background:rgba(170,179,196,.15)}
+.stprev.st-nasil em{position:absolute;left:24%;top:62%;width:52%;height:16%;background:#2f7df6;border:2px solid #111;transform:rotate(-6deg)}
 .stprev.st-tarih{background:radial-gradient(circle at 50% 45%,#fff,#e9e6de 80%)}
 .stprev.st-tarih b{position:absolute;left:22%;top:9%;width:56%;height:12px;border-radius:3px;background:#ffd23f;box-shadow:0 0 0 2px #1f1f24}
 .stprev.st-tarih i{position:absolute;left:40%;top:32%;width:20%;aspect-ratio:1;border-radius:50%;background:#fff;border:3px solid #1f1f24}
