@@ -333,6 +333,7 @@ async function bundleFor(id, withAudio, format, versionId) {
     : p.visual_style === 'deney' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, hl: s.hl, meter: s.meter, bg: s.bg, count: s.count, answer: s.answer, date: s.date, fx: s.fx, water: s.water, dark: s.dark, code: s.code }
     : { k: s.k, ch: s.ch, title: s.title, cap: s.cap, big: s.big, tag: s.tag, warn: s.warn, kw: s.kw, label: s.label, code: s.code }));
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', style: p.visual_style || 'teknik', scenes };
+  const lg = (await projectLogo(p)).effective; if (lg && lg.path) b.logo = { url: await thumbUrl(lg.path), pos: lg.pos || 'tr', size: lg.size || .14, opacity: lg.opacity != null ? lg.opacity : .9 };
   if (cine) b.hud = vis.data.hud || null;
   if (p.visual_style === 'nasil') { const so = p.style_opts || {}; b.title = vis.data.title || p.title; b.handle = so.handle || null; b.cta = so.cta === '' ? null : (so.cta || 'Arkadaşına gönder'); }
   if (p.visual_style === 'tarih') { const so = p.style_opts || {}; b.cast = vis.data.cast || []; b.series = so.series || null; b.episode = so.episode || null; b.next = vis.data.next || so.next || null; b.ask = vis.data.ask || null; }
@@ -429,6 +430,54 @@ on('POST', '/api/me/profile', async (req, res) => {
   const r = await db.update('users', `id=eq.${q(u.id)}`, patch); auth.forgetUser(u.id);
   send(res, 200, { user: { id: r.id, name: r.name, slug: r.slug } });
 }, 'user');
+/* ---------- logo: kullanıcının varsayılan logosu ve videoya özel logo ---------- */
+const LOGO_POS = ['tr', 'tl', 'br', 'bl'];
+function logoOpts(b, base = {}) {
+  const o = { pos: LOGO_POS.includes(b.pos) ? b.pos : (base.pos || 'tr'), size: Math.min(.3, Math.max(.06, +b.size || base.size || .14)), opacity: Math.min(1, Math.max(.2, b.opacity != null ? +b.opacity : (base.opacity != null ? base.opacity : .9))) };
+  return o;
+}
+async function saveLogoImage(dataUrl, prefix) {
+  const m = String(dataUrl || '').match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) throw Object.assign(new Error('Logo PNG, JPG ya da WEBP olmalı'), { code: 400 });
+  const buf = Buffer.from(m[2], 'base64'); if (buf.length > 1.5e6) throw Object.assign(new Error('Logo en fazla 1,5 MB olabilir'), { code: 400 });
+  const ext = m[1] === 'jpeg' ? 'jpg' : m[1], path = `logos/${prefix}-${Date.now()}.${ext}`;
+  await storage.upload(path, buf, 'image/' + m[1]); return path;
+}
+const logoView = async l => l && l.path ? { ...l, url: await thumbUrl(l.path) } : (l || null);
+on('GET', '/api/me/logo', async (req, res) => { const u = await db.one('users', `id=eq.${q(req.user.id)}&select=brand`); send(res, 200, { logo: await logoView(u && u.brand) }); });
+on('POST', '/api/me/logo', async (req, res) => {
+  const b = await readBody(req, 3e6); const cur = (await db.one('users', `id=eq.${q(req.user.id)}&select=brand`) || {}).brand || {};
+  try {
+    if (b.remove) { await db.update('users', `id=eq.${q(req.user.id)}`, { brand: null }); return send(res, 200, { logo: null }); }
+    const next = { ...logoOpts(b, cur), path: cur.path || null };
+    if (b.data) next.path = await saveLogoImage(b.data, 'u/' + req.user.id);
+    if (!next.path) return send(res, 400, { error: 'Önce bir logo dosyası seçin' });
+    await db.update('users', `id=eq.${q(req.user.id)}`, { brand: next }); send(res, 200, { logo: await logoView(next) });
+  } catch (e) { send(res, e.code || 500, { error: e.message }); }
+});
+// Videonun logosu: mode 'default' (varsayılan logom) | 'custom' (bu videoya özel) | 'none' (logo yok)
+async function projectLogo(p) {
+  const l = p.logo || { mode: 'default' };
+  if (l.mode === 'none') return { mode: 'none', effective: null };
+  if (l.mode === 'custom' && l.path) return { ...l, effective: l };
+  const u = p.owner_id ? await db.one('users', `id=eq.${q(p.owner_id)}&select=brand`) : null;
+  return { ...l, mode: 'default', effective: u && u.brand && u.brand.path ? u.brand : null };
+}
+on('GET', '/api/projects/:id/logo', async (req, res, { id }) => {
+  const p = await db.one('projects', `id=eq.${q(id)}&select=logo,owner_id`); if (!p) return send(res, 404, { error: 'Bulunamadı' });
+  const r = await projectLogo(p); const def = p.owner_id ? ((await db.one('users', `id=eq.${q(p.owner_id)}&select=brand`)) || {}).brand : null;
+  send(res, 200, { mode: r.mode, logo: await logoView(r.effective), custom: p.logo && p.logo.path ? await logoView(p.logo) : null, hasDefault: !!(def && def.path) });
+});
+on('POST', '/api/projects/:id/logo', async (req, res, { id }) => {
+  const b = await readBody(req, 3e6); const p = await db.one('projects', `id=eq.${q(id)}&select=logo`); if (!p) return send(res, 404, { error: 'Bulunamadı' });
+  try {
+    const mode = ['default', 'custom', 'none'].includes(b.mode) ? b.mode : 'default', cur = p.logo || {};
+    const next = { mode, ...(mode === 'custom' ? logoOpts(b, cur) : {}), path: cur.path || null };
+    if (mode === 'custom' && b.data) next.path = await saveLogoImage(b.data, 'p/' + id);
+    if (mode === 'custom' && !next.path) return send(res, 400, { error: 'Bu video için bir logo dosyası seçin' });
+    await db.update('projects', `id=eq.${q(id)}`, { logo: next }); send(res, 200, { ok: true });
+  } catch (e) { send(res, e.code || 500, { error: e.message }); }
+});
 on('GET', '/api/tones', async (req, res) => send(res, 200, Object.entries(TONES).map(([k, [label, desc]]) => ({ k, label, desc }))));
 
 on('GET', '/api/projects', async (req, res) => {
@@ -472,6 +521,7 @@ on('POST', '/api/projects', async (req, res) => {
   if ((+b.target_seconds || 90) > (lim.limits.max_seconds || 300)) return send(res, 402, { error: `Paketiniz en fazla ${lim.limits.max_seconds} saniyelik videoya izin veriyor.` });
   const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: ['sade', 'sinema', 'deney', 'tarih', 'nasil'].includes(b.visual_style) ? b.visual_style : 'teknik', style_opts: b.visual_style === 'nasil' ? { handle: (s => s ? (s.startsWith('@') ? s : '@' + s) : null)(String(b.handle || '').trim().replace(/\s+/g, '').slice(0, 30)), cta: b.cta == null ? 'Arkadaşına gönder' : String(b.cta).trim().slice(0, 30) } : b.visual_style === 'deney' ? { series: String(b.series == null ? 'Ya Olsaydı' : b.series).trim().slice(0, 30), next: String(b.next_topic || '').trim().slice(0, 80) || null } : b.visual_style === 'tarih' ? { series: String(b.series_t || '').trim().slice(0, 30) || null, episode: String(b.episode || '').trim().slice(0, 20) || null, next: String(b.next_topic_t || '').trim().slice(0, 80) || null } : null, cine_mode: b.visual_style === 'sinema' ? (['soru', 'algi', 'anlatim'].includes(b.cine_mode) ? b.cine_mode : 'anlatim') : null, status: 'content_generating' });
   await saveSources(p.id, b.sources);
+  if (b.logo && ['custom', 'none'].includes(b.logo.mode)) { try { const lg = { mode: b.logo.mode, ...(b.logo.mode === 'custom' ? logoOpts(b.logo) : {}), path: null }; if (lg.mode === 'custom') lg.path = b.logo.data ? await saveLogoImage(b.logo.data, 'p/' + p.id) : null; if (lg.mode === 'none' || lg.path) await db.update('projects', `id=eq.${q(p.id)}`, { logo: lg }); } catch (e) { console.error('logo', e.message); } }
   background(p.id, 'content', []);
   send(res, 201, p);
 });

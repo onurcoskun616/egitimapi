@@ -93,6 +93,8 @@
             <p class="note" id="cmNote">Her sahne için gerçekçi görsel üretilir (video başına yaklaşık 0,15–0,40 $ ek görsel maliyeti). Sosyal medya için en uygun biçim: Dikey 9:16, 1 dk.</p></div>
           <label>Video biçimi</label><div class="tiles">${radios('fmt', FMT_OPTS, def.fmt, o => `<i class="ar" style="aspect-ratio:${o[3]}"></i><b>${o[1]}</b><span>${o[2]}</span>`)}</div>
           <label>Süre</label><div class="tiles row4">${radios('dur', DUR_OPTS, def.dur, o => `<b>${o[1]}</b>`)}</div>
+          <label>Logo</label><div class="tiles row3">${radios('lgm', [['default', 'Varsayılan logom', 'Profilinizdeki logo'], ['custom', 'Bu videoya özel', 'Dosya seçin'], ['none', 'Logo yok', '']], 'default', o => `<b>${o[1]}</b>${o[2] ? `<span>${o[2]}</span>` : ''}`)}</div>
+          <div id="wlg" hidden>${logoFields('wl', null)}</div>
         </section>
         <section class="wstep" data-s="4" hidden>
           <label for="src">Kaynak dosyalar <span class="muted opt">(isteğe bağlı)</span></label><input id="src" type="file" multiple accept=".pdf,.docx,.txt,.md">
@@ -117,11 +119,14 @@
     };
     const check = n => {
       if (n === 1) { if (document.getElementById('t').value.trim().length < 3) return 'Konuyu yazın'; if (document.getElementById('b').value.trim().length < 10) return 'Ne anlatılacağını birkaç kelimeyle yazın'; }
+      if (n === 3 && val('lgm') === 'custom' && !wlst.data) return 'Bu videoya özel logo için bir dosya seçin (ya da Varsayılan logom / Logo yok seçin)';
       if (n === 2) { if (!val('tone')) return 'Bir anlatım dili seçin'; if (val('tone') === 'ozel' && document.getElementById('tno').value.trim().length < 3) return 'Anlatım dilini kısaca tarif edin'; }
       return '';
     };
     // görsel servisi bağlı değilse sinematik seçenek pasif (seçilirse görsel adımında takılırdı)
     if (!ME.cine) { const r = f.querySelector('input[name="sty"][value="sinema"]'); if (r) { if (r.checked) f.querySelector('input[name="sty"][value="teknik"]').checked = true; r.disabled = true; const t = r.closest('.tile'); t.classList.add('off'); t.title = 'Görsel servisi bağlanınca açılır'; const sp = t.querySelector('span'); if (sp) sp.textContent = 'Yakında: görsel servisi bağlanınca açılır'; } }
+    const wlst = {}, wlget = wireLogoFields('wl', wlst);
+    f.querySelectorAll('input[name="lgm"]').forEach(r => r.addEventListener('change', () => { document.getElementById('wlg').hidden = val('lgm') !== 'custom'; }));
     const syncCine = () => { const on = val('sty') === 'sinema'; document.getElementById('cmWrap').hidden = !on; document.getElementById('dnWrap').hidden = val('sty') !== 'deney'; document.getElementById('thWrap').hidden = val('sty') !== 'tarih'; document.getElementById('nsWrap').hidden = val('sty') !== 'nasil'; };
     f.querySelectorAll('input[name="sty"]').forEach(r => r.addEventListener('change', () => { syncCine();
       if (['sinema', 'deney', 'tarih', 'nasil'].includes(val('sty'))) { const fm = f.querySelector('input[name="fmt"][value="dikey"]'), du = f.querySelector('input[name="dur"][value="60"]'); if (fm) fm.checked = true; if (du) du.checked = true; } })); syncCine();
@@ -135,7 +140,7 @@
         const files = [...(document.getElementById('src').files || [])];
         const sources = files.length ? await extractAll(files, msg) : [];
         ['tone', 'fmt', 'dur', 'spd', 'sty', 'cm'].forEach(k => lsSet('v_' + k, val(k))); lsSet('v_dser', document.getElementById('dser').value); lsSet('v_tser', document.getElementById('tser').value); lsSet('v_nhan', document.getElementById('nhan').value); lsSet('v_ncta', document.getElementById('ncta').value);
-        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), visual_style: val('sty'), cine_mode: val('cm'), series: document.getElementById('dser').value, next_topic: document.getElementById('dnext').value, series_t: document.getElementById('tser').value, episode: document.getElementById('tep').value, next_topic_t: document.getElementById('tnext').value, handle: document.getElementById('nhan').value, cta: document.getElementById('ncta').value, sources } });
+        const p = await api('/api/projects', { method: 'POST', body: { title: document.getElementById('t').value, brief: document.getElementById('b').value, audience: document.getElementById('a').value, target_seconds: +val('dur'), tone: val('tone'), tone_note: document.getElementById('tno').value, format: val('fmt'), speech_rate: val('spd'), visual_style: val('sty'), cine_mode: val('cm'), series: document.getElementById('dser').value, next_topic: document.getElementById('dnext').value, series_t: document.getElementById('tser').value, episode: document.getElementById('tep').value, next_topic_t: document.getElementById('tnext').value, handle: document.getElementById('nhan').value, cta: document.getElementById('ncta').value, logo: val('lgm') === 'default' ? null : { mode: val('lgm'), ...(val('lgm') === 'custom' ? wlget() : {}) }, sources } });
         location.hash = '#/p/' + p.id;
       } catch (err) { msg.textContent = err.message; busy(btn, false); }
     };
@@ -193,7 +198,8 @@
     else if (p.status === 'delivered') body = delivered(d);
     else if (p.status === 'failed') { const [stage, ...m] = (p.error || '').split('|'); const SN = { content: 'İçerik hazırlama', visuals: 'Görsel hazırlama', voice: 'Seslendirme', render: 'Video üretimi' }; body = `<div class="card err"><strong>${esc(SN[stage] || 'Bir adım')} tamamlanamadı.</strong>\nTekrar deneyebilirsiniz; sorun sürerse yöneticinize bildirin.<details style="margin-top:8px"><summary>Teknik ayrıntı</summary>${esc(m.join('|'))}</details></div><div class="btns"><button class="primary" data-act="retry">Tekrar dene</button><button class="danger" data-act="cancel">Projeyi iptal et</button></div>`; }
     else if (p.status === 'archived') body = `<div class="card">Bu proje iptal edildi.</div>`;
-    app.innerHTML = head + body;
+    app.innerHTML = head + body + (p.status !== 'archived' && !/_generating$|^voicing$|^rendering$|^queued$/.test(p.status) ? '<div id="logoproj"></div>' : '');
+    if (document.getElementById('logoproj')) logoProjectCard(document.getElementById('logoproj'), id);
     wire(id, d);
   }
 
@@ -736,6 +742,58 @@
   }
 
   /* ---------- profil ---------- */
+  /* ---------- logo ---------- */
+  const LOGO_POS_OPTS = [['tr', 'Sağ üst'], ['tl', 'Sol üst'], ['br', 'Sağ alt'], ['bl', 'Sol alt']];
+  const LOGO_SIZE_OPTS = [['0.1', 'Küçük'], ['0.14', 'Orta'], ['0.2', 'Büyük']];
+  const LOGO_OP_OPTS = [['1', 'Tam görünür'], ['0.8', 'Hafif saydam'], ['0.55', 'Saydam (filigran)']];
+  // Dosyayı en fazla 600 px'e küçültüp PNG'ye çevirir (saydamlık korunur)
+  function fileToLogo(file) {
+    return new Promise((ok, no) => {
+      if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) return no(new Error('PNG, JPG, WEBP ya da SVG seçin'));
+      if (file.size > 8e6) return no(new Error('Dosya çok büyük (en fazla 8 MB)'));
+      const r = new FileReader(); r.onerror = () => no(new Error('Dosya okunamadı'));
+      r.onload = () => { const im = new Image(); im.onerror = () => no(new Error('Görsel açılamadı')); im.onload = () => {
+        const k = Math.min(1, 600 / Math.max(im.width || 600, im.height || 600)), cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round((im.width || 600) * k)); cv.height = Math.max(1, Math.round((im.height || 600) * k));
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); ok(cv.toDataURL('image/png')); }; im.src = r.result; };
+      r.readAsDataURL(file);
+    });
+  }
+  const optsHtml = (opts, cur) => opts.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`).join('');
+  // Logo ayar kutusu: önizleme (konum/boyut/saydamlık örnek kare üstünde), dosya, konum, boyut, saydamlık
+  function logoFields(pfx, l) {
+    l = l || {};
+    return `<div class="logoprev" id="${pfx}pv"><div class="lpframe"><img id="${pfx}img" alt="" ${l.url ? `src="${esc(l.url)}"` : 'hidden'}></div></div>
+      <label for="${pfx}f">Logo dosyası <span class="muted opt">(PNG önerilir; saydam arka planlı logo en iyi sonucu verir)</span></label><input id="${pfx}f" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+      <div class="grid3"><div><label for="${pfx}pos">Konum</label><select id="${pfx}pos">${optsHtml(LOGO_POS_OPTS, l.pos || 'tr')}</select></div>
+      <div><label for="${pfx}sz">Boyut</label><select id="${pfx}sz">${optsHtml(LOGO_SIZE_OPTS, l.size || 0.14)}</select></div>
+      <div><label for="${pfx}op">Saydamlık</label><select id="${pfx}op">${optsHtml(LOGO_OP_OPTS, l.opacity != null ? (l.opacity >= .95 ? 1 : l.opacity >= .7 ? .8 : .55) : .8)}</select></div></div>`;
+  }
+  function wireLogoFields(pfx, state) {
+    const img = document.getElementById(pfx + 'img'), fr = img.parentElement;
+    const apply = () => { const pos = document.getElementById(pfx + 'pos').value, sz = +document.getElementById(pfx + 'sz').value; fr.className = 'lpframe p-' + pos; img.style.width = (sz * 100 / .56) + '%'; img.style.opacity = document.getElementById(pfx + 'op').value; };
+    ['pos', 'sz', 'op'].forEach(k => document.getElementById(pfx + k).onchange = apply); apply();
+    document.getElementById(pfx + 'f').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { state.data = await fileToLogo(f); img.src = state.data; img.hidden = false; } catch (err) { alert(err.message); e.target.value = ''; } };
+    return () => ({ pos: document.getElementById(pfx + 'pos').value, size: +document.getElementById(pfx + 'sz').value, opacity: +document.getElementById(pfx + 'op').value, data: state.data || undefined });
+  }
+  async function logoProfileCard(el, note) {
+    let d; try { d = await api('/api/me/logo'); } catch (e) { el.innerHTML = `<p class="note">${esc(e.message)}</p>`; return; }
+    el.innerHTML = `<p class="note">Bu logo, aksi seçilmedikçe <b>bütün videolarınıza</b> eklenir. Bir videoda farklı logo ya da logosuz video isterseniz o videonun sayfasından değiştirebilirsiniz.</p>${logoFields('ml', d.logo)}
+      <div class="btns"><button class="primary" id="mlsave">Kaydet</button>${d.logo ? '<button class="danger" id="mldel">Logoyu kaldır</button>' : ''}</div><p class="note" id="mlmsg" ${note ? 'style="color:var(--green)"' : ''}>${note || ''}</p>`;
+    const st = {}, get = wireLogoFields('ml', st), msg = document.getElementById('mlmsg');
+    document.getElementById('mlsave').onclick = async () => { try { await api('/api/me/logo', { method: 'POST', body: get() }); logoProfileCard(el, 'Kaydedildi. Yeni üretilen videolarda kullanılacak.'); } catch (e) { msg.style.color = ''; msg.textContent = e.message; } };
+    const del = document.getElementById('mldel'); if (del) del.onclick = async () => { if (!confirm('Varsayılan logo kaldırılsın mı?')) return; await api('/api/me/logo', { method: 'POST', body: { remove: true } }); logoProfileCard(el); };
+  }
+  async function logoProjectCard(el, id) {
+    let d; try { d = await api(`/api/projects/${id}/logo`); } catch (e) { el.innerHTML = ''; return; }
+    const r = (v, l, extra = '') => `<label class="tile"><input type="radio" name="lgm" value="${v}" ${d.mode === v ? 'checked' : ''}><b>${l}</b>${extra ? `<span>${extra}</span>` : ''}</label>`;
+    el.innerHTML = `<h2>Logo</h2><div class="card"><div class="tiles row3">${r('default', 'Varsayılan logom', d.hasDefault ? 'Profildeki logo' : 'Henüz yok — <a href="#/profil">Profil</a>')}${r('custom', 'Bu videoya özel')}${r('none', 'Logo yok')}</div>
+      <div id="lgc" hidden>${logoFields('pl', d.custom)}</div>
+      <div class="btns"><button class="primary" id="lgsave">Logoyu kaydet</button></div><p class="note" id="lgmsg">Değişiklik bir sonraki video üretiminde uygulanır (teslim edilmiş videoyu yeni logoyla almak için "Başka biçimde üret" kullanılabilir).</p></div>`;
+    const st = {}, get = wireLogoFields('pl', st), cw = document.getElementById('lgc'), mode = () => (el.querySelector('input[name="lgm"]:checked') || {}).value || 'default';
+    const sync = () => { cw.hidden = mode() !== 'custom'; }; el.querySelectorAll('input[name="lgm"]').forEach(x => x.onchange = sync); sync();
+    document.getElementById('lgsave').onclick = async () => { const msg = document.getElementById('lgmsg'); try { await api(`/api/projects/${id}/logo`, { method: 'POST', body: { mode: mode(), ...(mode() === 'custom' ? get() : {}) } }); msg.style.color = 'var(--green)'; msg.textContent = 'Kaydedildi. Önizleme sayfa yenilenince güncellenir.'; } catch (e) { msg.style.color = ''; msg.textContent = e.message; } };
+  }
+
   async function viewProfile() {
     setSub('Profil');
     const u = ME.user;
@@ -743,6 +801,7 @@
     app.innerHTML = `<h1>Profil</h1>
       <div class="card qcard"><div class="qlinks">${qlinks.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}<button type="button" class="btn danger" id="lo2">Çıkış yap</button></div>
       <label for="thm">Görünüm</label><select id="thm"><option value="">Otomatik (telefonun ayarı)</option><option value="light">Açık</option><option value="dark">Koyu</option></select></div>
+      ${u.role !== 'student' && isTeacher() ? '<h2>Logom</h2><div class="card" id="logoc"><p class="note">Yükleniyor…</p></div>' : ''}
       <h2>Bildirimler</h2><div class="card" id="pushc"><p class="note">Yükleniyor…</p></div>
       <h2>Bilgilerim</h2><form class="card" id="pf"><label for="nm">Ad soyad</label><input id="nm" value="${esc(u.name)}" required minlength="3">
       <label>E-posta</label><input value="${esc(u.email)}" disabled>
@@ -753,6 +812,7 @@
       <h2>Şifre değiştir</h2><form class="card" id="wf"><label for="op">Mevcut şifre</label><input id="op" type="password" required autocomplete="current-password"><label for="np">Yeni şifre</label><input id="np" type="password" required minlength="8" autocomplete="new-password"><div class="btns"><button type="submit">Şifreyi değiştir</button></div><p class="note" id="m2"></p></form>`;
     const thm = document.getElementById('thm'); thm.value = curTheme(); thm.onchange = () => setTheme(thm.value);
     pushCard(document.getElementById('pushc'));
+    if (document.getElementById('logoc')) logoProfileCard(document.getElementById('logoc'));
     document.getElementById('lo2').onclick = logout;
     const v = id => (document.getElementById(id) || {}).value;
     document.getElementById('pf').onsubmit = async e => { e.preventDefault(); const m = document.getElementById('m1'); try { const body = { name: v('nm'), school: v('sc') }; if (u.role !== 'student') Object.assign(body, { subject: v('sj'), bio: v('bi'), slug: v('sl') }); await api('/api/me/profile', { method: 'POST', body }); m.style.color = 'var(--green)'; m.textContent = 'Kaydedildi.'; } catch (err) { m.style.color = ''; m.textContent = err.message; } };

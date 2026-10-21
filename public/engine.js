@@ -251,10 +251,10 @@
   function background() { c.fillStyle = C.bg; c.fillRect(0, 0, F.W, F.H); c.fillStyle = rg(F.hx, F.hy - 40, 40, 760, [[0, 'rgba(30,50,100,.38)'], [1, 'rgba(5,7,14,0)']]); c.fillRect(0, 0, F.W, F.H); bgGrid(); }
   function header(P, sc, si, u, t) {
     const R = F.W - 40;
-    c.fillStyle = C.yel; c.fillRect(40, F.brandY - 10, 10, 10);
+    if (!logoPush('l')) { c.fillStyle = C.yel; c.fillRect(40, F.brandY - 10, 10, 10); }
     c.font = `800 17px ${FM}`; let brand = (P.brand || 'NASIL ÇALIŞIR') + '  ·  ' + (P.topic || '').toUpperCase(); while (c.measureText(brand).width > F.W - 330 && brand.length > 10) brand = brand.slice(0, -2);
-    txt(brand, 58, F.brandY, `800 17px ${FM}`, C.muted);
-    const s = Math.floor(t); txt(`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}:${String(Math.floor((t % 1) * 100)).padStart(2, '0')}   F${String(Math.floor(t * 60)).padStart(5, '0')}`, R, F.brandY, `800 17px ${FM}`, C.muted, 'right');
+    if (!logoPush('l')) { txt(brand, 58, F.brandY, `800 17px ${FM}`, C.muted); }
+    const s = Math.floor(t); if (!logoPush('r')) txt(`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}:${String(Math.floor((t % 1) * 100)).padStart(2, '0')}   F${String(Math.floor(t * 60)).padStart(5, '0')}`, R, F.brandY, `800 17px ${FM}`, C.muted, 'right');
     const k = fade(u, .15, .5); withA(k, () => {
       const col = sc.warn ? C.red : C.lv; c.font = `800 20px ${FM}`; const lb = `${si + 1} · ${(sc.ch || '').toUpperCase()}`; const w = c.measureText(lb).width + 34;
       rr(F.titleX, F.chipY, w, 40, 20); c.fillStyle = 'rgba(8,11,20,.9)'; c.fill(); c.strokeStyle = col; c.lineWidth = 2.5; c.stroke(); txt(lb, F.titleX + w / 2, F.chipY + 27, `800 20px ${FM}`, col, 'center');
@@ -344,7 +344,7 @@
   }
   const getImg = url => { if (!url) return null; const e = imgEntry(url); return e.ok ? e.img : null; };
   function preload(bundle) {
-    const urls = []; (bundle && bundle.scenes || []).forEach(s => { if (s.img) urls.push(s.img); if (s.img2) urls.push(s.img2); });
+    const urls = []; (bundle && bundle.scenes || []).forEach(s => { if (s.img) urls.push(s.img); if (s.img2) urls.push(s.img2); }); if (bundle && bundle.logo && bundle.logo.url) urls.push(bundle.logo.url);
     return Promise.all(urls.map(u => new Promise(ok => { const e = imgEntry(u); if (e.ok || e.err || !e.img) return ok(); e.img.addEventListener('load', ok); e.img.addEventListener('error', ok); setTimeout(ok, 45000); })));
   }
   const CINE = {
@@ -517,7 +517,7 @@
     c.fillStyle = rg(F.W / 2, F.H * .5, 0, Math.hypot(F.W, F.H) * .6, [[0, a], [1, b]]); c.fillRect(0, 0, F.W, F.H);
   }
   function deneyMeter(sc, u, D, light) {
-    const m = sc.meter; if (!m) return; const U = Math.min(F.W, F.H), x = F.W * D.mX, y = F.H * D.mY, t0 = sc.capT[m.at || 0] != null ? sc.capT[m.at || 0] : 0;
+    const m = sc.meter; if (!m) return; const U = Math.min(F.W, F.H), x = F.W * D.mX, y = F.H * D.mY + logoPush('l'), t0 = sc.capT[m.at || 0] != null ? sc.capT[m.at || 0] : 0;
     const a = fade(u, Math.max(0, t0 - .6), .3), lab = light ? 'rgba(40,40,60,.75)' : 'rgba(255,255,255,.75)';
     let val; if (m.text) { const n = Math.floor(cl((u - t0) / 1.2) * m.text.length); val = m.text.slice(0, Math.max(1, n)); }
     else { const k = e3(cl((u - t0) / 1.8)); val = (m.prefix || '') + trNum(lerp(m.from, m.to, k), m.dec) + (m.unit ? ' ' + m.unit : ''); }
@@ -527,7 +527,7 @@
       if (m.sub) txt(m.sub, x, y + U * .038 + vs * .9, `700 ${Math.round(U * .017)}px ${FM}`, lab); });
   }
   function deneyBrand(P, D, light) {
-    const U = Math.min(F.W, F.H), s = P.series || ''; if (!s) return; const x = F.W * (1 - D.mX), y = F.H * D.mY + U * .02, col = light ? 'rgba(40,40,60,.85)' : '#ffffff';
+    const U = Math.min(F.W, F.H), s = P.series || ''; if (!s) return; const x = F.W * (1 - D.mX), y = F.H * D.mY + U * .02 + logoPush('r'), col = light ? 'rgba(40,40,60,.85)' : '#ffffff';
     const f = `700 ${Math.round(U * .02)}px ${FS}`; c.font = f; const w = c.measureText(s).width;
     txt(s, x, y, f, col, 'right'); seriesGlyph(x - w - U * .025, y - U * .008, U * .018, light ? '#6a5a20' : C.yel);
   }
@@ -598,6 +598,8 @@
 
   /* ---------- "Çizgi tarih" stili: düz çizgi karakterler, çizgi roman başlıkları, harita ve basit nesneler ---------- */
   let CAST = {};
+  let LOGOBOX = null; // {pos, h}: logonun kapladığı köşe (mantıksal px) — o köşedeki çerçeve yazıları aşağı kayar
+  const logoPush = side => (LOGOBOX && LOGOBOX.pos === 't' + side ? LOGOBOX.h + Math.min(F.W, F.H) * .02 : 0);
   function cast(id) { return CAST[id] || { name: String(id || '').toUpperCase() }; }
   // comic(yazı, x, y, boyut, renk): kalın konturlu çizgi roman yazısı (harfler hafif oynak)
   function comic(str, x, y, size, col, o = {}) {
@@ -780,7 +782,7 @@
     const fy = F.hy + 300 * F.hs; c.fillStyle = lg(0, fy, 0, F.H, [[0, 'rgba(0,0,0,.25)'], [1, 'rgba(0,0,0,.55)']]); c.fillRect(0, fy, F.W, F.H - fy);
   }
   function nasilMeter(sc, u, Ln) {
-    const m = sc.meter; if (!m) return; const U = Math.min(F.W, F.H), x = F.W * Ln.mX, y = F.H * Ln.mY, t0 = sc.capT[m.at || 0] != null ? sc.capT[m.at || 0] : 0;
+    const m = sc.meter; if (!m) return; const U = Math.min(F.W, F.H), x = F.W * Ln.mX, y = F.H * Ln.mY + logoPush('l'), t0 = sc.capT[m.at || 0] != null ? sc.capT[m.at || 0] : 0;
     const a = fade(u, Math.max(0, t0 - .3), .25);
     let val; if (m.text) val = m.text; else { const k = e3(cl((u - t0) / 1.2)); val = (m.prefix || '') + trNum(lerp(m.from, m.to, k), m.dec) + (m.unit && m.unitInline ? ' ' + m.unit : ''); }
     let vs = Math.round(U * .1); c.font = `900 ${vs}px ${FD}`; const mw = c.measureText(val).width; if (mw > F.W * .7) vs = Math.floor(vs * F.W * .7 / mw);
@@ -814,7 +816,7 @@
   }
   function nasilIntro(P, sc, u, Ln) {
     const U = Math.min(F.W, F.H), end = sc.capT[1] != null ? sc.capT[1] : sc.dur; if (u > end) return; const a = Math.min(fade(u, .05, .25), 1 - fade(u, end - .3, .3));
-    const x = F.W * Ln.mX, y = F.H * Ln.mY, title = String(P.title || P.topic || '');
+    const x = F.W * Ln.mX, y = F.H * Ln.mY + logoPush('l'), title = String(P.title || P.topic || '');
     withA(a, () => { txt((P.kicker || 'NASIL ÇALIŞIR').toLocaleUpperCase('tr').split('').join(' '), x, y, `800 ${Math.round(U * .02)}px ${FM}`, C.hl);
       let size = Math.round(U * .1); c.font = `900 ${size}px ${FS}`; let ls = wrap(title, F.W * .62); while (ls.length > 2 && size > 40) { size -= 4; c.font = `900 ${size}px ${FS}`; ls = wrap(title, F.W * .62); }
       ls.forEach((l, i) => { const yy = y + U * .02 + size * (i + .9) * 1.0; txt(l, x - 2, yy, `900 ${size}px ${FS}`, '#ffffff'); if (i === ls.length - 1) { c.font = `900 ${size}px ${FS}`; const w = c.measureText(l).width; txt('.', x + w, yy, `900 ${size}px ${FS}`, C.hl); } }); });
@@ -829,7 +831,7 @@
   function drawNasil(P, L, i, u, t, bare) {
     const sc = L.scenes[i], Ln = NASIL[P.format] || NASIL.dikey, U = Math.min(F.W, F.H);
     nasilBg(); SAFE = { x: 14 * F.S, y: 14 * F.S, w: (F.W - 28) * F.S, h: (F.H - 28) * F.S }; runScene(sc, u); SAFE = null; if (bare) return;
-    if (sc.label) txt(String(sc.label).toLocaleUpperCase('tr').split('').join(' '), F.W * (1 - Ln.mX), F.H * Ln.tagY, `700 ${Math.round(U * .016)}px ${FM}`, 'rgba(255,255,255,.6)', 'right');
+    if (sc.label) txt(String(sc.label).toLocaleUpperCase('tr').split('').join(' '), F.W * (1 - Ln.mX), F.H * Ln.tagY + logoPush('r'), `700 ${Math.round(U * .016)}px ${FM}`, 'rgba(255,255,255,.6)', 'right');
     if (P.handle && i === L.scenes.length - 1) txt('● ' + P.handle, F.W / 2, F.H * Ln.tagY, `700 ${Math.round(U * .02)}px ${FS}`, '#ffffff', 'center');
     if (i === 0 && (P.title || P.topic)) nasilIntro(P, sc, u, Ln); else nasilMeter(sc, u, Ln);
     nasilStickers(sc, u, Ln); nasilCaption(sc, u, Ln); if (i === L.scenes.length - 1) nasilOutro(P, sc, u, Ln);
@@ -841,7 +843,16 @@
     const ST = setStyle(bundle.style); setFormat(bundle.format); const FF = F; const CS = {}; (bundle.cast || []).forEach(x => { if (x && x.id) CS[x.id] = x; }); CAST = CS;
     canvas.width = Math.round(FF.W * FF.S); canvas.height = Math.round(FF.H * FF.S); c = canvas.getContext('2d'); c.setTransform(FF.S, 0, 0, FF.S, 0, 0);
     const L = layout(bundle);
-    function render(t) {
+    // Logo: her karede seçilen köşeye (tr/tl/br/bl), genişliğin size oranında, opacity saydamlığında
+    function drawLogo() {
+      const L0 = bundle.logo; if (!L0 || !L0.url) return; const img = getImg(L0.url); if (!img || !img.width) return;
+      const U = Math.min(F.W, F.H), m = U * .035; let w = U * (L0.size || .14), h = w * img.height / img.width; if (h > w * .9) { h = w * .9; w = h * img.width / img.height; }
+      const x = /l$/.test(L0.pos) ? m : F.W - m - w, y = /^b/.test(L0.pos) ? F.H - m - h - (F.H > F.W ? U * .02 : 0) : m;
+      c.save(); c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = L0.opacity != null ? L0.opacity : .9; c.drawImage(img, x, y, w, h); c.restore();
+    }
+    function logoBox() { const L0 = bundle.logo; if (!L0 || !L0.url) return null; const img = getImg(L0.url); if (!img || !img.width) return null; const U = Math.min(FF.W, FF.H); let w = U * (L0.size || .14), h = w * img.height / img.width; if (h > w * .9) h = w * .9; return { pos: L0.pos || 'tr', h }; }
+    function render(t) { LOGOBOX = logoBox(); const si = renderFrame(t); LOGOBOX = null; drawLogo(); return si; }
+    function renderFrame(t) {
       setStyle(ST); F = FF; CAST = CS; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
       let si = L.scenes.findIndex(s => t >= s.s && t < s.e); if (si < 0) si = L.scenes.length - 1; const u = t - L.scenes[si].s, TR = .6;
       const ox = F.W / 2, oy = F.H / 2, RM = Math.hypot(F.W, F.H) * .62;

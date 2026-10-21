@@ -251,3 +251,11 @@ label{font-weight:700;letter-spacing:.06em}
 
 .cinepair{display:flex;gap:6px}.cinepair img{flex:1;min-width:0;max-height:340px;object-fit:cover;border-radius:10px}
 .tile.off{opacity:.5;cursor:not-allowed}.tile.off input{pointer-events:none}
+
+.logoprev{display:flex;justify-content:center;margin:6px 0 10px}
+.lpframe{position:relative;width:180px;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:linear-gradient(160deg,#2b3550,#0f1424);border:1px solid var(--line,rgba(127,127,127,.3))}
+.lpframe::after{content:"";position:absolute;left:12%;right:12%;top:40%;height:22%;border-radius:10px;background:rgba(255,255,255,.08)}
+.lpframe img{position:absolute;max-height:45%;object-fit:contain;z-index:1}
+.lpframe.p-tr img{top:3.5%;right:3.5%}.lpframe.p-tl img{top:3.5%;left:3.5%}.lpframe.p-br img{bottom:5%;right:3.5%}.lpframe.p-bl img{bottom:5%;left:3.5%}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:420px){.grid3{grid-template-columns:1fr}}
