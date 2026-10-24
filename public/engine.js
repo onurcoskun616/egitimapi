@@ -54,9 +54,13 @@
     if (m) return `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}${m[4]}`;
     return col;
   }
-  function addStops(g, stops) { (stops || []).forEach(([o, col]) => { o = Math.min(1, Math.max(0, +o || 0)); try { g.addColorStop(o, fixColor(col)); } catch { try { g.addColorStop(o, 'rgba(0,0,0,0)'); } catch { } } }); return g; }
+  function addStops(g, stops) { if (!Array.isArray(stops)) return g; stops.forEach(([o, col]) => { o = Math.min(1, Math.max(0, +o || 0)); try { g.addColorStop(o, fixColor(col)); } catch { try { g.addColorStop(o, 'rgba(0,0,0,0)'); } catch { } } }); return g; }
   function lg(x0, y0, x1, y1, stops) { return addStops(c.createLinearGradient(x0, y0, x1, y1), stops); }
-  function rg(x, y, r0, r1, stops) { return addStops(c.createRadialGradient(x, y, Math.max(0, r0), x, y, Math.max(0, r1)), stops); }
+  // rg(x, y, r0, r1, duraklar) — tarayıcı biçimi rg(x0, y0, r0, x1, y1, r1[, duraklar]) de kabul edilir
+  function rg(x, y, r0, r1, stops) {
+    const a = arguments; if (a.length >= 6 && typeof a[4] === 'number' && typeof a[5] === 'number') return addStops(c.createRadialGradient(a[0], a[1], Math.max(0, a[2]), a[3], a[4], Math.max(0, a[5])), a[6]);
+    return addStops(c.createRadialGradient(x, y, Math.max(0, r0), x, y, Math.max(0, r1)), stops);
+  }
   // glow(renk, bulanıklık, fn) parlatma; yanlışlıkla glow(x, y, r, renk, alfa) yazılırsa yumuşak hale çizer
   function glow(col, b, fn) {
     if (typeof col === 'number') { const [x, y, r, cc, a] = arguments; if (!(r > 0)) return; const g = c.globalAlpha; c.globalAlpha = g * (a == null ? .25 : +a || 0); c.fillStyle = rg(x, y, 0, r, [[0, typeof cc === 'string' ? cc : C.yel], [1, 'rgba(0,0,0,0)']]); c.fillRect(x - r, y - r, r * 2, r * 2); c.globalAlpha = g; return; }
@@ -901,7 +905,7 @@
       const fs = g.em ? big : small, font = g.em ? `400 ${fs}px ${FSER}` : `600 ${fs}px ${FS}`; c.font = font; const sp = c.measureText(' ').width, ws = g.t.map(t => c.measureText(t.w).width); let x = F.W / 2 - (ws.reduce((a, b) => a + b, 0) + sp * (ws.length - 1)) / 2;
       y += g.em ? big * .95 : small * 1.2;
       c.save(); c.shadowColor = 'rgba(5,8,20,.75)'; c.shadowBlur = 14; c.textAlign = 'left';
-      g.t.forEach((t, i) => { const k = cl((el - t.at + 2) / 6); c.globalAlpha *= 1; withA(.22 + .78 * k, () => { c.font = font; c.fillStyle = g.em ? C.red : '#f2efe8'; c.fillText(t.w, x, y + (1 - k) * 4); }); x += ws[i] + sp; });
+      g.t.forEach((t, i) => { const k = cl((el - t.at + 2) / 6); c.globalAlpha *= 1; withA((g.em ? .4 : .3) + (g.em ? .6 : .7) * k, () => { c.font = font; c.fillStyle = g.em ? '#ef8f74' : '#f2efe8'; c.fillText(t.w, x, y + (1 - k) * 4); }); x += ws[i] + sp; });
       c.restore(); y += g.em ? big * .15 : small * .2; }));
   }
   function hikayeOutro(P, u) {
