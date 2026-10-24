@@ -112,7 +112,7 @@ const ctxFor = (projectId, kind) => ({
   async viaActions(items, model) {
     // Aynı istem için bekleyen ya da biten görev varsa yeniden çalıştırma, onu kullan
     const key = canon(items);
-    const open = await db.select('gen_tasks', `select=id,items,status,created_at&project_id=eq.${q(projectId)}&kind=eq.${kind}&consumed=is.false&status=in.(queued,running,done)&order=created_at.desc&limit=5`);
+    const open = await db.select('gen_tasks', `select=id,items,status,created_at&project_id=${projectId ? 'eq.' + q(projectId) : 'is.null'}&kind=eq.${kind}&consumed=is.false&status=in.(queued,running,done)&order=created_at.desc&limit=5`);
     let task = open.find(t => canon(t.items) === key && Date.now() - new Date(t.created_at) < 45 * 60 * 1000);
     if (!task) {
       const token = crypto.randomBytes(24).toString('hex');
@@ -387,6 +387,7 @@ async function apkAvailable() {
 }
 on('GET', '/api/app-info', async (req, res) => send(res, 200, { apk: await apkAvailable() ? APK_URL : null, play: process.env.APP_PLAY_URL || null, ios: process.env.APP_IOS_URL || null }), 'public');
 require('./lib/series')({ on, db, q, send, readBody, isAdmin, activeLimits, monthUsage, background, FORMATS, TONES, now });
+require('./lib/ortak')({ on, db, q, send, readBody, isAdmin, claude, ctxFor, logClaude, now, shortId: () => shortId(), publicBase });
 /* ---------- hesaplar ---------- */
 on('POST', '/api/auth/register', async (req, res) => {
   const b = await readBody(req, 8000); const ip = ipOf(req); if (auth.tooMany(ip)) return send(res, 429, { error: 'Çok fazla deneme, biraz sonra tekrar deneyin' });
@@ -873,6 +874,7 @@ http.createServer(async (req, res) => {
     }
     let file = path.normalize(path.join(PUBLIC, url.pathname === '/' ? 'index.html' : url.pathname));
     if (/^\/izle\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'izle.html');
+    else if (/^\/test\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'test.html');
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
     const hdr = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' };
     if (file.endsWith('sw.js')) hdr['Service-Worker-Allowed'] = '/';

@@ -263,3 +263,10 @@ label{font-weight:700;letter-spacing:.06em}
 .lpframe.p-tr img{top:3.5%;right:3.5%}.lpframe.p-tl img{top:3.5%;left:3.5%}.lpframe.p-br img{bottom:5%;right:3.5%}.lpframe.p-bl img{bottom:5%;left:3.5%}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 @media (max-width:420px){.grid3{grid-template-columns:1fr}}
+/* ortak sınav */
+.tbl .c{text-align:center}.tbl tr.dim td,.tbl td.dim{opacity:.45}
+.tview .tpass{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:12px 14px;margin:14px 0}.tview .ttext{white-space:pre-line;margin-top:6px;font-family:Georgia,serif}
+.tview .tq{margin:14px 0;padding-bottom:10px;border-bottom:1px dashed var(--line)}.tview .topts{margin:6px 0 0 20px}.tview .topts li.ok{color:var(--green);font-weight:700}
+.tview .tkey{background:var(--panel2);border-left:3px solid var(--green);padding:6px 10px;margin:6px 0;font-size:14px}.tview .tkey ul{margin:4px 0 0 18px;padding:0}
+.kbar{height:8px;background:var(--panel2);border-radius:9px;overflow:hidden}.kbar i{display:block;height:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.grid2{grid-template-columns:1fr}}

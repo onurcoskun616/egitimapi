@@ -621,7 +621,7 @@
         links = ['<a href="#/">Eğitimler</a>', '<a href="#/derslerim">Derslerim</a>'];
         tabs = [['#/', 'home', 'Ana sayfa'], ['#/derslerim', 'book', 'Derslerim'], ['#/?ara=1', 'search', 'Ara'], ['#/profil', 'user', 'Profil']];
       } else if (isTeacher()) {
-        links = ['<a href="#/projeler">Videolar</a>', '<a href="#/egitimler">Eğitimlerim</a>', `<a href="#/talepler">Talepler${ME.pending ? ` <b class="badge">${ME.pending}</b>` : ''}</a>`, '<a href="#/sonuclar">Sonuçlar</a>', '<a href="#/paketim">Paketim</a>'];
+        links = ['<a href="#/projeler">Videolar</a>', '<a href="#/egitimler">Eğitimlerim</a>', '<a href="#/ortak-sinav">Ortak sınav</a>', `<a href="#/talepler">Talepler${ME.pending ? ` <b class="badge">${ME.pending}</b>` : ''}</a>`, '<a href="#/sonuclar">Sonuçlar</a>', '<a href="#/paketim">Paketim</a>'];
         tabs = [['#/projeler', 'video', 'Videolar'], ['#/egitimler', 'layers', 'Eğitimler'], ['#/talepler', 'inbox', 'Talepler', ME.pending], ['#/sonuclar', 'chart', 'Sonuçlar'], ['#/profil', 'user', 'Profil']];
       } else tabs = [['#/', 'home', 'Ana sayfa'], ['#/profil', 'user', 'Profil']];
       if (u.role === 'admin') links.push('<a href="#/yonetim">Yönetim</a>');
@@ -631,7 +631,7 @@
     const th = curTheme();
     document.querySelector('.top').insertAdjacentHTML('beforeend', `<nav id="tbar" class="tbar" aria-label="Ana menü">${links.join('')}<button type="button" class="themebtn" id="themebtn" title="${THEME_L[th]}" aria-label="${THEME_L[th]}">${THEME_I[th]}</button></nav>`);
     const hcur = location.hash || '#/', hbase = hcur.split('?')[0];
-    const active = h => { const b = h.split('?')[0]; if (h.includes('ara=1')) return hcur.includes('ara=1'); if (b === '#/') return (hbase === '#/' || hbase === '#') && !hcur.includes('ara=1'); return hbase === b || hbase.startsWith(b + '/') || (b === '#/projeler' && hbase.startsWith('#/p/')) || (b === '#/egitimler' && hbase.startsWith('#/egitimler')); };
+    const active = h => { const b = h.split('?')[0]; if (h.includes('ara=1')) return hcur.includes('ara=1'); if (b === '#/') return (hbase === '#/' || hbase === '#') && !hcur.includes('ara=1'); return hbase === b || hbase.startsWith(b + '/') || (b === '#/projeler' && hbase.startsWith('#/p/')) || (b === '#/egitimler' && (hbase.startsWith('#/egitimler') || hbase.startsWith('#/ortak-sinav'))); };
     document.body.insertAdjacentHTML('beforeend', `<nav id="bbar" class="bbar" aria-label="Alt menü">${tabs.map(([h, ic, l, n]) => `<a href="${h}" class="${active(h) ? 'on' : ''}" ${active(h) ? 'aria-current="page"' : ''}>${icon(ic)}<span>${l}</span>${n ? `<b class="bdot">${n}</b>` : ''}</a>`).join('')}</nav>`);
     document.getElementById('themebtn').onclick = () => setTheme(THEMES[(THEMES.indexOf(curTheme()) + 1) % 3]);
     const lo = document.getElementById('logout'); if (lo) lo.onclick = logout;
@@ -854,6 +854,7 @@
     let list; try { list = await api('/api/my/courses'); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
     app.innerHTML = `<h1>Eğitimlerim</h1><p class="muted">Videolarınızı eğitim (ders serisi) olarak gruplayın; öğrenciler ana sayfadaki vitrinden görüp katılım talebi gönderir.</p>
       <form class="card" id="nc"><label for="ct">Yeni eğitim adı</label><div class="cp"><input id="ct" required minlength="3" maxlength="140" placeholder="Örn. Asenkron motorlar ve yol verme"><button class="primary" type="submit">Oluştur</button></div><p class="note err-t" id="m"></p></form>
+      <a class="row card" href="#/ortak-sinav" style="margin-top:12px"><span><b>📋 Ortak sınav hazırlığı</b><span class="note"> · MEB senaryolarından hazırlık videoları ve kazanım testi</span></span><span>›</span></a>
       <h2>Eğitimler</h2><div class="list">${list.length ? list.map(c => `<a class="row" href="#/egitimler/${esc(c.id)}"><span><b>${esc(c.title)}</b><span class="note"> · ${c.lessons} ders · ${c.students} öğrenci${c.pending ? ` · <b style="color:var(--yel)">${c.pending} talep</b>` : ''}</span></span><span class="pill" style="color:${c.status === 'published' ? 'var(--green)' : 'var(--muted)'}">${c.status === 'published' ? 'Yayında' : 'Taslak'}</span></a>`).join('') : '<div class="empty">Henüz eğitim yok. Yukarıdan ilkini oluşturun.</div>'}</div>`;
     document.getElementById('nc').onsubmit = async e => { e.preventDefault(); try { const c = await api('/api/my/courses', { method: 'POST', body: { title: document.getElementById('ct').value } }); location.hash = '#/egitimler/' + c.id; } catch (err) { document.getElementById('m').textContent = err.message; } };
   }
@@ -1020,20 +1021,20 @@
   const TONE_L = { akademik: 'Akademik ve resmi', samimi: 'Sıcak ve samimi', akran: 'Akran anlatımı', usta: 'Usta-çırak', hikaye: 'Hikâye', merak: 'Soru-cevap', belgesel: 'Belgesel', sinav: 'Sınav odaklı' };
   const FMT_L = { yatay: 'Yatay 16:9', dikey: 'Dikey 9:16', kare: 'Kare 1:1', dikey45: 'Dikey 4:5' };
   function drawPlan(c, pm) {
-    const P = c.plan, el = document.getElementById('plan'), D = P.defaults || {};
+    const P = c.plan, el = document.getElementById('plan'), D = P.defaults || {}, OK = P.kind === 'ortak';
     const units = Object.fromEntries((P.units || []).map(u => [u.n, u]));
     const made = P.weeks.filter(w => w.project_id).length, ready = P.weeks.filter(w => w.project_id && pm[w.project_id] && pm[w.project_id].status === 'delivered').length;
     let lastU = null;
     const rows = P.weeks.map(w => {
       const p = w.project_id && pm[w.project_id];
-      const head = w.unit !== lastU ? `<tr class="urow"><td colspan="5"><b>${w.unit}. Öğrenme birimi · ${esc((units[w.unit] || {}).title || '')}</b> <span class="note">· ${(units[w.unit] || {}).hours || ''} ders saati · ${esc((units[w.unit] || {}).outcome || '')}</span></td></tr>` : ''; lastU = w.unit;
+      const head = w.unit !== lastU ? (OK ? `<tr class="urow"><td colspan="5"><b>${esc((units[w.unit] || {}).title || '')}</b> <span class="note">· ${esc((units[w.unit] || {}).outcome || '')}</span></td></tr>` : `<tr class="urow"><td colspan="5"><b>${w.unit}. Öğrenme birimi · ${esc((units[w.unit] || {}).title || '')}</b> <span class="note">· ${(units[w.unit] || {}).hours || ''} ders saati · ${esc((units[w.unit] || {}).outcome || '')}</span></td></tr>`) : ''; lastU = w.unit;
       const st = !w.project_id ? `<label class="chk"><input type="checkbox" data-w="${w.week}"> Üret</label>` : p ? `<a href="#/p/${esc(w.project_id)}"><span class="pill st-${esc(p.status)}">${esc(STATUS[p.status] || p.status)}</span></a>` : '<span class="note">oluşturuldu</span>';
-      return head + `<tr><td><b>${w.week}</b></td><td style="white-space:normal;min-width:220px"><b>${esc(w.title)}</b>${w.unit_end ? ' <span class="pill" style="color:var(--yel)">Değerlendirme</span>' : ''}<details><summary class="note">İçerik ve uygulama</summary><p class="note" style="white-space:normal">${esc(w.content)}</p><p class="note" style="white-space:normal"><b>Uygulama:</b> ${esc(w.uygulama || '')}</p></details></td><td style="white-space:normal;min-width:220px"><ul class="kzl">${(w.kazanimlar || []).map(k => `<li>${esc(k)}</li>`).join('')}</ul></td><td style="white-space:normal;min-width:200px" class="note">${esc(w.olcme || '')}</td><td>${st}</td></tr>`;
+      return head + `<tr><td><b>${w.week}</b></td><td style="white-space:normal;min-width:220px"><b>${esc(w.title)}</b>${w.unit_end ? ' <span class="pill" style="color:var(--yel)">Değerlendirme</span>' : ''}<details><summary class="note">${OK ? 'Konu ve sınavdaki yeri' : 'İçerik ve uygulama'}</summary><p class="note" style="white-space:normal">${esc(w.content)}</p><p class="note" style="white-space:normal"><b>${OK ? 'Ortak sınav' : 'Uygulama'}:</b> ${esc(w.uygulama || '')}</p></details></td><td style="white-space:normal;min-width:220px"><ul class="kzl">${(w.kazanimlar || []).map(k => `<li>${esc(k)}</li>`).join('')}</ul></td><td style="white-space:normal;min-width:200px" class="note">${esc(w.olcme || '')}</td><td>${st}</td></tr>`;
     }).join('');
-    el.innerHTML = `<h2>Yıllık plan <span class="muted" style="font-size:14px">· ${P.weeks.length} hafta · ${made} video oluşturuldu · ${ready} teslim edildi</span></h2>
-      <div class="card"><p class="note" style="margin-top:0">Her hafta: bir anlatımlı video + video içinde bölüm sonu soruları (kazanım takibi, sonuçlar “Sonuçlar” sayfasında) + atölye uygulaması ve rubrik. Videolar ${esc(FMT_L[D.format] || D.format || '')}, ${esc(TONE_L[D.tone] || D.tone || '')} anlatımla, yaklaşık ${Math.round((D.target_seconds || 180) / 60 * 10) / 10} dakika.</p>
-      <div class="btns" style="margin-top:0"><button class="primary" id="prod">Seçili haftaların videolarını üret</button><button id="selnext">Sıradaki 5 haftayı seç</button><button id="prt">Planı yazdır / PDF</button></div><p class="note" id="pm"></p></div>
-      <div class="card" style="overflow:auto;margin-top:12px" id="plantbl"><table class="tbl plan"><thead><tr><th>Hafta</th><th>Konu</th><th>Kazanımlar</th><th>Ölçme ve değerlendirme</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    el.innerHTML = `<h2>${OK ? 'Ortak sınav hazırlık planı' : 'Yıllık plan'} <span class="muted" style="font-size:14px">· ${P.weeks.length} ${OK ? 'kazanım' : 'hafta'} · ${made} video oluşturuldu · ${ready} teslim edildi</span></h2>
+      <div class="card"><p class="note" style="margin-top:0">${OK ? `Her kazanım için bir hazırlık videosu: kazanımın ne ölçtüğü, örnek ortak sınav sorusu ve çözümü, sık yapılan hatalar + video içinde kontrol soruları. Kazanım testini <a href="#/ortak-sinav?plan=${esc((P.exam || {}).plan_id || '')}">Ortak sınav</a> sayfasından oluşturun.` : 'Her hafta: bir anlatımlı video + video içinde bölüm sonu soruları (kazanım takibi, sonuçlar “Sonuçlar” sayfasında) + atölye uygulaması ve rubrik.'} Videolar ${esc(FMT_L[D.format] || D.format || '')}, ${esc(TONE_L[D.tone] || D.tone || '')} anlatımla, yaklaşık ${Math.round((D.target_seconds || 180) / 60 * 10) / 10} dakika.</p>
+      <div class="btns" style="margin-top:0"><button class="primary" id="prod">Seçili ${OK ? 'kazanımların' : 'haftaların'} videolarını üret</button><button id="selnext">Sıradaki 5 ${OK ? 'kazanımı' : 'haftayı'} seç</button><button id="prt">Planı yazdır / PDF</button></div><p class="note" id="pm"></p></div>
+      <div class="card" style="overflow:auto;margin-top:12px" id="plantbl"><table class="tbl plan"><thead><tr><th>${OK ? 'No' : 'Hafta'}</th><th>Konu</th><th>Kazanımlar</th><th>${OK ? 'Sınavdaki soru' : 'Ölçme ve değerlendirme'}</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     document.getElementById('selnext').onclick = () => { let n = 0; el.querySelectorAll('[data-w]').forEach(x => { x.checked = n < 5; if (n < 5) n++; }); };
     document.getElementById('prt').onclick = () => {
       const w = window.open('', '_blank'); if (!w) return;
@@ -1043,10 +1044,126 @@
     document.getElementById('prod').onclick = async e => {
       const weeks = [...el.querySelectorAll('[data-w]:checked')].map(x => +x.dataset.w), m = document.getElementById('pm');
       if (!weeks.length) { m.textContent = 'Önce üretilecek haftaları işaretleyin.'; return; }
-      if (!confirm(`${weeks.length} haftanın videosu sıraya alınsın mı? İçerikler sırayla hazırlanır, her biri onayınıza gelir.`)) return;
+      if (!confirm(`${weeks.length} ${OK ? 'kazanımın' : 'haftanın'} videosu sıraya alınsın mı? İçerikler sırayla hazırlanır, her biri onayınıza gelir.`)) return;
       e.target.disabled = true;
       try { const r = await api(`/api/my/courses/${c.id}/produce`, { method: 'POST', body: { weeks } }); alert(r.message); route(); } catch (err) { m.textContent = err.message; e.target.disabled = false; }
     };
+  }
+
+  /* ---------- ortak yazılı sınav hazırlığı ---------- */
+  const QT_L = { mix: 'Karışık (ortak yazılı tarzı)', mc: 'Çoktan seçmeli', open: 'Açık uçlu' };
+  async function xlsxToSheets(file) {
+    await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const wb = window.XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    return wb.SheetNames.map(n => ({ name: n, rows: window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: null, raw: false, blankrows: true }) }));
+  }
+  async function viewOrtak() {
+    setSub('Ortak sınav hazırlığı');
+    let plans, tests; try { [plans, tests] = await Promise.all([api('/api/ortak/plans'), api('/api/ortak/tests')]); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
+    const qs = qsOf(); const pid = qs.get('plan') || (plans[0] && plans[0].id);
+    app.innerHTML = `<h1>Ortak sınav hazırlığı</h1><p class="muted">MEB'in yayımladığı konu soru dağılım tablosunu (senaryolar) yükleyin. Sınıf, sınav ve senaryoları seçin; seçilen kazanımlar için hazırlık videoları ve senaryodaki soru dağılımına uygun kazanım testi üretilir.</p>
+      <div class="card"><label for="ox">Senaryo dosyası (Excel .xlsx)</label><div class="cp"><input type="file" id="ox" accept=".xlsx,.xls"><button class="primary" id="oup">Yükle</button></div>
+      <p class="note">Dosyada her sınıf ayrı sayfada olmalı (9. Sınıf, 10. Sınıf…), sütunlar: Tema/Ünite · Konu · Kazanım · senaryolardaki soru sayıları. EK sayfaları (ör. yazma kazanımları) açıklama olarak saklanır.</p><p class="note err-t" id="om"></p></div>
+      ${plans.length ? `<div class="card" style="margin-top:12px"><label for="opl">Yüklenen dosyalar</label><div class="cp"><select id="opl">${plans.map(p => `<option value="${esc(p.id)}" ${p.id === pid ? 'selected' : ''}>${esc(p.title)}${p.source_name ? ' · ' + esc(p.source_name) : ''} (${p.grades.join(', ')}. sınıf)</option>`).join('')}</select><button id="odel" class="linkbtn">Sil</button></div></div><div id="osel"></div>` : '<div class="empty" style="margin-top:12px">Henüz dosya yüklenmedi.</div>'}
+      <h2>Kazanım testleri</h2><div class="list">${tests.length ? tests.map(t => `<a class="row" href="#/ortak-sinav/t/${esc(t.id)}"><span><b>${esc(t.title)}</b><span class="note"> · ${new Date(t.created_at).toLocaleDateString('tr-TR')}${t.published ? ` · yayında (${esc(t.code)})` : ''}</span></span><span class="pill st-${t.status === 'ready' ? 'delivered' : t.status === 'failed' ? 'failed' : 'content_generating'}">${t.status === 'ready' ? 'Hazır' : t.status === 'failed' ? 'Hata' : 'Hazırlanıyor'}</span></a>`).join('') : '<div class="empty">Henüz test yok.</div>'}</div>`;
+    document.getElementById('oup').onclick = async e => {
+      const f = document.getElementById('ox').files[0], m = document.getElementById('om'); if (!f) { m.textContent = 'Önce dosyayı seçin.'; return; }
+      e.target.disabled = true; m.textContent = 'Dosya okunuyor…';
+      try { const sheets = await xlsxToSheets(f); const r = await api('/api/ortak/plans', { method: 'POST', body: { name: f.name, sheets } }); location.hash = '#/ortak-sinav?plan=' + r.id; }
+      catch (err) { m.textContent = err.message; e.target.disabled = false; }
+    };
+    if (!plans.length) return;
+    document.getElementById('opl').onchange = e => { location.hash = '#/ortak-sinav?plan=' + e.target.value; };
+    document.getElementById('odel').onclick = async () => { if (!confirm('Bu senaryo dosyası silinsin mi? Üretilmiş testler ve videolar silinmez.')) return; await api('/api/ortak/plans/' + document.getElementById('opl').value, { method: 'DELETE' }); location.hash = '#/ortak-sinav'; route(); };
+    let P; try { P = await api('/api/ortak/plans/' + pid); } catch (e) { return; }
+    const D = P.data, st = { g: +(qs.get('g') || (D.grades[0] || {}).grade), ex: +(qs.get('ex') || 0), sc: new Set() };
+    const box = document.getElementById('osel');
+    function draw() {
+      const g = D.grades.find(x => x.grade === st.g) || D.grades[0]; const ex = g.exams[st.ex] || g.exams[0];
+      if (ex && !st.sc.size) ex.scenarios.forEach(s => st.sc.add(s.n));
+      const pick = ex ? ex.scenarios.filter(s => st.sc.has(s.n)) : [];
+      const cnt = (s, k) => { const it = s.items.find(i => i.tema === k.tema && i.text === k.text); return it ? it.count : 0; };
+      const rows = g.kazanimlar.map((k, i) => { const cs = ex ? ex.scenarios.map(s => cnt(s, k)) : []; const mx = Math.max(0, ...pick.map(s => cnt(s, k))); return { k, i, cs, mx }; });
+      let lastT = null;
+      const tbody = rows.map(r => { const h = r.k.tema !== lastT ? `<tr class="urow"><td colspan="${3 + (ex ? ex.scenarios.length : 0)}"><b>${esc(r.k.tema)}</b></td></tr>` : ''; lastT = r.k.tema;
+        return h + `<tr class="${r.mx ? '' : 'dim'}"><td><label class="chk"><input type="checkbox" data-k="${r.i}" ${r.mx ? 'checked' : ''}></label></td><td style="white-space:normal;min-width:260px">${r.k.skill ? `<span class="pill">${esc(r.k.skill)}</span> ` : ''}${esc(r.k.text)}<details><summary class="note">Konu (içerik çerçevesi)</summary><p class="note" style="white-space:pre-line">${esc(r.k.konu)}</p></details></td>${ex ? ex.scenarios.map((s, j) => `<td class="c ${st.sc.has(s.n) ? '' : 'dim'}">${r.cs[j] || ''}</td>`).join('') : ''}<td class="c"><b>${r.mx || ''}</b></td></tr>`; }).join('');
+      const tot = rows.reduce((a, r) => a + r.mx, 0);
+      box.innerHTML = `<div class="card" style="margin-top:12px">
+        <label>Sınıf</label><div class="btns" style="margin-top:4px">${D.grades.map(x => `<button class="${x.grade === g.grade ? 'primary' : ''}" data-g="${x.grade}">${x.grade}. sınıf</button>`).join('')}</div>
+        <label for="oex">Sınav</label><select id="oex">${g.exams.map((e, i) => `<option value="${i}" ${i === st.ex ? 'selected' : ''}>${esc(e.name)}${e.scenarios.length ? ` · ${e.scenarios.length} senaryo` : ' · senaryo yok'}</option>`).join('')}</select>
+        ${ex && ex.note ? `<p class="note" style="white-space:normal;border-left:3px solid var(--yel);padding-left:8px">${esc(ex.note)}</p>` : ''}
+        ${ex && ex.scenarios.length ? `<label>Senaryolar <span class="note">(birkaçını seçerseniz her kazanım için en yüksek soru sayısı alınır)</span></label><div class="btns" style="margin-top:4px">${ex.scenarios.map(s => `<label class="chk" style="margin-right:10px"><input type="checkbox" data-s="${s.n}" ${st.sc.has(s.n) ? 'checked' : ''}> ${esc(s.label)} <span class="note">(${s.total} soru)</span></label>`).join('')}</div>` : ''}
+      </div>
+      <div class="card" style="overflow:auto;margin-top:12px"><table class="tbl plan"><thead><tr><th></th><th>Kazanım</th>${ex ? ex.scenarios.map(s => `<th class="c">S${s.n}</th>`).join('') : ''}<th class="c">Seçim</th></tr></thead><tbody>${tbody}</tbody></table>
+        <p class="note">Seçili senaryolarda toplam <b>${tot}</b> soru · ${rows.filter(r => r.mx).length} kazanım. İşaretli kazanımlar video serisine alınır.</p></div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="card"><h3 style="margin-top:0">🎬 Hazırlık videoları</h3><p class="note">Her işaretli kazanım için bir video: kazanımın ne ölçtüğü, örnek ortak sınav sorusu ve çözüm yolu, sık yapılan hatalar. Bir eğitim (ders serisi) oluşturulur; videoları oradan sıraya alırsınız.</p>
+          <label for="ovs">Video stili</label><select id="ovs"><option value="sade">Sade anlatım</option><option value="teknik">Teknik (şema ve diyagram)</option><option value="nasil">Nasıl çalışır</option><option value="tarih">Çizgi tarih</option><option value="deney">Ya olsaydı (deney)</option></select>
+          <div class="grid2"><div><label for="ovf">Biçim</label><select id="ovf"><option value="dikey">Dikey 9:16</option><option value="yatay">Yatay 16:9</option><option value="kare">Kare 1:1</option></select></div><div><label for="ovd">Süre</label><select id="ovd"><option value="90">1,5 dk</option><option value="120" selected>2 dk</option><option value="180">3 dk</option></select></div></div>
+          <div class="btns"><button class="primary" id="oser">Video serisini oluştur</button></div><p class="note err-t" id="osm"></p></div>
+        <div class="card"><h3 style="margin-top:0">📝 Kazanım testi</h3><p class="note">Seçili senaryonun soru dağılımına göre (kazanım başına soru sayısı) test: özgün metinler, cevap anahtarı, açık uçlularda örnek cevap ve puanlama ölçütü. Öğrencilere bağlantı/QR ile açabilir ya da yazdırabilirsiniz.</p>
+          <label for="oqt">Soru türü</label><select id="oqt">${Object.entries(QT_L).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+          <div class="grid2"><div><label for="olv">Zorluk</label><select id="olv"><option>kolay</option><option selected>orta</option><option>zor</option></select></div><div><label for="omu">Soru sayısı</label><select id="omu"><option value="1">Senaryodaki kadar (${tot})</option><option value="2">2 katı (${tot * 2})</option><option value="3">3 katı (${tot * 3})</option></select></div></div>
+          <div class="btns"><button class="primary" id="otest" ${tot ? '' : 'disabled'}>Testi oluştur</button></div><p class="note err-t" id="otm"></p></div>
+      </div>`;
+      box.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { st.g = +b.dataset.g; st.ex = 0; st.sc.clear(); draw(); });
+      document.getElementById('oex').onchange = e => { st.ex = +e.target.value; st.sc.clear(); draw(); };
+      box.querySelectorAll('[data-s]').forEach(b => b.onchange = () => { if (b.checked) st.sc.add(+b.dataset.s); else st.sc.delete(+b.dataset.s); if (!st.sc.size) st.sc.add(-1); draw(); });
+      const body = () => ({ grade: g.grade, exam: st.ex, scenarios: [...st.sc].filter(n => n > 0) });
+      document.getElementById('oser').onclick = async e => {
+        const ks = [...box.querySelectorAll('[data-k]:checked')].map(x => +x.dataset.k), m = document.getElementById('osm');
+        if (!ks.length) { m.textContent = 'En az bir kazanım işaretleyin.'; return; }
+        e.target.disabled = true;
+        try { const r = await api(`/api/ortak/plans/${pid}/series`, { method: 'POST', body: { ...body(), all: true, pick: ks, defaults: { visual_style: document.getElementById('ovs').value, format: document.getElementById('ovf').value, target_seconds: +document.getElementById('ovd').value, tone: 'samimi' } } }); location.hash = '#/egitimler/' + r.course_id; }
+        catch (err) { m.textContent = err.message; e.target.disabled = false; }
+      };
+      document.getElementById('otest').onclick = async e => {
+        e.target.disabled = true; const m = document.getElementById('otm');
+        try { const r = await api(`/api/ortak/plans/${pid}/test`, { method: 'POST', body: { ...body(), qtype: document.getElementById('oqt').value, level: document.getElementById('olv').value, multiplier: +document.getElementById('omu').value } }); location.hash = '#/ortak-sinav/t/' + r.id; }
+        catch (err) { m.textContent = err.message; e.target.disabled = false; }
+      };
+    }
+    draw();
+  }
+  function testHtml(d, withKey) {
+    const P = Object.fromEntries((d.passages || []).map(p => [p.id, p])); const shown = new Set();
+    return d.questions.map(q => {
+      let pre = '';
+      if (q.passage && P[q.passage] && !shown.has(q.passage)) { const p = P[q.passage]; shown.add(q.passage); pre = `<div class="tpass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="ttext">${esc(p.text)}</div></div>`; }
+      const ref = q.passage && P[q.passage] && !pre ? `<span class="note">(${esc(P[q.passage].title || q.passage)} metnine göre)</span> ` : '';
+      const opts = q.type === 'mc' ? `<ol class="topts" type="A">${q.options.map((o, i) => `<li class="${withKey && 'ABCDE'[i] === q.answer ? 'ok' : ''}">${esc(o)}</li>`).join('')}</ol>` : (withKey ? '' : '<div class="tlines"></div>');
+      const key = withKey ? (q.type === 'mc' ? `<p class="tkey"><b>Cevap: ${q.answer}</b>${q.explain ? ' · ' + esc(q.explain) : ''}</p>` : `<div class="tkey"><b>Örnek cevap:</b> ${esc(q.model_answer)}${(q.rubric || []).length ? `<ul>${q.rubric.map(r => `<li>${esc(r.criterion)} <b>(${r.points} puan)</b></li>`).join('')}</ul>` : ''}</div>`) : '';
+      return pre + `<div class="tq"><p><b>${q.n}.</b> ${ref}${esc(q.stem)} <span class="note">(${q.points} puan${q.kazanim_code ? ' · ' + esc(q.kazanim_code) : ''})</span></p>${opts}${key}</div>`;
+    }).join('');
+  }
+  const TEST_PRINT_CSS = 'body{font:13px/1.5 Georgia,serif;margin:28px;color:#111}h1{font-size:18px;margin:0}.note{color:#555;font-size:11px}.tpass{border:1px solid #999;padding:10px 12px;margin:14px 0;break-inside:avoid}.ttext{white-space:pre-line;margin-top:6px}.tq{margin:12px 0;break-inside:avoid}.topts{margin:4px 0 0 18px}.topts li.ok{font-weight:bold;text-decoration:underline}.tlines{height:90px;border-bottom:1px dotted #999;background:repeating-linear-gradient(transparent 0 28px,#ccc 28px 29px)}.tkey{background:#f3f3f3;padding:6px 8px;margin:4px 0}.hd{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}';
+  async function viewOrtakTest(id) {
+    let d; try { d = await api('/api/ortak/tests/' + id); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
+    const t = d.test; setSub('Kazanım testi');
+    const back = `<p><a href="#/ortak-sinav?plan=${esc(t.plan_id || '')}">← Ortak sınav hazırlığı</a></p>`;
+    if (t.status === 'generating') { app.innerHTML = back + `<h1>${esc(t.title)}</h1><div class="card"><p>⏳ Test hazırlanıyor. Kazanım ve senaryo sayısına göre birkaç dakika sürebilir; bu sayfa kendiliğinden yenilenir.</p></div>`; pollTimer = setTimeout(() => route(), 8000); return; }
+    if (t.status === 'failed') { app.innerHTML = back + `<h1>${esc(t.title)}</h1><div class="card err">Test hazırlanamadı: ${esc(t.error || '')}</div><div class="btns"><button class="primary" id="tre">Yeniden dene</button><button id="tdl">Sil</button></div>`; document.getElementById('tre').onclick = async () => { await api(`/api/ortak/tests/${id}/retry`, { method: 'POST' }); route(); }; document.getElementById('tdl').onclick = async () => { if (confirm('Test silinsin mi?')) { await api('/api/ortak/tests/' + id, { method: 'DELETE' }); location.hash = '#/ortak-sinav'; } }; return; }
+    const T = t.data, S = t.spec, at = d.attempts;
+    const mc = T.questions.filter(q => q.type === 'mc').length, op = T.questions.length - mc;
+    // kazanım bazında başarı
+    const perK = {}; at.forEach(a => (a.per_kazanim || []).forEach(k => { const x = perK[k.code || k.text] = perK[k.code || k.text] || { code: k.code, text: k.text, mc: 0, ok: 0 }; x.mc += k.mc; x.ok += k.ok; }));
+    app.innerHTML = back + `<h1>${esc(T.title || t.title)}</h1><p class="muted">${S.grade}. sınıf · ${esc(S.exam)} · ${S.scenarios.map(n => 'Senaryo ' + n).join(', ')} · ${T.questions.length} soru (${mc} çoktan seçmeli, ${op} açık uçlu) · ${esc(QT_L[(t.opts || {}).qtype] || '')}</p>
+      <div class="card"><div class="btns" style="margin-top:0"><button class="primary" id="tpub">${t.published ? 'Öğrencilere kapat' : 'Öğrencilere aç (bağlantı + QR)'}</button><button id="tpr">Sınav kâğıdını yazdır</button><button id="tkey">Cevap anahtarını yazdır</button><button id="tdl" class="linkbtn">Sil</button></div>
+        ${t.published && d.url ? `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px"><div id="tqr" style="background:#fff;padding:10px;border-radius:10px"></div><div><p style="margin:0">Test kodu <b style="font-size:20px">${esc(t.code)}</b></p><p class="note"><a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.url)}</a></p><button id="tcp">Bağlantıyı kopyala</button></div></div>` : ''}
+        <label for="tfb" style="margin-top:12px">Düzeltme isteği</label><div class="cp"><input id="tfb" maxlength="1500" placeholder="Örn. 3. soruyu daha kolay yap; şiir yerine hikâye kullan"><button id="trv">Düzelt</button></div><p class="note err-t" id="tm"></p></div>
+      <h2>Sonuçlar <span class="muted" style="font-size:14px">· ${at.length} öğrenci</span></h2>
+      ${at.length ? `<div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Öğrenci</th><th>Sınıf</th><th class="c">Doğru</th><th class="c">Puan (ÇS)</th><th>Tarih</th></tr></thead><tbody>${at.map(a => `<tr><td>${esc(a.student_name)}</td><td>${esc(a.student_class || '')}</td><td class="c">${a.mc_correct}/${a.mc_total}</td><td class="c"><b>${a.score ?? '—'}</b></td><td class="note">${new Date(a.created_at).toLocaleString('tr-TR')}</td></tr>`).join('')}</tbody></table>
+        <h3>Kazanım bazında başarı (çoktan seçmeli)</h3><table class="tbl"><tbody>${Object.values(perK).filter(k => k.mc).map(k => { const p = Math.round(k.ok / k.mc * 100); return `<tr><td style="white-space:normal"><b>${esc(k.code || '')}</b> ${esc((k.text || '').slice(0, 120))}</td><td style="min-width:140px"><div class="kbar"><i style="width:${p}%;background:${p >= 70 ? 'var(--green)' : p >= 45 ? 'var(--yel)' : 'var(--red, #e5484d)'}"></i></div></td><td class="c"><b>%${p}</b></td></tr>`; }).join('')}</tbody></table><p class="note">Açık uçlu cevapları öğrenci örnek cevapla karşılaştırır; puanlamayı sınav kâğıdında siz yaparsınız.</p></div>` : '<div class="empty">Henüz çözen yok. Testi öğrencilere açın.</div>'}
+      <h2>Sorular ve cevap anahtarı</h2>${T.instructions ? `<p class="note">${esc(T.instructions)}</p>` : ''}<div class="card tview">${testHtml(T, true)}</div>`;
+    document.getElementById('tpub').onclick = async e => { e.target.disabled = true; try { await api(`/api/ortak/tests/${id}/publish`, { method: 'POST', body: { on: !t.published } }); route(); } catch (err) { document.getElementById('tm').textContent = err.message; e.target.disabled = false; } };
+    document.getElementById('tdl').onclick = async () => { if (confirm('Test ve sonuçları silinsin mi?')) { await api('/api/ortak/tests/' + id, { method: 'DELETE' }); location.hash = '#/ortak-sinav'; } };
+    document.getElementById('trv').onclick = async e => { const v = document.getElementById('tfb').value.trim(); if (!v) return; e.target.disabled = true; try { await api(`/api/ortak/tests/${id}/revise`, { method: 'POST', body: { feedback: v } }); route(); } catch (err) { document.getElementById('tm').textContent = err.message; e.target.disabled = false; } };
+    const prt = key => { const w = window.open('', '_blank'); if (!w) return; w.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${esc(T.title)}${key ? ' · Cevap anahtarı' : ''}</title><style>${TEST_PRINT_CSS}</style></head><body><div class="hd"><div><h1>${esc(T.title)}${key ? ' · CEVAP ANAHTARI' : ''}</h1><div class="note">${S.grade}. sınıf · ${esc(S.exam)}</div></div>${key ? '' : '<div>Adı Soyadı: ……………………<br>Sınıfı / No: ……………</div>'}</div>${T.instructions && !key ? `<p>${esc(T.instructions)}</p>` : ''}${testHtml(T, key)}</body></html>`); w.document.close(); w.focus(); setTimeout(() => w.print(), 300); };
+    document.getElementById('tpr').onclick = () => prt(false); document.getElementById('tkey').onclick = () => prt(true);
+    if (t.published && d.url) {
+      document.getElementById('tcp').onclick = () => navigator.clipboard && navigator.clipboard.writeText(d.url);
+      loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js').then(() => { const el = document.getElementById('tqr'); if (el && window.QRCode) new window.QRCode(el, { text: d.url, width: 140, height: 140, correctLevel: window.QRCode.CorrectLevel.M }); }).catch(() => {});
+    }
   }
 
   /* ---------- telefon uygulaması ---------- */
@@ -1146,6 +1263,8 @@
     if (h === '#/yonetim' && u.role === 'admin') return viewAdmin();
     if (h === '#/sonuclar') return viewLessons();
     if (h === '#/egitimler') return viewMyCourses();
+    if (h === '#/ortak-sinav') return viewOrtak();
+    m = h.match(/^#\/ortak-sinav\/t\/([0-9a-f-]{36})$/); if (m) return viewOrtakTest(m[1]);
     m = h.match(/^#\/egitimler\/([0-9a-f-]{36})$/); if (m) return viewEditCourse(m[1]);
     if (h === '#/talepler') return viewRequests();
     if (h === '#/paketim') return viewPlan();

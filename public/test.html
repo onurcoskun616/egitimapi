@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="tr" translate="no">
+<head>
+<meta name="google" content="notranslate">
+<meta charset="utf-8">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kazanım Testi</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#05070e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Eğitim Stüdyosu">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Lilita+One&family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<style>
+:root{--bg:#05070e;--panel:#0c1222;--panel2:#111a2e;--line:#1d2742;--fg:#eef1f7;--muted:#8a94ad;--yel:#ffc93c;--lv:#3fb0ff;--green:#3ee0a1;--red:#ff4f4f;--d:'Archivo',system-ui,sans-serif;--m:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--field:#070b16;--err-t:#ffb3b3}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f5f6f9;--panel:#fff;--panel2:#eef1f6;--line:#dbe0ea;--fg:#141a28;--muted:#5d6678;--lv:#0b6bcb;--green:#0f8a5f;--red:#c62828;--field:#fff;--err-t:#b3261e}}
+:root[data-theme="light"]{--bg:#f5f6f9;--panel:#fff;--panel2:#eef1f6;--line:#dbe0ea;--fg:#141a28;--muted:#5d6678;--lv:#0b6bcb;--green:#0f8a5f;--red:#c62828;--field:#fff;--err-t:#b3261e}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.6 var(--m)}
+main{max-width:760px;margin:0 auto;padding:20px 16px 80px}
+h1{font:900 clamp(24px,5vw,34px)/1.1 var(--d);margin:6px 0 8px}
+.muted{color:var(--muted)}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+label.f{display:block;font:800 12px var(--m);letter-spacing:.1em;color:var(--muted);margin:12px 0 6px;text-transform:uppercase}
+input[type=text],textarea{width:100%;font:500 16px var(--m);color:var(--fg);background:var(--field);border:1.5px solid var(--line);border-radius:10px;padding:12px}
+textarea{min-height:120px;resize:vertical}
+button{font:800 16px var(--m);color:#111;background:var(--yel);border:0;border-radius:12px;padding:14px 18px;cursor:pointer;width:100%;margin-top:14px}button:disabled{opacity:.5}
+.pass{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:16px 0}.pass .tx{white-space:pre-line;font-family:Georgia,serif;margin-top:6px}
+.q{margin:18px 0}.q p{margin:0 0 8px}.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;margin:6px 0;cursor:pointer;background:var(--panel)}
+.opt input{margin-top:5px}.opt b{min-width:18px}.opt.ok{border-color:var(--green)}.opt.no{border-color:var(--red)}
+.note{color:var(--muted);font-size:13px}.err{color:var(--err-t)}.rev{border-left:3px solid var(--lv);background:var(--panel2);padding:8px 12px;border-radius:8px;margin-top:8px;font-size:14px}
+.score{font:900 48px var(--d);color:var(--yel)}.bar{height:8px;background:var(--panel2);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%}
+.sticky{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding-top:20px}
+</style></head><body><main id="m"><p class="muted">Yükleniyor…</p></main>
+<script>
+(function () {
+  const M = document.getElementById('m'), code = (location.pathname.split('/')[2] || '').toUpperCase();
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const KEY = 'test-' + code; let draft = {}; try { draft = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(draft)); } catch (e) { } };
+  let T;
+  fetch('/api/test/' + encodeURIComponent(code)).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => { if (!ok) throw new Error(j.error || 'Test bulunamadı'); T = j.test; document.title = j.title; start(); }).catch(e => { M.innerHTML = `<h1>Test açılamadı</h1><p class="err">${esc(e.message)}</p>`; });
+  function start() {
+    const P = Object.fromEntries((T.passages || []).map(p => [p.id, p])), shown = new Set(); draft.a = draft.a || {};
+    const qs = T.questions.map(q => {
+      let pre = ''; if (q.passage && P[q.passage] && !shown.has(q.passage)) { shown.add(q.passage); const p = P[q.passage]; pre = `<div class="pass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="tx">${esc(p.text)}</div></div>`; }
+      const ref = q.passage && P[q.passage] && !pre ? `<span class="note">(${esc(P[q.passage].title || '')} metnine göre)</span> ` : '';
+      const body = q.type === 'mc' ? q.options.map((o, i) => { const L = 'ABCDE'[i]; return `<label class="opt" data-q="${q.n}" data-l="${L}"><input type="radio" name="q${q.n}" value="${L}" ${draft.a[q.n] === L ? 'checked' : ''}><b>${L})</b><span>${esc(o)}</span></label>`; }).join('') : `<textarea data-t="${q.n}" placeholder="Cevabınızı yazın">${esc(draft.a[q.n] || '')}</textarea>`;
+      return pre + `<div class="q" id="q${q.n}"><p><b>${q.n}.</b> ${ref}${esc(q.stem)} <span class="note">(${q.points} puan)</span></p>${body}<div class="r"></div></div>`;
+    }).join('');
+    M.innerHTML = `<p class="note">Kazanım testi · kod ${esc(code)}</p><h1>${esc(T.title)}</h1>${T.instructions ? `<p class="muted">${esc(T.instructions)}</p>` : ''}
+      <div class="card"><label class="f" for="nm">Adın soyadın</label><input type="text" id="nm" maxlength="80" value="${esc(draft.nm || '')}" autocomplete="name"><label class="f" for="cl">Sınıfın / numaran</label><input type="text" id="cl" maxlength="40" value="${esc(draft.cl || '')}" placeholder="Örn. 10-A / 245"></div>
+      ${qs}<div class="sticky"><p class="err" id="er"></p><button id="go">Testi bitir ve gönder</button></div>`;
+    M.querySelectorAll('input[type=radio]').forEach(x => x.onchange = () => { draft.a[x.name.slice(1)] = x.value; save(); });
+    M.querySelectorAll('textarea').forEach(x => x.oninput = () => { draft.a[x.dataset.t] = x.value; save(); });
+    ['nm', 'cl'].forEach(k => document.getElementById(k).oninput = e => { draft[k] = e.target.value; save(); });
+    document.getElementById('go').onclick = async e => {
+      const er = document.getElementById('er'), name = document.getElementById('nm').value.trim();
+      if (name.length < 2) { er.textContent = 'Önce adını yaz.'; document.getElementById('nm').focus(); return; }
+      const empty = T.questions.filter(q => !String(draft.a[q.n] || '').trim()).length;
+      if (empty && !confirm(`${empty} soru boş. Yine de gönderilsin mi?`)) return;
+      e.target.disabled = true;
+      try {
+        const r = await fetch('/api/test/' + encodeURIComponent(code), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, cls: document.getElementById('cl').value, answers: draft.a }) });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Gönderilemedi');
+        result(j); try { localStorage.removeItem(KEY); } catch (x) { }
+      } catch (x) { er.textContent = x.message; e.target.disabled = false; }
+    };
+  }
+  function result(j) {
+    document.querySelector('.sticky').remove(); M.querySelectorAll('input,textarea').forEach(x => x.disabled = true);
+    for (const r of j.review) {
+      const box = document.querySelector(`#q${r.n} .r`);
+      if (r.type === 'mc') { document.querySelectorAll(`.opt[data-q="${r.n}"]`).forEach(o => { if (o.dataset.l === r.answer) o.classList.add('ok'); else if (o.dataset.l === r.given) o.classList.add('no'); }); box.innerHTML = `<div class="rev">${r.given === r.answer ? '✅ Doğru.' : r.given ? `❌ Doğru cevap ${r.answer}.` : `Boş bıraktın; doğru cevap ${r.answer}.`} ${esc(r.explain || '')}</div>`; }
+      else box.innerHTML = `<div class="rev"><b>Örnek cevap:</b> ${esc(r.model_answer || '')}${(r.rubric || []).length ? `<br><b>Puanlama:</b> ${r.rubric.map(x => esc(x.criterion) + ' (' + x.points + ')').join(' · ')}` : ''}<br><span class="note">Kendi cevabını örnek cevapla karşılaştır. Açık uçlu soruları öğretmenin puanlar.</span></div>`;
+    }
+    const per = j.per_kazanim.filter(k => k.mc);
+    M.insertAdjacentHTML('afterbegin', `<div class="card"><p class="note">Sonucun gönderildi</p>${j.mc_total ? `<div class="score">${j.mc_correct}/${j.mc_total}</div><p class="muted">Çoktan seçmeli sorularda puanın: <b>${j.score}</b>/100</p>` : '<p>Cevapların öğretmenine gönderildi.</p>'}
+      ${per.length ? per.map(k => { const p = Math.round(k.ok / k.mc * 100); return `<p style="margin:10px 0 4px;font-size:14px"><b>${esc(k.code || '')}</b> ${esc((k.text || '').replace(/^\S+\s/, '').slice(0, 110))} · %${p}</p><div class="bar"><i style="width:${p}%;background:${p >= 70 ? 'var(--green)' : p >= 45 ? 'var(--yel)' : 'var(--red)'}"></i></div>`; }).join('') : ''}
+      <p class="note">Aşağıda her sorunun doğru cevabını ve açıklamasını görebilirsin.</p></div>`);
+    window.scrollTo(0, 0);
+  }
+})();
+</script></body></html>
