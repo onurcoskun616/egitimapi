@@ -17,7 +17,7 @@ function runClaude(system, user, model, dir, i) {
     if (model) args.push('--model', model);
     const p = spawn('claude', args, { env: process.env, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '', err = '';
-    p.stdout.on('data', d => out += d); p.stderr.on('data', d => err += d);
+    p.stdout.setEncoding('utf8'); p.stderr.setEncoding('utf8'); p.stdout.on('data', d => out += d); p.stderr.on('data', d => err += d);
     p.on('close', code => {
       try {
         const j = JSON.parse(out);
