@@ -133,6 +133,7 @@ const ctxFor = (projectId, kind) => ({
 /* ---------- üretim adımları ---------- */
 async function runContent(id, feedback) {
   const p = await db.one('projects', `id=eq.${q(id)}`);
+  if (p.visual_style === 'hikaye' && p.style_opts && p.style_opts.series_id) { const ser = await db.one('story_series', `id=eq.${q(p.style_opts.series_id)}&select=bible`); p.story_bible = ser && ser.bible; }
   const prev = feedback ? await latest(id, 'content') : null;
   await setStatus(id, 'content_generating', { error: null });
   const { data, usage } = await claude.generateContent(p, prev && prev.data, feedback, ctxFor(id, 'content'), await loadSources(id));
@@ -151,7 +152,7 @@ async function runVisuals(id, onlyK, feedback, fixes) {
   const topic = content.data.topic;
   const pst = await db.one('projects', `id=eq.${q(id)}&select=visual_style,format`);
   if (pst && pst.visual_style === 'sinema') return runCineVisuals(id, content, prevV, onlyK, feedback, pst.format || 'dikey');
-  const sopts = { style: (pst && pst.visual_style) || 'teknik', anchor: content.data.anchor || null, cast: content.data.cast || null };
+  const sopts = { style: (pst && pst.visual_style) || 'teknik', anchor: content.data.anchor || null, cast: content.data.cast || null, bible: content.data.bible || null };
   const desc = s => s ? `${s.title} — ${(s.visual && s.visual.subject) || ''} ${(s.visual && s.visual.animation) || ''}`.slice(0, 400) : null;
   const near = (list, k) => { const i = list.findIndex(x => x.k === k); return { prev: desc(list[i - 1]), next: desc(list[i + 1]) }; };
   const sources = await loadSources(id);
@@ -179,7 +180,7 @@ async function runVisuals(id, onlyK, feedback, fixes) {
     await logClaude(id, res.map(r => r.usage), 'scenes');
     scenes = content.data.scenes.map((s, i) => ({ ...s, code: res[i].code }));
   }
-  const extra = sopts.style === 'nasil' ? { title: content.data.title || null } : sopts.style === 'tarih' ? { cast: content.data.cast || [], next: content.data.next || null, ask: content.data.ask || null } : sopts.style === 'deney' ? { note: content.data.note || null, next: content.data.next || null, ask: content.data.ask || null, anchor: content.data.anchor || null } : {};
+  const extra = sopts.style === 'hikaye' ? { title: content.data.title || null, next: content.data.next || null } : sopts.style === 'nasil' ? { title: content.data.title || null } : sopts.style === 'tarih' ? { cast: content.data.cast || [], next: content.data.next || null, ask: content.data.ask || null } : sopts.style === 'deney' ? { note: content.data.note || null, next: content.data.next || null, ask: content.data.ask || null, anchor: content.data.anchor || null } : {};
   const v = await db.insert('versions', { project_id: id, stage: 'visuals', version: await nextVersion(id, 'visuals'), data: { topic, scenes, ...extra }, feedback: label });
   await setStatus(id, 'visuals_review');
   startAudit(id, v, changed, prevV).catch(e => console.error('denetim', e));
@@ -328,6 +329,7 @@ async function bundleFor(id, withAudio, format, versionId) {
   const scenes = await Promise.all(vis.data.scenes.map(async s => cine
     ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, role: s.role, hook: s.hook, hl: s.hl, card: s.card, count: s.count, answer: s.answer, cta: s.cta, cam: s.cam, fx: s.fx, img2_at: s.img2_at,
         img: s.img_path ? await thumbUrl(s.img_path) : null, img2: s.img2_path ? await thumbUrl(s.img2_path) : null }
+    : p.visual_style === 'hikaye' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, em: s.em, bg: s.bg, code: s.code }
     : p.visual_style === 'nasil' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, hl: s.hl, meter: s.meter, stick: s.stick, label: s.label, code: s.code }
     : p.visual_style === 'tarih' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, head: s.head, hl: s.hl, bg: s.bg, era: s.era, code: s.code }
     : p.visual_style === 'deney' ? { k: s.k, ch: s.ch, title: s.title, cap: s.cap, hl: s.hl, meter: s.meter, bg: s.bg, count: s.count, answer: s.answer, date: s.date, fx: s.fx, water: s.water, dark: s.dark, code: s.code }
@@ -335,6 +337,7 @@ async function bundleFor(id, withAudio, format, versionId) {
   const b = { topic: vis.data.topic || p.title, brand: 'NASIL ÇALIŞIR', format: format || p.format || 'dikey', style: p.visual_style || 'teknik', scenes };
   const lg = (await projectLogo(p)).effective; if (lg && lg.path) b.logo = { url: await thumbUrl(lg.path), pos: lg.pos || 'tr', size: lg.size || .14, opacity: lg.opacity != null ? lg.opacity : .9 };
   if (cine) b.hud = vis.data.hud || null;
+  if (p.visual_style === 'hikaye') { const so = p.style_opts || {}; const ep = +so.episode || 1; b.series = so.series || p.title; b.episodeLabel = `Bölüm ${ep}`; b.nextLabel = `Bölüm ${ep + 1}`; b.next = vis.data.next || null; }
   if (p.visual_style === 'nasil') { const so = p.style_opts || {}; b.title = vis.data.title || p.title; b.handle = so.handle || null; b.cta = so.cta === '' ? null : (so.cta || 'Arkadaşına gönder'); }
   if (p.visual_style === 'tarih') { const so = p.style_opts || {}; b.cast = vis.data.cast || []; b.series = so.series || null; b.episode = so.episode || null; b.next = vis.data.next || so.next || null; b.ask = vis.data.ask || null; }
   if (p.visual_style === 'deney') { const so = p.style_opts || {}; b.series = so.series === '' ? null : (so.series || 'Ya Olsaydı'); b.next = so.next || vis.data.next || null; b.note = vis.data.note || null; b.ask = vis.data.ask || null; }
@@ -430,6 +433,7 @@ on('POST', '/api/me/profile', async (req, res) => {
   const r = await db.update('users', `id=eq.${q(u.id)}`, patch); auth.forgetUser(u.id);
   send(res, 200, { user: { id: r.id, name: r.name, slug: r.slug } });
 }, 'user');
+on('GET', '/api/my/story-series', async (req, res) => send(res, 200, await db.select('story_series', `owner_id=eq.${q(req.user.id)}&select=id,title,episodes,updated_at&order=updated_at.desc`)));
 /* ---------- logo: kullanıcının varsayılan logosu ve videoya özel logo ---------- */
 const LOGO_POS = ['tr', 'tl', 'br', 'bl'];
 function logoOpts(b, base = {}) {
@@ -519,7 +523,13 @@ on('POST', '/api/projects', async (req, res) => {
   if (!lim) return send(res, 402, { error: 'Video üretmek için etkin bir paketiniz yok. Paketim sayfasından paket seçin.' });
   if (await monthUsage(req.user.id) >= (lim.limits.videos_per_month || 0)) return send(res, 402, { error: `Bu ayki video hakkınız doldu (${lim.limits.videos_per_month} video). Paketinizi yükseltebilirsiniz.` });
   if ((+b.target_seconds || 90) > (lim.limits.max_seconds || 300)) return send(res, 402, { error: `Paketiniz en fazla ${lim.limits.max_seconds} saniyelik videoya izin veriyor.` });
-  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: ['sade', 'sinema', 'deney', 'tarih', 'nasil'].includes(b.visual_style) ? b.visual_style : 'teknik', style_opts: b.visual_style === 'nasil' ? { handle: (s => s ? (s.startsWith('@') ? s : '@' + s) : null)(String(b.handle || '').trim().replace(/\s+/g, '').slice(0, 30)), cta: b.cta == null ? 'Arkadaşına gönder' : String(b.cta).trim().slice(0, 30) } : b.visual_style === 'deney' ? { series: String(b.series == null ? 'Ya Olsaydı' : b.series).trim().slice(0, 30), next: String(b.next_topic || '').trim().slice(0, 80) || null } : b.visual_style === 'tarih' ? { series: String(b.series_t || '').trim().slice(0, 30) || null, episode: String(b.episode || '').trim().slice(0, 20) || null, next: String(b.next_topic_t || '').trim().slice(0, 80) || null } : null, cine_mode: b.visual_style === 'sinema' ? (['soru', 'algi', 'anlatim'].includes(b.cine_mode) ? b.cine_mode : 'anlatim') : null, status: 'content_generating' });
+  let story = null;
+  if (b.visual_style === 'hikaye') {
+    const st = b.story || {};
+    if (st.mode === 'continue' && st.series_id) { const ser = await db.one('story_series', `id=eq.${q(st.series_id)}${isAdmin(req.user) ? '' : `&owner_id=eq.${q(req.user.id)}`}`); if (!ser) return send(res, 400, { error: 'Seri bulunamadı' }); story = { series_id: ser.id, series: ser.title, episode: (ser.episodes || 0) + 1 }; }
+    else { const t = String(st.title || b.title).trim().slice(0, 60); const ser = await db.insert('story_series', { owner_id: req.user.id, title: t }); story = { series_id: ser.id, series: t, episode: 1 }; }
+  }
+  const p = await db.insert('projects', { owner_id: req.user.id, title: String(b.title).slice(0, 120), brief: String(b.brief).slice(0, 4000), audience: b.audience || null, target_seconds: Math.min(300, Math.max(30, +b.target_seconds || 90)), voice_id: b.voice_id || null, tone, format: FORMATS[b.format] ? b.format : 'dikey', speech_rate: SPEEDS[b.speech_rate] ? b.speech_rate : 'normal', visual_style: ['sade', 'sinema', 'deney', 'tarih', 'nasil', 'hikaye'].includes(b.visual_style) ? b.visual_style : 'teknik', style_opts: story ? story : b.visual_style === 'nasil' ? { handle: (s => s ? (s.startsWith('@') ? s : '@' + s) : null)(String(b.handle || '').trim().replace(/\s+/g, '').slice(0, 30)), cta: b.cta == null ? 'Arkadaşına gönder' : String(b.cta).trim().slice(0, 30) } : b.visual_style === 'deney' ? { series: String(b.series == null ? 'Ya Olsaydı' : b.series).trim().slice(0, 30), next: String(b.next_topic || '').trim().slice(0, 80) || null } : b.visual_style === 'tarih' ? { series: String(b.series_t || '').trim().slice(0, 30) || null, episode: String(b.episode || '').trim().slice(0, 20) || null, next: String(b.next_topic_t || '').trim().slice(0, 80) || null } : null, cine_mode: b.visual_style === 'sinema' ? (['soru', 'algi', 'anlatim'].includes(b.cine_mode) ? b.cine_mode : 'anlatim') : null, status: 'content_generating' });
   await saveSources(p.id, b.sources);
   if (b.logo && ['custom', 'none'].includes(b.logo.mode)) { try { const lg = { mode: b.logo.mode, ...(b.logo.mode === 'custom' ? logoOpts(b.logo) : {}), path: null }; if (lg.mode === 'custom') lg.path = b.logo.data ? await saveLogoImage(b.logo.data, 'p/' + p.id) : null; if (lg.mode === 'none' || lg.path) await db.update('projects', `id=eq.${q(p.id)}`, { logo: lg }); } catch (e) { console.error('logo', e.message); } }
   background(p.id, 'content', []);
@@ -574,6 +584,8 @@ on('POST', '/api/projects/:id/content/revise', async (req, res, { id }) => { con
 on('POST', '/api/projects/:id/content/approve', async (req, res, { id }) => {
   if (!await guard(res, id, ['content_review'])) return;
   const v = await latest(id, 'content'); await db.update('versions', `id=eq.${v.id}`, { approved_at: now() });
+  const pp = await db.one('projects', `id=eq.${q(id)}&select=visual_style,style_opts`);
+  if (pp && pp.visual_style === 'hikaye' && pp.style_opts && pp.style_opts.series_id && v.data.bible) { const ser = await db.one('story_series', `id=eq.${q(pp.style_opts.series_id)}&select=episodes`); if (ser) await db.update('story_series', `id=eq.${q(pp.style_opts.series_id)}`, { bible: v.data.bible, episodes: Math.max(ser.episodes || 0, +pp.style_opts.episode || 1), updated_at: now() }).catch(e => console.error('seri defteri', e.message)); }
   background(id, 'visuals', []); send(res, 202, { ok: true });
 });
 on('POST', '/api/projects/:id/visuals/revise', async (req, res, { id }) => { const { feedback, k } = await readBody(req); if (!feedback) return send(res, 400, { error: 'Düzeltme notu gerekli' }); if (!await guard(res, id, ['visuals_review'])) return; background(id, 'visuals', [k || null, feedback]); send(res, 202, { ok: true }); });

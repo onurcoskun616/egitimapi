@@ -16,17 +16,20 @@
   PALETTES.sinema = Object.assign({}, PALETTES.teknik, { bg: '#000000', hl: '#8fd3ff' });
   PALETTES.tarih = Object.assign({}, PALETTES.teknik, { bg: '#f4f2ec', fg: '#1f1f24', ink: '#1f1f24', paper: '#f4f2ec', muted: '#7a756a', dim: '#cfc9bc', yel: '#ffd23f', red: '#e0322f', lv: '#2f74c9', cool: '#3aa0d8', green: '#4d9a3c', hv: '#f08a24', copper: '#b8743d', steel: '#9aa1ab', leaf: '#4d9a3c', violet: '#7d5bb5' });
   PALETTES.nasil = Object.assign({}, PALETTES.teknik, { bg: '#16181d', paper: '#22252c', hl: '#ffc93c' });
+  PALETTES.hikaye = Object.assign({}, PALETTES.teknik, { bg: '#141a33', fg: '#f2efe8', muted: '#9aa3c0', dim: '#3a4266', red: '#e8826a', hv: '#f0a64b', yel: '#f0c35b', lv: '#6f9be0', cool: '#7cc6c0', green: '#5f9e6e', paper: '#e9dfc8', ink: '#141a33', hl: '#e8826a' });
   PALETTES.deney = Object.assign({}, PALETTES.teknik, { bg: '#2a2380', fg: '#ffffff', yel: '#ffc93c', cool: '#4fd8e8', muted: '#b7b3e6', dim: '#5a54a8', paper: '#2a2380', ink: '#ffffff' });
   Object.assign(C, PALETTES.teknik);
   let STYLE = 'teknik';
   const FS = '"Inter","Noto Sans","DejaVu Sans",system-ui,sans-serif';
-  const FC = '"Lilita One","Archivo","Arial Black",sans-serif'; // çizgi roman başlık fontu (Türkçe karakterli)
+  const FC = '"Lilita One","Archivo","Arial Black",sans-serif';
+  const FSER = '"DM Serif Display","Georgia","Times New Roman",serif'; // hikâye stilinde vurgu harfi // çizgi roman başlık fontu (Türkçe karakterli)
   function setStyle(name) { STYLE = PALETTES[name] ? name : 'teknik'; Object.assign(C, PALETTES[STYLE]); return STYLE; }
   const sade = () => STYLE === 'sade';
   const cine = () => STYLE === 'sinema';
   const deney = () => STYLE === 'deney';
   const tarih = () => STYLE === 'tarih';
   const nasil = () => STYLE === 'nasil';
+  const hikaye = () => STYLE === 'hikaye';
   let c = null; // aktif 2D bağlam
 
   /* ---------- yardımcılar ---------- */
@@ -198,7 +201,7 @@
     glow('rgba(255,110,20,.8)', 40, () => { f(-50 * s, 140 * s, 240 * s * fl(1), '#ff5a1f'); f(50 * s, 140 * s, 220 * s * fl(2), '#ff5a1f'); f(0, 170 * s, 300 * s * fl(3), '#ff5a1f'); }); f(0, 110 * s, 200 * s * fl(4), '#ff9b2e'); f(0, 70 * s, 130 * s * fl(5), '#ffd45a'); }
   function hero(fn, u, sc = 1, dy = 0, cy = 800) { const k = 1.04 - .04 * e3(cl(u / 6)); c.save(); c.translate(F.hx + Math.sin(u * .3) * 6, F.hy + (cy - 800 + dy) * F.hs + Math.cos(u * .25) * 4); c.scale(sc * k * F.hs, sc * k * F.hs); fn(); c.restore(); }
 
-  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, globe, ring, ball, sun, person, cast, tag, crossX, qmark, tablet, sack, pot, wheat, scroll, reed, pyramid, palm, river, region, sea, comic, FC, mlabel, ctx: () => c };
+  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, globe, ring, ball, sun, person, cast, tag, crossX, qmark, tablet, sack, pot, wheat, scroll, reed, pyramid, palm, river, region, sea, comic, FC, mlabel, FSER, planet, figure, reticle, cloud, mountain, wave, lantern, starfield, ctx: () => c };
   const LIB_NAMES = Object.keys(LIB);
 
   function compileScene(code) {
@@ -213,6 +216,7 @@
     scenes.forEach(s => {
       if (!s.capT) { let tt = LEAD; s.capT = s.cap.map(x => { const st = tt; tt += x.length / CPS + GAP; return st; }); s.dur = Math.max(s.minDur || 6, Math.ceil((tt + .6) * 2) / 2); s.capR = s.cap.map(() => CPS); }
     });
+    if (bundle.style === 'hikaye' && bundle.series && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: 4.5, outro: true, code: '' });
     if (bundle.style === 'tarih' && (bundle.next || bundle.ask) && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: 4, outro: true, code: '' });
     if (bundle.style === 'deney' && (bundle.next || bundle.series || bundle.ask) && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: bundle.ask ? 4.5 : 3.2, outro: true, code: '' });
     let acc = 0; scenes.forEach(s => { s.s = acc; acc += s.dur; s.e = acc; s.fn = compileScene(s.code || ''); });
@@ -244,7 +248,7 @@
     dikey45: { hx: 450, hy: 565, hs: .74, kwY: 240, kwMax: 60, labelY: 848, capY: 920, capW: 800, capFont: 34, capLh: 46 },
   };
   let F = FORMATS.dikey;
-  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : deney() ? Object.assign({}, b, DENEY[name] || DENEY.dikey) : tarih() ? Object.assign({}, b, TARIH[name] || TARIH.dikey) : nasil() ? Object.assign({}, b, NASIL[name] || NASIL.dikey) : b; return F; }
+  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : deney() ? Object.assign({}, b, DENEY[name] || DENEY.dikey) : tarih() ? Object.assign({}, b, TARIH[name] || TARIH.dikey) : nasil() ? Object.assign({}, b, NASIL[name] || NASIL.dikey) : hikaye() ? Object.assign({}, b, HIKAYE[name] || HIKAYE.dikey) : b; return F; }
 
   /* ---------- çerçeve ---------- */
   function bgGrid() { c.fillStyle = 'rgba(120,150,210,.12)'; for (let x = 38; x < F.W; x += 76) for (let y = 38; y < F.H; y += 76) { c.fillRect(x - 6, y - 1, 12, 2); c.fillRect(x - 1, y - 6, 2, 12); } }
@@ -836,10 +840,91 @@
     if (i === 0 && (P.title || P.topic)) nasilIntro(P, sc, u, Ln); else nasilMeter(sc, u, Ln);
     nasilStickers(sc, u, Ln); nasilCaption(sc, u, Ln); if (i === L.scenes.length - 1) nasilOutro(P, sc, u, Ln);
   }
+
+  /* ---------- "Hikâye" stili: düz vektör, gece paleti, iki katmanlı vurgulu altyazı, bölümlü anlatı ---------- */
+  // planet(x, y, r, renk1, renk2, {bands, ring, light}) düz gölgeli gezegen
+  function planet(x, y, r, c1 = '#5f9e6e', c2 = '#2c4a6e', o = {}) {
+    c.save(); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = rg(x - r * .35, y - r * .35, r * .1, r * 1.15, [[0, c1], [1, c2]]); c.fill(); c.clip();
+    if (o.bands) for (let i = 0; i < o.bands; i++) { c.fillStyle = `rgba(255,255,255,${.06 + .05 * (i % 2)})`; c.fillRect(x - r, y - r + (i + .3) * 2 * r / o.bands, r * 2, r / o.bands * .6); }
+    c.fillStyle = rg(x - r * .5, y - r * .5, r * .2, r * 1.6, [[0, 'rgba(0,0,0,0)'], [.6, 'rgba(0,0,10,.15)'], [1, 'rgba(0,0,20,.65)']]); c.fillRect(x - r, y - r, r * 2, r * 2); c.restore();
+    if (o.ring) { c.save(); c.strokeStyle = o.ring === true ? 'rgba(240,195,91,.7)' : o.ring; c.lineWidth = r * .06; c.beginPath(); c.ellipse(x, y, r * 1.7, r * .45, -.25, 0, Math.PI * 2); c.stroke(); c.restore(); }
+  }
+  // figure(x, y, ölçek, renk, {hat, lantern, alien, u}) sade silüet insan (ayakları y'de, boy ≈ 160)
+  function figure(x, y, s = 1, col = '#3a4266', o = {}) {
+    c.save(); c.translate(x, y); c.scale(s, s); const sw = Math.sin((o.u || 0) * 2 + x) * 1.5;
+    c.fillStyle = col; c.beginPath(); c.moveTo(-22, 0); c.lineTo(-16, -95); c.quadraticCurveTo(0, -112, 16, -95); c.lineTo(22, 0); c.closePath(); c.fill();
+    c.fillStyle = o.alien ? '#7cc6c0' : (o.skin || '#e0b896'); c.beginPath(); c.ellipse(0, -126 + sw * .3, o.alien ? 20 : 15, o.alien ? 24 : 17, 0, 0, Math.PI * 2); c.fill();
+    if (o.alien) { c.fillStyle = '#141a33'; c.beginPath(); c.ellipse(-8, -128, 5, 7, -.4, 0, Math.PI * 2); c.ellipse(8, -128, 5, 7, .4, 0, Math.PI * 2); c.fill(); }
+    if (o.hat) { c.fillStyle = o.hat === true ? '#6b4a32' : o.hat; c.fillRect(-20, -142, 40, 6); c.fillRect(-12, -158, 24, 18); }
+    if (o.lantern) lantern(26, -50, .8, o.u || 0);
+    c.restore();
+  }
+  // reticle(x, y, r, u, renk): dönen kesikli hedef halkası (arama / odak)
+  function reticle(x, y, r, u = 0, col, o = {}) { c.save(); c.translate(x, y); c.rotate(u * .4); c.strokeStyle = col || C.hv; c.lineWidth = Math.max(2, r * .06); c.setLineDash([r * .35, r * .22]); c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); if (o.dot !== false) { c.fillStyle = col || C.hv; c.beginPath(); c.arc(0, 0, Math.max(3, r * .06), 0, Math.PI * 2); c.fill(); } c.restore(); }
+  function cloud(x, y, s = 1, a = .85, col = '#e9eef5') { withA(a, () => { c.fillStyle = col; c.beginPath(); [[0, 0, 40], [38, -12, 32], [70, 4, 30], [-34, 6, 28]].forEach(([dx, dy, r]) => { c.moveTo(x + dx * s + r * s, y + dy * s); c.arc(x + dx * s, y + dy * s, r * s, 0, Math.PI * 2); }); c.fill(); }); }
+  function mountain(x, y, w, h, col = '#3f6b55') { c.fillStyle = col; c.beginPath(); c.moveTo(x - w / 2, y); c.quadraticCurveTo(x - w * .2, y - h * 1.05, x, y - h); c.quadraticCurveTo(x + w * .25, y - h * .95, x + w / 2, y); c.closePath(); c.fill(); }
+  // wave(y, renk, u, genlik): deniz yüzeyi bandı (y'den aşağısı dolu)
+  function wave(y, col = '#2c5d7a', u = 0, amp = 6) { c.fillStyle = col; c.beginPath(); c.moveTo(-1400, 1400); for (let x = -1400; x <= 1400; x += 20) c.lineTo(x, y + Math.sin(x * .02 + u * 1.6) * amp); c.lineTo(1400, 1400); c.closePath(); c.fill(); }
+  function lantern(x, y, s = 1, u = 0) { const f = .85 + .15 * Math.sin(u * 7) * Math.sin(u * 3.1); c.save(); c.fillStyle = rg(x, y, 0, 60 * s, [[0, `rgba(255,190,90,${.45 * f})`], [1, 'rgba(255,190,90,0)']]); c.fillRect(x - 60 * s, y - 60 * s, 120 * s, 120 * s); c.fillStyle = '#ffcf7a'; c.fillRect(x - 6 * s, y - 10 * s, 12 * s, 18 * s); c.strokeStyle = '#2a2a33'; c.lineWidth = 2; c.strokeRect(x - 7 * s, y - 11 * s, 14 * s, 20 * s); c.restore(); }
+  function starfield(u = 0, n = 90) { for (let i = 0; i < n; i++) { const tw = .35 + .65 * Math.abs(Math.sin(u * (.5 + seeded(i + 7)) + i)); c.fillStyle = `rgba(255,255,255,${.25 + .55 * tw * seeded(i + 3)})`; const r = .6 + 1.4 * seeded(i + 11); c.beginPath(); c.arc(-450 + seeded(i) * 900, -800 + seeded(i + 1) * 1600, r, 0, Math.PI * 2); c.fill(); } }
+
+  const HIKAYE = {
+    dikey: { hx: 450, hy: 800, hs: 1.05, capY: .45 }, yatay: { hx: 800, hy: 450, hs: .72, capY: .5 },
+    kare: { hx: 450, hy: 450, hs: .68, capY: .5 }, dikey45: { hx: 450, hy: 562, hs: .8, capY: .46 },
+  };
+  function hikayeBg(bg, u) {
+    const G = (stops) => { c.fillStyle = lg(0, 0, 0, F.H, stops); c.fillRect(0, 0, F.W, F.H); };
+    if (bg === 'dusk') G([[0, '#3a3466'], [.55, '#c98aa0'], [1, '#f2c4a0']]);
+    else if (bg === 'day') G([[0, '#9fc3e0'], [1, '#e6eef2']]);
+    else if (bg === 'paper') { G([[0, '#2a2622'], [1, '#1a1714']]); }
+    else if (bg === 'interior') G([[0, '#3a2a22'], [1, '#1d1612']]);
+    else { G([[0, '#0f1530'], [1, '#1b2244']]); if (bg !== 'night') { c.save(); c.translate(F.W / 2, F.H / 2); c.scale(F.W / 900, F.H / 1600); starfield(u, bg === 'space' ? 140 : 60); c.restore(); } }
+    if (bg === 'night') { c.save(); c.translate(F.W / 2, F.H / 2); c.scale(F.W / 900, F.H / 1600); starfield(u, 50); c.restore(); }
+  }
+  // İki katmanlı altyazı: cümle küçük düz yazıyla, "em" ifadesi büyük mercan serif satırda; konuşulmamış kelimeler soluk
+  function hikayeCaption(sc, u, Lh) {
+    let idx = -1; sc.capT.forEach((x, i) => { if (u >= x - .05) idx = i; }); if (idx < 0) return;
+    const s = sc.cap[idx] || '', rate = sc.capR ? sc.capR[idx] : CPS, el = (u - sc.capT[idx]) * rate, em = String((sc.em || [])[idx] || '').trim();
+    const end = sc.capT[idx] + s.length / rate + .6, nx = sc.capT[idx + 1]; const out = u > end ? cl((u - end) / .5) : 0; if (out >= 1 && (nx == null || u < nx)) return;
+    // parçalara böl: em ifadesi ayrı; diğerleri ≤ 26 harf
+    const words = s.split(/\s+/).filter(Boolean); let pos = 0; const toks = words.map(w => { const t = { w, at: pos }; pos += w.length + 1; return t; });
+    const ei = em ? s.toLocaleLowerCase('tr').indexOf(em.toLocaleLowerCase('tr')) : -1;
+    const isEm = t => ei >= 0 && t.at >= ei && t.at < ei + em.length;
+    const segs = []; let cur = null;
+    toks.forEach(t => { const e = isEm(t); if (!cur || cur.em !== e || (!e && (cur.t.map(x => x.w).join(' ').length + t.w.length > 26))) { cur = { em: e, t: [] }; segs.push(cur); } cur.t.push(t); });
+    // gösterilecek pencere: konuşulan konumu içeren em parçası ve ona komşu küçük satır(lar)
+    let si = 0; segs.forEach((g, i) => { if (el >= g.t[0].at - 1) si = i; });
+    let a0 = si, a1 = si; if (segs[si].em) { if (si > 0 && !segs[si - 1].em) a0 = si - 1; } else if (segs[si + 1] && segs[si + 1].em && el >= segs[si].t[0].at) a1 = si + 1;
+    const show = segs.slice(a0, a1 + 1), U = Math.min(F.W, F.H), small = Math.round(U * .036), big = Math.round(U * .085);
+    let y = F.H * Lh.capY - (show.reduce((h, g) => h + (g.em ? big * 1.05 : small * 1.35), 0)) / 2;
+    withA(1 - out, () => show.forEach(g => {
+      const fs = g.em ? big : small, font = g.em ? `400 ${fs}px ${FSER}` : `600 ${fs}px ${FS}`; c.font = font; const sp = c.measureText(' ').width, ws = g.t.map(t => c.measureText(t.w).width); let x = F.W / 2 - (ws.reduce((a, b) => a + b, 0) + sp * (ws.length - 1)) / 2;
+      y += g.em ? big * .95 : small * 1.2;
+      c.save(); c.shadowColor = 'rgba(5,8,20,.75)'; c.shadowBlur = 14; c.textAlign = 'left';
+      g.t.forEach((t, i) => { const k = cl((el - t.at + 2) / 6); c.globalAlpha *= 1; withA(.22 + .78 * k, () => { c.font = font; c.fillStyle = g.em ? C.red : '#f2efe8'; c.fillText(t.w, x, y + (1 - k) * 4); }); x += ws[i] + sp; });
+      c.restore(); y += g.em ? big * .15 : small * .2; }));
+  }
+  function hikayeOutro(P, u) {
+    hikayeBg('space', u); const U = Math.min(F.W, F.H), cx = F.W / 2, cy = F.H * .42, a = fade(u, .1, .5);
+    withA(a, () => { c.save(); c.translate(cx, cy); c.scale(F.W / 900 * (F.H > F.W ? 1 : .7), F.W / 900 * (F.H > F.W ? 1 : .7)); reticle(0, 0, 210, u * .5, 'rgba(240,166,75,.85)', { dot: false }); c.restore();
+      txt(String(P.series || '').toLocaleUpperCase('tr').split('').join(' '), cx, cy - U * .025, `500 ${Math.round(U * .06)}px ${FS}`, '#f2efe8', 'center');
+      txt(P.nextLabel || 'Sıradaki bölüm', cx, cy + U * .055, `400 ${Math.round(U * .05)}px ${FSER}`, C.red, 'center');
+      txt('çok yakında', cx, cy + U * .1, `500 ${Math.round(U * .028)}px ${FS}`, '#f2efe8', 'center');
+      if (P.next) { c.font = `500 ${Math.round(U * .032)}px ${FS}`; wrap(P.next, F.W * .78).slice(0, 2).forEach((l, i) => txt(l, cx, F.H * (F.H > F.W ? .7 : .86) + i * U * .045, `500 ${Math.round(U * .032)}px ${FS}`, 'rgba(242,239,232,.8)', 'center')); }
+      txt('t a k i p t e   k a l', cx, cy + U * .15, `500 ${Math.round(U * .018)}px ${FS}`, 'rgba(242,239,232,.6)', 'center'); });
+  }
+  function drawHikaye(P, L, i, u, t, bare) {
+    const sc = L.scenes[i], Lh = HIKAYE[P.format] || HIKAYE.dikey;
+    if (sc.outro) return hikayeOutro(P, u);
+    hikayeBg(sc.bg || 'space', u); runScene(sc, u); if (bare) return;
+    hikayeCaption(sc, u, Lh);
+    if (i === 0 && P.series && u < 4) withA(Math.min(fade(u, .3, .5), 1 - fade(u, 3.4, .5)), () => txt(`${String(P.series).toLocaleUpperCase('tr')}${P.episodeLabel ? '  ·  ' + P.episodeLabel.toLocaleUpperCase('tr') : ''}`.split('').join(' ').replace(/ {3}/g, '   '), F.W / 2, F.H * .06, `500 ${Math.round(Math.min(F.W, F.H) * .02)}px ${FS}`, 'rgba(242,239,232,.7)', 'center'));
+  }
   function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; if (sade()) return drawSade(P, L, i, u, t); if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); } else background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); if (P.__bare) return; header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
   function createPlayer(canvas, bundle) {
     if (bundle.style === 'tarih' && typeof document !== 'undefined' && document.fonts) document.fonts.load('400 40px "Lilita One"').catch(() => {});
+    if (bundle.style === 'hikaye' && typeof document !== 'undefined' && document.fonts) document.fonts.load('400 40px "DM Serif Display"').catch(() => {});
     const ST = setStyle(bundle.style); setFormat(bundle.format); const FF = F; const CS = {}; (bundle.cast || []).forEach(x => { if (x && x.id) CS[x.id] = x; }); CAST = CS;
     canvas.width = Math.round(FF.W * FF.S); canvas.height = Math.round(FF.H * FF.S); c = canvas.getContext('2d'); c.setTransform(FF.S, 0, 0, FF.S, 0, 0);
     const L = layout(bundle);
@@ -856,6 +941,7 @@
       setStyle(ST); F = FF; CAST = CS; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
       let si = L.scenes.findIndex(s => t >= s.s && t < s.e); if (si < 0) si = L.scenes.length - 1; const u = t - L.scenes[si].s, TR = .6;
       const ox = F.W / 2, oy = F.H / 2, RM = Math.hypot(F.W, F.H) * .62;
+      if (hikaye()) { drawHikaye(bundle, L, si, u, t); const pu = si > 0 ? u : 99; if (pu < .45) { withA(1 - pu / .45, () => { c.fillStyle = '#0b0f22'; c.fillRect(0, 0, F.W, F.H); }); } const left = L.scenes[si].dur - u; if (si < L.scenes.length - 1 && left < .35) withA(1 - left / .35, () => { c.fillStyle = '#0b0f22'; c.fillRect(0, 0, F.W, F.H); }); return si; }
       if (nasil()) { drawNasil(bundle, L, si, u, t); if (u < .12 && si > 0) withA(1 - u / .12, () => { c.fillStyle = '#000'; c.fillRect(0, 0, F.W, F.H); }); return si; }
       if (tarih()) { drawTarih(bundle, L, si, u, t); if (u < .35 && si > 0) withA(1 - e3(u / .35), () => drawTarih(bundle, L, si - 1, L.scenes[si - 1].dur - .35 + u, t)); return si; }
       if (deney()) { drawDeney(bundle, L, si, u, t); if (u < .4 && si > 0) withA(1 - e3(u / .4), () => drawDeney(bundle, L, si - 1, L.scenes[si - 1].dur - .4 + u, t)); return si; }
@@ -870,7 +956,8 @@
     function still(k, frac) {
       setStyle(ST); F = FF; CAST = CS; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0);
       const i = L.scenes.findIndex(s => s.k === String(k)); if (i < 0) return null;
-      const sc = L.scenes[i]; if (nasil()) { drawNasil(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
+      const sc = L.scenes[i]; if (hikaye()) { drawHikaye(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
+      if (nasil()) { drawNasil(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
       if (tarih()) { drawTarih(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
       if (deney()) { drawDeney(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
       if (cine()) { drawCine(bundle, L, i, sc.dur * (frac == null ? .5 : frac), sc.s, true); return { x: 0, y: 0, w: F.W * F.S, h: F.H * F.S }; }
