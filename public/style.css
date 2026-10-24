@@ -270,3 +270,9 @@ label{font-weight:700;letter-spacing:.06em}
 .tview .tkey{background:var(--panel2);border-left:3px solid var(--green);padding:6px 10px;margin:6px 0;font-size:14px}.tview .tkey ul{margin:4px 0 0 18px;padding:0}
 .kbar{height:8px;background:var(--panel2);border-radius:9px;overflow:hidden}.kbar i{display:block;height:100%}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.promo{display:flex;align-items:center;gap:14px;margin-top:14px;padding:16px;border-radius:16px;text-decoration:none;color:var(--fg);background:linear-gradient(135deg,color-mix(in srgb,var(--yel) 22%,var(--panel)),var(--panel) 70%);border:1.5px solid color-mix(in srgb,var(--yel) 55%,var(--line));box-shadow:var(--shadow,none);transition:transform .15s,border-color .15s}
+.promo:hover{transform:translateY(-1px);border-color:var(--yel)}
+.promo .pico{flex:none;width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--yel);color:#111}
+.promo .ptx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.promo .ptx b{font:800 17px/1.25 var(--display,inherit)}.promo .ptx span{font-size:14px;line-height:1.4;color:var(--muted)}
+.promo .parr{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--panel2);font-weight:800;font-size:18px}
