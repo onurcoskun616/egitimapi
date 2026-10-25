@@ -1092,7 +1092,7 @@
     if (n === 1) {
       let plans = []; try { plans = await api('/api/ortak/plans'); } catch { }
       body = `<p class="muted">MEB'in yayımladığı "Konu Soru Dağılım Tablosu" Excel dosyasını yükleyin${plans.length ? ' ya da daha önce yüklediğiniz bir dosyayı seçin' : ''}.</p>
-        <div class="card"><label for="ox">Excel dosyası (.xlsx)</label><input type="file" id="ox" accept=".xlsx,.xls"><div class="btns"><button class="primary big" id="oup">Yükle ve devam et →</button></div><p class="note">Her sınıf ayrı sayfada olmalı; sütunlar Tema/Ünite · Konu · Kazanım · senaryolar.</p><p class="note err-t" id="om"></p></div>
+        <div class="card"><label for="ox">Excel dosyası (.xlsx)</label><input type="file" id="ox" accept=".xlsx,.xls"><div class="btns"><button class="primary big" id="oup">Yükle ve devam et →</button></div><p class="note">Her sınıf ayrı sayfada olmalı; "Öğrenme Çıktıları" ya da "Kazanım" sütunu ve sağında sınav/senaryo sütunları. Tüm dersler (Türkçe, Matematik, Fen, Sosyal, İngilizce, Din Kültürü, Edebiyat…) desteklenir.</p><p class="note err-t" id="om"></p></div>
         ${plans.length ? `<h2>Yüklenmiş dosyalar</h2><div class="pickl">${plans.map(p => `<button data-pl="${esc(p.id)}" class="${p.id === WZ.plan ? 'on' : ''}"><b>${esc(p.title)}</b><span>${esc(p.source_name || '')} · ${p.grades.join(', ')}. sınıf</span><i>→</i></button>`).join('')}</div>` : ''}`;
     } else if (n === 2) {
       body = `<p class="muted">Hangi sınıf için çalışma hazırlanacak?</p><div class="gradebtns big">${D.grades.map(x => `<button class="${x.grade === WZ.g ? 'on' : ''}" data-g="${x.grade}"><b>${x.grade}</b><span>. sınıf</span></button>`).join('')}</div>`;
