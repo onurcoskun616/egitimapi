@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="tr" translate="no">
+<head>
+<meta name="google" content="notranslate">
+<meta charset="utf-8">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ortak Sınav Çalışması</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#05070e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Eğitim Stüdyosu">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Lilita+One&family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<style>
+:root{--bg:#05070e;--panel:#0c1222;--panel2:#111a2e;--line:#1d2742;--fg:#eef1f7;--muted:#8a94ad;--yel:#ffc93c;--lv:#3fb0ff;--green:#3ee0a1;--red:#ff4f4f;--d:'Archivo',system-ui,sans-serif;--m:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--field:#070b16;--err-t:#ffb3b3}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f5f6f9;--panel:#fff;--panel2:#eef1f6;--line:#dbe0ea;--fg:#141a28;--muted:#5d6678;--lv:#0b6bcb;--green:#0f8a5f;--red:#c62828;--field:#fff;--err-t:#b3261e}}
+:root[data-theme="light"]{--bg:#f5f6f9;--panel:#fff;--panel2:#eef1f6;--line:#dbe0ea;--fg:#141a28;--muted:#5d6678;--lv:#0b6bcb;--green:#0f8a5f;--red:#c62828;--field:#fff;--err-t:#b3261e}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.6 var(--m)}
+main{max-width:760px;margin:0 auto;padding:20px 16px 80px}
+h1{font:900 clamp(24px,5vw,34px)/1.1 var(--d);margin:6px 0 8px}
+.muted{color:var(--muted)}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+label.f{display:block;font:800 12px var(--m);letter-spacing:.1em;color:var(--muted);margin:12px 0 6px;text-transform:uppercase}
+input[type=text],textarea{width:100%;font:500 16px var(--m);color:var(--fg);background:var(--field);border:1.5px solid var(--line);border-radius:10px;padding:12px}
+textarea{min-height:120px;resize:vertical}
+button{font:800 16px var(--m);color:#111;background:var(--yel);border:0;border-radius:12px;padding:14px 18px;cursor:pointer;width:100%;margin-top:14px}button:disabled{opacity:.5}
+.pass{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:16px 0}.pass .tx{white-space:pre-line;font-family:Georgia,serif;margin-top:6px}
+.q{margin:18px 0}.q p{margin:0 0 8px}.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;margin:6px 0;cursor:pointer;background:var(--panel)}
+.opt input{margin-top:5px}.opt b{min-width:18px}.opt.ok{border-color:var(--green)}.opt.no{border-color:var(--red)}
+.note{color:var(--muted);font-size:13px}.err{color:var(--err-t)}.rev{border-left:3px solid var(--lv);background:var(--panel2);padding:8px 12px;border-radius:8px;margin-top:8px;font-size:14px}
+.score{font:900 48px var(--d);color:var(--yel)}.bar{height:8px;background:var(--panel2);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%}
+.sticky{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding-top:20px}
+
+.steps{display:flex;gap:6px;margin:14px 0 6px}.steps>button{all:unset;cursor:pointer;flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11.5px;color:var(--muted);text-align:center;position:relative}
+.steps>button:not(:last-child)::after{content:"";position:absolute;top:15px;left:calc(50% + 18px);right:calc(-50% + 18px);height:2px;background:var(--line)}.steps>button.done:not(:last-child)::after{background:var(--green)}
+.steps i{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;background:var(--panel);border:2px solid var(--line);color:var(--fg)}
+.steps .done i{background:var(--green);border-color:var(--green);color:#fff}.steps .on i{background:var(--yel);border-color:var(--yel);color:#111}.steps .on{color:var(--fg);font-weight:700}.steps .lock{opacity:.45;cursor:default}
+h2{font:900 24px/1.15 var(--d);margin:18px 0 6px}
+.vbox{background:#000;border-radius:14px;overflow:hidden;display:flex;justify-content:center}.vbox video{width:100%;max-height:72vh;display:block;background:#000}
+.vlist{display:grid;gap:8px;margin-top:12px}.vli{display:flex;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel);cursor:pointer;font-size:14px}.vli.cur{border-color:var(--yel)}.vli b{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--panel2);font-size:12px}.vli.ok b{background:var(--green);color:#fff}
+.btn2{background:var(--panel2);color:var(--fg);border:1.5px solid var(--line)}
+.lockmsg{text-align:center;padding:30px 10px;color:var(--muted)}
+.solv{margin-top:10px}.qres{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:14px 0;background:var(--panel)}
+</style></head><body><main id="m"><p class="muted">Yükleniyor…</p></main>
+<script>
+(function () {
+  const M = document.getElementById('m'), code = (location.pathname.split('/')[2] || '').toUpperCase();
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const KEY = 'cal-' + code; let S = {}; try { S = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } };
+  S.w = S.w || {}; S.pa = S.pa || {}; S.ea = S.ea || {};
+  let D, step = 0, vi = 0;
+  fetch('/api/calisma/' + encodeURIComponent(code)).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => { if (!ok) throw new Error(j.error || 'Bulunamadı'); D = j; document.title = j.title; step = S.step || 0; draw(); })
+    .catch(e => { M.innerHTML = `<h1>Çalışma açılamadı</h1><p class="err">${esc(e.message)}</p>`; });
+  const ST = () => [{ t: 'Konu anlatımı', has: D.videos.length > 0 }, { t: 'Konu soruları', has: !!D.practice }, { t: 'Sınav', has: !!D.exam }, { t: 'Soru çözümleri', has: true }];
+  const done = i => i === 0 ? D.videos.every((_, k) => S.w[k]) : i === 1 ? !!S.pr : i === 2 ? !!S.er : false;
+  const openS = i => { for (let k = 0; k < i; k++) if (ST()[k].has && !done(k)) return false; return true; };
+  function go(i) { step = i; S.step = i; save(); draw(); window.scrollTo(0, 0); }
+  const nextStep = i => { let k = i + 1; while (k < 3 && !ST()[k].has) k++; return k; };
+  function draw() {
+    const st = ST();
+    if (!st[step].has || !openS(step)) step = [0, 1, 2, 3].find(i => st[i].has && !done(i)) ?? 3;
+    let h = `<p class="note">${esc(D.subject || '')} · ${D.grade}. sınıf · ${esc(D.exam_name)}</p><h1>Ortak sınav çalışması</h1>
+      <div class="steps">${st.map((x, i) => !x.has ? '' : `<button data-st="${i}" class="${i === step ? 'on' : done(i) ? 'done' : openS(i) ? '' : 'lock'}"><i>${done(i) && i !== step ? '✓' : i + 1}</i>${x.t}</button>`).join('')}</div>`;
+    if (step === 0) h += pVideos(); else if (step === 1) h += pQuiz(D.practice, 'pa', S.pr, 'Konu soruları', 'Her kazanımla ilgili soruları çöz; gönderince doğru cevapları ve açıklamaları göreceksin.');
+    else if (step === 2) h += pQuiz(D.exam, 'ea', S.er, 'Sınav', 'Ortak sınavda çıkabilecek sorular. Dikkatle çöz; gönderdikten sonra değiştiremezsin.', true);
+    else h += pSol();
+    M.innerHTML = h; wire();
+  }
+  function pVideos() {
+    const v = D.videos[vi]; const all = D.videos.every((_, k) => S.w[k]);
+    return `<h2>Konu anlatımı</h2><p class="muted">Videoları sırayla izle. Hepsini izleyince konu sorularına geçebilirsin.</p>
+      <p style="margin:6px 0"><b>${vi + 1}/${D.videos.length}</b> · ${esc(v.title)}</p>
+      <div class="vbox"><video id="vp" src="${esc(v.url)}" ${v.poster ? `poster="${esc(v.poster)}"` : ''} controls playsinline preload="metadata"></video></div>
+      <div class="vlist">${D.videos.map((x, k) => `<div class="vli ${k === vi ? 'cur' : ''} ${S.w[k] ? 'ok' : ''}" data-v="${k}"><b>${S.w[k] ? '✓' : k + 1}</b><span>${esc(x.title)}</span></div>`).join('')}</div>
+      <button id="nx" ${all ? '' : 'disabled'}>${all ? (ST()[1].has ? 'Konu sorularına geç →' : 'Sınava geç →') : `Tüm videoları izleyince devam edebilirsin (${D.videos.filter((_, k) => S.w[k]).length}/${D.videos.length})`}</button>`;
+  }
+  function qHtml(T, store, res) {
+    const P = Object.fromEntries((T.passages || []).map(p => [p.id, p])), shown = new Set(), rv = res ? Object.fromEntries(res.review.map(r => [r.n, r])) : {};
+    return T.questions.map(q => {
+      let pre = ''; if (q.passage && P[q.passage] && !shown.has(q.passage)) { shown.add(q.passage); const p = P[q.passage]; pre = `<div class="pass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="tx">${esc(p.text)}</div></div>`; }
+      const r = rv[q.n], given = S[store][q.n];
+      const body = q.type === 'mc' ? q.options.map((o, i) => { const L = 'ABCDE'[i]; const cls = r ? (L === r.answer ? 'ok' : L === given ? 'no' : '') : ''; return `<label class="opt ${cls}"><input type="radio" name="${store}${q.n}" value="${L}" ${given === L ? 'checked' : ''} ${r ? 'disabled' : ''}><b>${L})</b><span>${esc(o)}</span></label>`; }).join('')
+        : `<textarea data-t="${q.n}" ${r ? 'disabled' : ''} placeholder="Cevabını yaz">${esc(given || '')}</textarea>`;
+      const rev = !r ? '' : r.type === 'mc' ? `<div class="rev">${r.given === r.answer ? '✅ Doğru.' : r.given ? `❌ Doğru cevap ${r.answer}.` : `Boş; doğru cevap ${r.answer}.`} ${esc(r.explain || '')}</div>` : `<div class="rev"><b>Örnek cevap:</b> ${esc(r.model_answer || '')}${(r.rubric || []).length ? `<br><b>Puanlama:</b> ${r.rubric.map(x => esc(x.criterion) + ' (' + x.points + ')').join(' · ')}` : ''}</div>`;
+      return pre + `<div class="q" id="${store}q${q.n}"><p><b>${q.n}.</b> ${esc(q.stem)} <span class="note">(${q.points} puan)</span></p>${body}${rev}</div>`;
+    }).join('');
+  }
+  function pQuiz(T, store, res, title, intro, isExam) {
+    let h = `<h2>${title}</h2><p class="muted">${intro}</p>`;
+    if (res) h += `<div class="card">${res.mc_total ? `<div class="score">${res.mc_correct}/${res.mc_total}</div><p class="muted">Çoktan seçmelilerde puanın <b>${res.score}</b>/100</p>` : '<p>Cevapların gönderildi.</p>'}</div>`;
+    else if (isExam) h += `<div class="card"><label class="f" for="nm">Adın soyadın</label><input type="text" id="nm" maxlength="80" value="${esc(S.nm || '')}"><label class="f" for="cl">Sınıfın / numaran</label><input type="text" id="cl" maxlength="40" value="${esc(S.cl || '')}"></div>`;
+    h += qHtml(T, store, res);
+    h += res ? `<button id="nx">${isExam ? 'Soru çözümlerine geç →' : 'Sınava geç →'}</button>` : `<div class="sticky"><p class="err" id="er"></p><button id="go">${isExam ? 'Sınavı bitir ve gönder' : 'Cevapları gönder'}</button></div>`;
+    return h;
+  }
+  function pSol() {
+    const res = S.er; if (!res) return `<div class="lockmsg">Önce sınavı çöz.</div>`;
+    const T = D.exam, V = Object.fromEntries(D.solutions.map(v => [v.qn, v])), rv = Object.fromEntries(res.review.map(r => [r.n, r]));
+    const P = Object.fromEntries((T.passages || []).map(p => [p.id, p]));
+    return `<h2>Soru çözümleri</h2><p class="muted">Sınavdaki her sorunun doğru cevabı ve çözüm videosu. Bir video bitince bir sonraki soruya geçilir.</p>
+      <div class="card"><div class="score">${res.mc_correct}/${res.mc_total}</div><p class="muted">Sınav puanın (çoktan seçmeli): <b>${res.score}</b>/100</p></div>
+      ${T.questions.map(q => { const r = rv[q.n], v = V[q.n], p = q.passage && P[q.passage];
+        const verdict = r.type === 'mc' ? (r.given === r.answer ? '✅ Doğru yaptın' : r.given ? `❌ Senin cevabın ${r.given}, doğru cevap ${r.answer}` : `Boş bıraktın; doğru cevap ${r.answer}`) : '✍️ Açık uçlu';
+        return `<div class="qres" id="s${q.n}"><p><b>Soru ${q.n}.</b> ${esc(q.stem)}</p>${p ? `<details><summary class="note">Metni göster: ${esc(p.title || '')}</summary><div class="pass"><div class="tx">${esc(p.text)}</div></div></details>` : ''}
+          ${q.type === 'mc' ? `<ol type="A" style="margin:6px 0 0 18px;padding:0">${q.options.map((o, i) => `<li style="${'ABCDE'[i] === r.answer ? 'color:var(--green);font-weight:700' : ''}">${esc(o)}</li>`).join('')}</ol>` : ''}
+          <div class="rev"><b>${verdict}</b>${r.type === 'mc' && r.explain ? '<br>' + esc(r.explain) : ''}${r.type === 'open' ? `<br><b>Örnek cevap:</b> ${esc(r.model_answer || '')}` : ''}</div>
+          ${v ? `<div class="solv vbox"><video data-sv="${q.n}" src="${esc(v.url)}" ${v.poster ? `poster="${esc(v.poster)}"` : ''} controls playsinline preload="none"></video></div>` : '<p class="note">Bu soru için çözüm videosu yok.</p>'}</div>`; }).join('')}`;
+  }
+  function wire() {
+    M.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { const i = +b.dataset.st; if (openS(i)) go(i); });
+    const vp = document.getElementById('vp');
+    if (vp) { const mark = () => { if (!S.w[vi]) { S.w[vi] = 1; save(); const el = M.querySelector(`[data-v="${vi}"]`); if (el) { el.classList.add('ok'); el.querySelector('b').textContent = '✓'; } const nx = document.getElementById('nx'); if (D.videos.every((_, k) => S.w[k])) { draw(); } } };
+      vp.ontimeupdate = () => { if (vp.duration && vp.currentTime / vp.duration > .8) mark(); };
+      vp.onended = () => { mark(); if (vi < D.videos.length - 1) { vi++; draw(); const n = document.getElementById('vp'); if (n) n.play().catch(() => {}); } }; }
+    M.querySelectorAll('[data-v]').forEach(el => el.onclick = () => { vi = +el.dataset.v; draw(); const n = document.getElementById('vp'); if (n) n.play().catch(() => {}); });
+    const nx = document.getElementById('nx'); if (nx) nx.onclick = () => go(step === 0 ? nextStep(0) : step === 1 ? 2 : 3);
+    const store = step === 1 ? 'pa' : 'ea';
+    M.querySelectorAll('input[type=radio]').forEach(x => x.onchange = () => { S[store][x.name.slice(2)] = x.value; save(); });
+    M.querySelectorAll('textarea[data-t]').forEach(x => x.oninput = () => { S[store][x.dataset.t] = x.value; save(); });
+    ['nm', 'cl'].forEach(k => { const el = document.getElementById(k); if (el) el.oninput = () => { S[k] = el.value; save(); }; });
+    const g = document.getElementById('go'); if (g) g.onclick = async () => {
+      const isExam = step === 2, T = isExam ? D.exam : D.practice, er = document.getElementById('er');
+      if (isExam && String(S.nm || '').trim().length < 2) { er.textContent = 'Önce adını yaz.'; document.getElementById('nm').focus(); return; }
+      const empty = T.questions.filter(q => !String(S[store][q.n] || '').trim()).length;
+      if (empty && !confirm(`${empty} soru boş. Yine de gönderilsin mi?`)) return;
+      if (isExam && !confirm('Sınav gönderilsin mi? Gönderdikten sonra cevaplarını değiştiremezsin.')) return;
+      g.disabled = true;
+      try { const r = await fetch(`/api/calisma/${encodeURIComponent(code)}/${isExam ? 'exam' : 'practice'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: S.nm || '', cls: S.cl || '', answers: S[store] }) });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Gönderilemedi');
+        if (isExam) S.er = j; else S.pr = j; save(); draw(); window.scrollTo(0, 0);
+      } catch (x) { er.textContent = x.message; g.disabled = false; }
+    };
+    M.querySelectorAll('video[data-sv]').forEach(v => v.onended = () => { const all = [...M.querySelectorAll('video[data-sv]')]; const i = all.indexOf(v); if (all[i + 1]) { all[i + 1].closest('.qres').scrollIntoView({ behavior: 'smooth' }); all[i + 1].play().catch(() => {}); } });
+  }
+})();
+</script></body></html>

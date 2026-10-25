@@ -387,7 +387,7 @@ async function apkAvailable() {
 }
 on('GET', '/api/app-info', async (req, res) => send(res, 200, { apk: await apkAvailable() ? APK_URL : null, play: process.env.APP_PLAY_URL || null, ios: process.env.APP_IOS_URL || null }), 'public');
 const SERIES = require('./lib/series')({ on, db, q, send, readBody, isAdmin, activeLimits, monthUsage, background, FORMATS, TONES, now });
-require('./lib/ortak')({ series: SERIES, on, db, q, send, readBody, isAdmin, claude, ctxFor, logClaude, now, shortId: () => shortId(), publicBase });
+require('./lib/ortak')({ series: SERIES, storage, on, db, q, send, readBody, isAdmin, claude, ctxFor, logClaude, now, shortId: () => shortId(), publicBase });
 /* ---------- hesaplar ---------- */
 on('POST', '/api/auth/register', async (req, res) => {
   const b = await readBody(req, 8000); const ip = ipOf(req); if (auth.tooMany(ip)) return send(res, 429, { error: 'Çok fazla deneme, biraz sonra tekrar deneyin' });
@@ -875,6 +875,7 @@ http.createServer(async (req, res) => {
     let file = path.normalize(path.join(PUBLIC, url.pathname === '/' ? 'index.html' : url.pathname));
     if (/^\/izle\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'izle.html');
     else if (/^\/test\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'test.html');
+    else if (/^\/calisma\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'calisma.html');
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
     const hdr = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' };
     if (file.endsWith('sw.js')) hdr['Service-Worker-Allowed'] = '/';
