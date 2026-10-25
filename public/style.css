@@ -276,3 +276,23 @@ label{font-weight:700;letter-spacing:.06em}
 .promo .ptx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .promo .ptx b{font:800 17px/1.25 var(--display,inherit)}.promo .ptx span{font-size:14px;line-height:1.4;color:var(--muted)}
 .promo .parr{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--panel2);font-weight:800;font-size:18px}
+/* ortak sınav: sihirbaz ve adımlar */
+.wz{margin-top:14px}.wzh{display:flex;align-items:center;gap:10px;margin:18px 0 8px}.wzh span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:800 14px var(--sans);background:var(--panel2);border:1.5px solid var(--line)}.wzh.done span{background:var(--green);border-color:var(--green);color:#fff}.wzh b{font-size:16px}
+.wzb{padding-left:38px}@media(max-width:520px){.wzb{padding-left:0}}
+.gradebtns{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.gradebtns button{flex-direction:column;justify-content:center;padding:16px 6px;gap:0}.gradebtns b{font:900 30px/1 var(--display,inherit)}.gradebtns span{font-size:12px;color:var(--muted)}
+.exbtns,.scbtns{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}.exbtns button,.scbtns button{flex-direction:column;align-items:flex-start;text-align:left;gap:2px}.exbtns span,.scbtns span{font-size:12px;color:var(--muted);font-weight:600}
+.gradebtns button.on,.exbtns button.on,.scbtns button.on{background:var(--yel);border-color:var(--yel);color:#111}.gradebtns button.on span,.exbtns button.on span,.scbtns button.on span{color:#333}
+.kzbox{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel2)}.kzbox p{margin:0 0 8px}.kzbox ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:14px}.kzbox li{display:flex;gap:8px;align-items:flex-start}.kc{flex:none;min-width:24px;height:24px;border-radius:7px;background:var(--yel);color:#111;font-weight:800;display:grid;place-items:center;font-size:13px}
+button.big{font-size:16px;padding:14px 22px}
+.oscard .osdots{display:flex;gap:4px;margin-top:6px}.osdots i{width:22px;height:5px;border-radius:3px;background:var(--line)}.osdots i.on{background:var(--green)}
+.stepper{list-style:none;margin:18px 0 0;padding:0}
+.sstep{display:flex;gap:14px;position:relative;padding-bottom:18px}.sstep:not(:last-child)::before{content:"";position:absolute;left:17px;top:38px;bottom:0;width:2px;background:var(--line)}.sstep.done:not(:last-child)::before{background:var(--green)}
+.sdot{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font:800 15px var(--sans);background:var(--panel);border:2px solid var(--line);z-index:1}
+.sstep.done .sdot{background:var(--green);border-color:var(--green);color:#fff}.sstep.cur .sdot{background:var(--yel);border-color:var(--yel);color:#111;box-shadow:0 0 0 5px color-mix(in srgb,var(--yel) 30%,transparent)}
+.sbody{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}.sstep.cur .sbody{border:1.5px solid var(--yel)}.sstep.lock .sbody{opacity:.55}
+.shead{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}.shead b{font-size:16px}
+.sact .grid3{margin-top:4px}@media(max-width:560px){.sact .grid3{grid-template-columns:1fr}}
+.oslist{margin:8px 0}.oslist a.row{padding:10px 12px;font-size:14px}
+.osbusy{background:var(--panel2);border-radius:10px;padding:10px 12px}
+.osqr{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0}.osqr #sqr{background:#fff;padding:8px;border-radius:10px}
+.qpick{display:grid;gap:8px;margin:8px 0}.qrow{display:flex!important;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}.qrow input{margin-top:3px}
