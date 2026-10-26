@@ -1242,7 +1242,7 @@
     const P = Object.fromEntries((d.passages || []).map(p => [p.id, p])); const shown = new Set();
     return d.questions.map(q => {
       let pre = '';
-      if (q.passage && P[q.passage] && !shown.has(q.passage)) { const p = P[q.passage]; shown.add(q.passage); pre = `<div class="tpass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="ttext">${esc(p.text)}</div></div>`; }
+      if (q.passage && P[q.passage] && !shown.has(q.passage)) { const p = P[q.passage]; shown.add(q.passage); pre = `<div class="tpass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="ttext">${esc(p.text).replace(/&lt;(\/?)u&gt;/g, '<$1u>')}</div></div>`; }
       const ref = q.passage && P[q.passage] && !pre ? `<span class="note">(${esc(P[q.passage].title || q.passage)} metnine göre)</span> ` : '';
       const crit = q.show_criteria && (q.rubric || []).length && !withKey ? `<p class="note" style="margin:6px 0 2px">Değerlendirmede aşağıdaki kriterler dikkate alınacaktır.</p><ul class="tcrit">${q.rubric.map(r => `<li>${esc(r.criterion)}</li>`).join('')}</ul>` : '';
       let body;

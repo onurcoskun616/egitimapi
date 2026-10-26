@@ -60,7 +60,7 @@ button{font:800 16px var(--m);color:#111;background:var(--yel);border:0;border-r
   function start() {
     const P = Object.fromEntries((T.passages || []).map(p => [p.id, p])), shown = new Set(); draft.a = draft.a || {};
     const qs = T.questions.map(q => {
-      let pre = ''; if (q.passage && P[q.passage] && !shown.has(q.passage)) { shown.add(q.passage); const p = P[q.passage]; pre = `<div class="pass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="tx">${esc(p.text)}</div></div>`; }
+      let pre = ''; if (q.passage && P[q.passage] && !shown.has(q.passage)) { shown.add(q.passage); const p = P[q.passage]; pre = `<div class="pass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="tx">${esc(p.text).replace(/&lt;(\/?)u&gt;/g, '<$1u>')}</div></div>`; }
       const ref = q.passage && P[q.passage] && !pre ? `<span class="note">(${esc(P[q.passage].title || '')} metnine göre)</span> ` : '';
       const body = q.type === 'mc' ? q.options.map((o, i) => { const L = 'ABCDE'[i]; return `<label class="opt" data-q="${q.n}" data-l="${L}"><input type="radio" name="q${q.n}" value="${L}" ${draft.a[q.n] === L ? 'checked' : ''}><b>${L})</b><span>${esc(o)}</span></label>`; }).join('') : openBody(q, k => draft.a[k], false);
       return pre + `<div class="q" id="q${q.n}"><p><b>${q.n}.</b> ${ref}${esc(q.stem)} <span class="note">(${q.points} puan)</span></p>${body}<div class="r"></div></div>`;

@@ -96,7 +96,7 @@ h2{font:900 24px/1.15 var(--d);margin:18px 0 6px}
   function qHtml(T, store, res) {
     const P = Object.fromEntries((T.passages || []).map(p => [p.id, p])), shown = new Set(), rv = res ? Object.fromEntries(res.review.map(r => [r.n, r])) : {};
     return T.questions.map(q => {
-      let pre = ''; if (q.passage && P[q.passage] && !shown.has(q.passage)) { shown.add(q.passage); const p = P[q.passage]; pre = `<div class="pass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="tx">${esc(p.text)}</div></div>`; }
+      let pre = ''; if (q.passage && P[q.passage] && !shown.has(q.passage)) { shown.add(q.passage); const p = P[q.passage]; pre = `<div class="pass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="tx">${esc(p.text).replace(/&lt;(\/?)u&gt;/g, '<$1u>')}</div></div>`; }
       const r = rv[q.n], given = S[store][q.n];
       const body = q.type === 'mc' ? q.options.map((o, i) => { const L = 'ABCDE'[i]; const cls = r ? (L === r.answer ? 'ok' : L === given ? 'no' : '') : ''; return `<label class="opt ${cls}"><input type="radio" name="${store}${q.n}" value="${L}" ${given === L ? 'checked' : ''} ${r ? 'disabled' : ''}><b>${L})</b><span>${esc(o)}</span></label>`; }).join('')
         : openBody(q, k => S[store][k], !!r);
@@ -120,7 +120,7 @@ h2{font:900 24px/1.15 var(--d);margin:18px 0 6px}
       <div class="card"><div class="score">${res.mc_correct}/${res.mc_total}</div><p class="muted">Sınav puanın (çoktan seçmeli): <b>${res.score}</b>/100</p></div>
       ${T.questions.map(q => { const r = rv[q.n], v = V[q.n], p = q.passage && P[q.passage];
         const verdict = r.type === 'mc' ? (r.given === r.answer ? '✅ Doğru yaptın' : r.given ? `❌ Senin cevabın ${r.given}, doğru cevap ${r.answer}` : `Boş bıraktın; doğru cevap ${r.answer}`) : '✍️ Açık uçlu';
-        return `<div class="qres" id="s${q.n}"><p><b>Soru ${q.n}.</b> ${esc(q.stem)}</p>${q.parts ? q.parts.map(pp => `<p style="margin:4px 0 4px 10px"><b>${esc(pp.label)})</b> ${esc(pp.stem)} <span class="note">(${pp.points} puan)</span></p>`).join('') : ''}${p ? `<details><summary class="note">Metni göster: ${esc(p.title || '')}</summary><div class="pass"><div class="tx">${esc(p.text)}</div></div></details>` : ''}
+        return `<div class="qres" id="s${q.n}"><p><b>Soru ${q.n}.</b> ${esc(q.stem)}</p>${q.parts ? q.parts.map(pp => `<p style="margin:4px 0 4px 10px"><b>${esc(pp.label)})</b> ${esc(pp.stem)} <span class="note">(${pp.points} puan)</span></p>`).join('') : ''}${p ? `<details><summary class="note">Metni göster: ${esc(p.title || '')}</summary><div class="pass"><div class="tx">${esc(p.text).replace(/&lt;(\/?)u&gt;/g, '<$1u>')}</div></div></details>` : ''}
           ${q.type === 'mc' ? `<ol type="A" style="margin:6px 0 0 18px;padding:0">${q.options.map((o, i) => `<li style="${'ABCDE'[i] === r.answer ? 'color:var(--green);font-weight:700' : ''}">${esc(o)}</li>`).join('')}</ol>` : ''}
           <div class="rev"><b>${verdict}</b>${r.type === 'mc' && r.explain ? '<br>' + esc(r.explain) : ''}</div>${r.type === 'open' ? openRev(r) : ''}
           ${v ? `<div class="solv vbox"><video data-sv="${q.n}" src="${esc(v.url)}" ${v.poster ? `poster="${esc(v.poster)}"` : ''} controls playsinline preload="none"></video></div>` : '<p class="note">Bu soru için çözüm videosu yok.</p>'}</div>`; }).join('')}`;
