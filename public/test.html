@@ -48,7 +48,7 @@ button{font:800 16px var(--m);color:#111;background:var(--yel);border:0;border-r
     if (q.parts) return q.parts.map(p => `<div class="part"><p><b>${esc(p.label)})</b> ${esc(p.stem)} <span class="note">(${p.points} puan)</span></p>${tbl(p.table)}${ta(q.n + p.label, p.table ? 'Tablodaki boşlukları sırayla yaz' : 'Cevabını yaz')}</div>`).join('');
     return tbl(q.table) + (q.criteria ? `<p class="note" style="margin:6px 0 2px">Değerlendirmede şu kriterler dikkate alınacak:</p><ul class="crit">${q.criteria.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : '') + ta(q.n, q.table ? 'Tablodaki boşlukları sırayla yaz' : 'Cevabını yaz');
   }
-  const keyBlock = (x, mdl) => `${x.answer_table ? tbl(x.answer_table) : ''}<b>Doğru cevap:</b> ${esc(mdl || '')}${x.partial ? `<br><b>Kısmi doğru:</b> ${esc(x.partial)}` : ''}`;
+  const keyBlock = (x, mdl) => `${x.answer_table ? tbl(x.answer_table) : ''}<b>Tam puan:</b> ${esc(mdl || '')}${x.partial ? `<br><b>Kısmi puan:</b> ${esc(x.partial)}` : ''}`;
   function openRev(r) {
     if (r.parts) return r.parts.map(p => `<div class="rev"><b>${esc(p.label)})</b> ${keyBlock(p, p.answer)}</div>`).join('');
     return `<div class="rev">${keyBlock(r, r.model_answer)}${(r.rubric || []).length ? `<br><b>Puanlama:</b> ${r.rubric.map(x => esc(x.criterion) + ' (' + x.points + ')').join(' · ')}` : ''}</div>`;

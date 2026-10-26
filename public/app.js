@@ -1237,7 +1237,7 @@
     if (busy || (step === 3 && EX.published)) pollTimer = setTimeout(poll, busy ? 8000 : 20000);
   }
   const tblHtml = t => t ? `<table class="ttbl">${t.headers.length ? `<thead><tr>${t.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>` : ''}<tbody>${t.rows.map(r => `<tr>${r.map(c => `<td class="${c ? '' : 'blank'}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '';
-  const keyHtml = (x, mdl) => `<div class="tkey">${x.answer_table ? tblHtml(x.answer_table) : ''}<p><b>Doğru cevap:</b> ${esc(mdl || '')}</p>${x.partial ? `<p><b>Kısmi doğru cevap:</b> ${esc(x.partial)}</p>` : ''}${x.wrong ? `<p><b>Yanlış cevap:</b> ${esc(x.wrong)}</p>` : ''}${(x.rubric || []).length ? `<ul>${x.rubric.map(r => `<li>${esc(r.criterion)} <b>(${r.points} puan)</b></li>`).join('')}</ul>` : ''}</div>`;
+  const keyHtml = (x, mdl) => `<div class="tkey">${x.answer_table ? tblHtml(x.answer_table) : ''}<p><b>TAM PUAN:</b> ${esc(mdl || '')}</p>${x.partial ? `<p><b>KISMİ PUAN:</b> ${esc(x.partial)}</p>` : ''}${x.wrong ? `<p><b>SIFIR PUAN:</b> ${esc(x.wrong)}</p>` : ''}${(x.rubric || []).length ? `<ul>${x.rubric.map(r => `<li>${esc(r.criterion)} <b>(${r.points} puan)</b></li>`).join('')}</ul>` : ''}</div>`;
   function testHtml(d, withKey) {
     const P = Object.fromEntries((d.passages || []).map(p => [p.id, p])); const shown = new Set();
     return d.questions.map(q => {
