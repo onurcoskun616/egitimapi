@@ -45,11 +45,25 @@ h2{font:900 24px/1.15 var(--d);margin:18px 0 6px}
 .btn2{background:var(--panel2);color:var(--fg);border:1.5px solid var(--line)}
 .lockmsg{text-align:center;padding:30px 10px;color:var(--muted)}
 .solv{margin-top:10px}.qres{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:14px 0;background:var(--panel)}
+.tw{overflow-x:auto;margin:6px 0}.tt{border-collapse:collapse;width:100%;font-size:14px}.tt th,.tt td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}.tt th{background:var(--panel2)}.tt td.b{background:color-mix(in srgb,var(--yel) 10%,transparent);min-width:60px}.part{margin:8px 0 12px 10px}.crit{margin:2px 0 8px 18px;font-size:14px}
 </style></head><body><main id="m"><p class="muted">Yükleniyor…</p></main>
 <script>
 (function () {
   const M = document.getElementById('m'), code = (location.pathname.split('/')[2] || '').toUpperCase();
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const tbl = t => t ? `<div class="tw"><table class="tt">${t.headers.length ? `<tr>${t.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr>` : ''}${t.rows.map(r => `<tr>${r.map(c => `<td class="${c ? '' : 'b'}">${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>` : '';
+  const keysOf = q => q.parts ? q.parts.map(p => q.n + p.label) : [String(q.n)];
+  function openBody(q, val, dis) {
+    const ta = (k, ph) => `<textarea data-t="${k}" ${dis ? 'disabled' : ''} placeholder="${ph}">${esc(val(k) || '')}</textarea>`;
+    if (q.parts) return q.parts.map(p => `<div class="part"><p><b>${esc(p.label)})</b> ${esc(p.stem)} <span class="note">(${p.points} puan)</span></p>${tbl(p.table)}${ta(q.n + p.label, p.table ? 'Tablodaki boşlukları sırayla yaz' : 'Cevabını yaz')}</div>`).join('');
+    return tbl(q.table) + (q.criteria ? `<p class="note" style="margin:6px 0 2px">Değerlendirmede şu kriterler dikkate alınacak:</p><ul class="crit">${q.criteria.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : '') + ta(q.n, q.table ? 'Tablodaki boşlukları sırayla yaz' : 'Cevabını yaz');
+  }
+  const keyBlock = (x, mdl) => `${x.answer_table ? tbl(x.answer_table) : ''}<b>Doğru cevap:</b> ${esc(mdl || '')}${x.partial ? `<br><b>Kısmi doğru:</b> ${esc(x.partial)}` : ''}`;
+  function openRev(r) {
+    if (r.parts) return r.parts.map(p => `<div class="rev"><b>${esc(p.label)})</b> ${keyBlock(p, p.answer)}</div>`).join('');
+    return `<div class="rev">${keyBlock(r, r.model_answer)}${(r.rubric || []).length ? `<br><b>Puanlama:</b> ${r.rubric.map(x => esc(x.criterion) + ' (' + x.points + ')').join(' · ')}` : ''}</div>`;
+  }
   const KEY = 'cal-' + code; let S = {}; try { S = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } };
   S.w = S.w || {}; S.pa = S.pa || {}; S.ea = S.ea || {};
@@ -85,8 +99,8 @@ h2{font:900 24px/1.15 var(--d);margin:18px 0 6px}
       let pre = ''; if (q.passage && P[q.passage] && !shown.has(q.passage)) { shown.add(q.passage); const p = P[q.passage]; pre = `<div class="pass"><b>${esc(p.title || 'Metin')}</b>${p.source ? ` <span class="note">(${esc(p.source)})</span>` : ''}<div class="tx">${esc(p.text)}</div></div>`; }
       const r = rv[q.n], given = S[store][q.n];
       const body = q.type === 'mc' ? q.options.map((o, i) => { const L = 'ABCDE'[i]; const cls = r ? (L === r.answer ? 'ok' : L === given ? 'no' : '') : ''; return `<label class="opt ${cls}"><input type="radio" name="${store}${q.n}" value="${L}" ${given === L ? 'checked' : ''} ${r ? 'disabled' : ''}><b>${L})</b><span>${esc(o)}</span></label>`; }).join('')
-        : `<textarea data-t="${q.n}" ${r ? 'disabled' : ''} placeholder="Cevabını yaz">${esc(given || '')}</textarea>`;
-      const rev = !r ? '' : r.type === 'mc' ? `<div class="rev">${r.given === r.answer ? '✅ Doğru.' : r.given ? `❌ Doğru cevap ${r.answer}.` : `Boş; doğru cevap ${r.answer}.`} ${esc(r.explain || '')}</div>` : `<div class="rev"><b>Örnek cevap:</b> ${esc(r.model_answer || '')}${(r.rubric || []).length ? `<br><b>Puanlama:</b> ${r.rubric.map(x => esc(x.criterion) + ' (' + x.points + ')').join(' · ')}` : ''}</div>`;
+        : openBody(q, k => S[store][k], !!r);
+      const rev = !r ? '' : r.type === 'mc' ? `<div class="rev">${r.given === r.answer ? '✅ Doğru.' : r.given ? `❌ Doğru cevap ${r.answer}.` : `Boş; doğru cevap ${r.answer}.`} ${esc(r.explain || '')}</div>` : openRev(r);
       return pre + `<div class="q" id="${store}q${q.n}"><p><b>${q.n}.</b> ${esc(q.stem)} <span class="note">(${q.points} puan)</span></p>${body}${rev}</div>`;
     }).join('');
   }
@@ -106,9 +120,9 @@ h2{font:900 24px/1.15 var(--d);margin:18px 0 6px}
       <div class="card"><div class="score">${res.mc_correct}/${res.mc_total}</div><p class="muted">Sınav puanın (çoktan seçmeli): <b>${res.score}</b>/100</p></div>
       ${T.questions.map(q => { const r = rv[q.n], v = V[q.n], p = q.passage && P[q.passage];
         const verdict = r.type === 'mc' ? (r.given === r.answer ? '✅ Doğru yaptın' : r.given ? `❌ Senin cevabın ${r.given}, doğru cevap ${r.answer}` : `Boş bıraktın; doğru cevap ${r.answer}`) : '✍️ Açık uçlu';
-        return `<div class="qres" id="s${q.n}"><p><b>Soru ${q.n}.</b> ${esc(q.stem)}</p>${p ? `<details><summary class="note">Metni göster: ${esc(p.title || '')}</summary><div class="pass"><div class="tx">${esc(p.text)}</div></div></details>` : ''}
+        return `<div class="qres" id="s${q.n}"><p><b>Soru ${q.n}.</b> ${esc(q.stem)}</p>${q.parts ? q.parts.map(pp => `<p style="margin:4px 0 4px 10px"><b>${esc(pp.label)})</b> ${esc(pp.stem)} <span class="note">(${pp.points} puan)</span></p>`).join('') : ''}${p ? `<details><summary class="note">Metni göster: ${esc(p.title || '')}</summary><div class="pass"><div class="tx">${esc(p.text)}</div></div></details>` : ''}
           ${q.type === 'mc' ? `<ol type="A" style="margin:6px 0 0 18px;padding:0">${q.options.map((o, i) => `<li style="${'ABCDE'[i] === r.answer ? 'color:var(--green);font-weight:700' : ''}">${esc(o)}</li>`).join('')}</ol>` : ''}
-          <div class="rev"><b>${verdict}</b>${r.type === 'mc' && r.explain ? '<br>' + esc(r.explain) : ''}${r.type === 'open' ? `<br><b>Örnek cevap:</b> ${esc(r.model_answer || '')}` : ''}</div>
+          <div class="rev"><b>${verdict}</b>${r.type === 'mc' && r.explain ? '<br>' + esc(r.explain) : ''}</div>${r.type === 'open' ? openRev(r) : ''}
           ${v ? `<div class="solv vbox"><video data-sv="${q.n}" src="${esc(v.url)}" ${v.poster ? `poster="${esc(v.poster)}"` : ''} controls playsinline preload="none"></video></div>` : '<p class="note">Bu soru için çözüm videosu yok.</p>'}</div>`; }).join('')}`;
   }
   function wire() {
@@ -126,7 +140,7 @@ h2{font:900 24px/1.15 var(--d);margin:18px 0 6px}
     const g = document.getElementById('go'); if (g) g.onclick = async () => {
       const isExam = step === 2, T = isExam ? D.exam : D.practice, er = document.getElementById('er');
       if (isExam && String(S.nm || '').trim().length < 2) { er.textContent = 'Önce adını yaz.'; document.getElementById('nm').focus(); return; }
-      const empty = T.questions.filter(q => !String(S[store][q.n] || '').trim()).length;
+      const empty = T.questions.filter(q => keysOf(q).every(k => !String(S[store][k] || '').trim())).length;
       if (empty && !confirm(`${empty} soru boş. Yine de gönderilsin mi?`)) return;
       if (isExam && !confirm('Sınav gönderilsin mi? Gönderdikten sonra cevaplarını değiştiremezsin.')) return;
       g.disabled = true;

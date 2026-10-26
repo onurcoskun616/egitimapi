@@ -316,3 +316,5 @@ h1.pgt{font-size:clamp(24px,6vw,34px);margin:14px 0 6px}
 .vact{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.vact button,.vact .btn{min-height:40px;padding:8px 12px;font-size:13px}
 .peek{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}.peekl{margin:0 0 8px;padding-left:20px;font-size:14px;display:grid;gap:8px}.peekl b{display:block}.peekl span{color:var(--muted)}
 .sharecard{margin-top:18px;border:1.5px solid var(--yel)}.sharecard #cqr{background:#fff;padding:8px;border-radius:10px}
+.tview .ttbl{border-collapse:collapse;width:100%;margin:8px 0;font-size:13.5px}.tview .ttbl th,.tview .ttbl td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}.tview .ttbl th{background:var(--panel2)}.tview .ttbl td.blank{background:color-mix(in srgb,var(--yel) 8%,transparent)}
+.tview .tpart{margin:8px 0 8px 14px}.tview .tkey p{margin:4px 0}.tview .tcrit{margin:2px 0 6px 18px;font-size:13px}.tview .ttl{font-size:15px;margin:18px 0 4px}.tview .ttbl.pt th,.tview .ttbl.pt td{text-align:center}
