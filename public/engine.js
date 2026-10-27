@@ -1113,9 +1113,9 @@
     txt(st.text, -w / 2 + h * .95 + tw / 2 + sz * .2, sz * .36, `900 ${sz}px ${FN}`, INK, 'center'); c.restore();
   }
   function pastelChips(sc, Lp, u) {
-    const ch = (sc.chips || []).filter(x => x && x.text && sc.capT[x.at] != null && u >= sc.capT[x.at] + .15); if (!ch.length) return;
+    const ch = (sc.chips || []).filter(x => x && x.text && sc.capT[x.at] != null); if (!ch.some(x => u >= sc.capT[x.at] + .15)) return; // yerleşim tüm haplara göre sabit, görünmeyenler çizilmez
     const U = Math.min(F.W, F.H), sz = Math.round(U * .027); c.font = `900 ${sz}px ${FN}`; const ws = ch.map(x => c.measureText(String(x.text).toLocaleUpperCase('tr')).width + sz * 1.6), gap = sz * .7, tot = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1); let x = F.W / 2 - tot / 2; const y = F.H * Lp.chipY;
-    ch.forEach((it, i) => { const k = outB(cl((u - sc.capT[it.at] - .15) / .3)), w = ws[i], h = sz * 1.8; c.save(); c.translate(x + w / 2, y); c.scale(.5 + .5 * k, .5 + .5 * k); rr(-w / 2 + 2, -h / 2 + 4, w, h, h / 2); c.fillStyle = INK; c.fill(); rr(-w / 2, -h / 2, w, h, h / 2); inkFill(it.fill ? '#c96a43' : '#fffdf8', 2.5); txt(String(it.text).toLocaleUpperCase('tr'), 0, sz * .36, `900 ${sz}px ${FN}`, it.fill ? '#fffdf8' : INK, 'center'); c.restore(); x += w + gap; });
+    ch.forEach((it, i) => { const k = outB(cl((u - sc.capT[it.at] - .15) / .3)), w = ws[i], h = sz * 1.8; if (u < sc.capT[it.at] + .15) { x += w + gap; return; } c.save(); c.translate(x + w / 2, y); c.scale(.5 + .5 * k, .5 + .5 * k); rr(-w / 2 + 2, -h / 2 + 4, w, h, h / 2); c.fillStyle = INK; c.fill(); rr(-w / 2, -h / 2, w, h, h / 2); inkFill(it.fill ? '#c96a43' : '#fffdf8', 2.5); txt(String(it.text).toLocaleUpperCase('tr'), 0, sz * .36, `900 ${sz}px ${FN}`, it.fill ? '#fffdf8' : INK, 'center'); c.restore(); x += w + gap; });
   }
   // Kelime kelime altyazı: beyaz hap içinde 1–3 kelime; konuşulan kelimenin arkasında sarı vurgu, gelecek kelimeler soluk
   function pastelCaption(sc, u, Lp) {
