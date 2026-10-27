@@ -318,3 +318,7 @@ h1.pgt{font-size:clamp(24px,6vw,34px);margin:14px 0 6px}
 .sharecard{margin-top:18px;border:1.5px solid var(--yel)}.sharecard #cqr{background:#fff;padding:8px;border-radius:10px}
 .tview .ttbl{border-collapse:collapse;width:100%;margin:8px 0;font-size:13.5px}.tview .ttbl th,.tview .ttbl td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}.tview .ttbl th{background:var(--panel2)}.tview .ttbl td.blank{background:color-mix(in srgb,var(--yel) 8%,transparent)}
 .tview .tpart{margin:8px 0 8px 14px}.tview .tkey p{margin:4px 0}.tview .tcrit{margin:2px 0 6px 18px;font-size:13px}.tview .ttl{font-size:15px;margin:18px 0 4px}.tview .ttbl.pt th,.tview .ttbl.pt td{text-align:center}
+.stprev.st-pastel{background:#f6efe4}
+.stprev.st-pastel b{position:absolute;left:18%;top:28%;width:16%;height:46%;border-radius:40% 40% 8px 8px;background:linear-gradient(#e9b48e 0 30%,#c96a43 30% 70%,#8fae8b 70%);border:2px solid #4a2e24}
+.stprev.st-pastel i{position:absolute;left:46%;top:30%;width:36%;height:30%;border-radius:8px;background:#f2c76a;border:2px solid #4a2e24}
+.stprev.st-pastel em{position:absolute;left:24%;top:80%;width:52%;height:12%;border-radius:20px;background:#fffdf8;border:2px solid #4a2e24}
