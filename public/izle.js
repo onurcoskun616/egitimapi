@@ -70,7 +70,7 @@
   function player(t0, resumed) {
     const pv = pickVideo();
     app.innerHTML = `${brand()}<h1 style="font-size:clamp(22px,4.5vw,32px)">${esc(L.title)}</h1>
-      <div class="stage" id="st" style="aspect-ratio:${AR[pv.f] || '9/16'}"><video id="v" playsinline preload="auto" controls controlslist="nofullscreen nodownload noplaybackrate" disablepictureinpicture src="${esc(pv.url)}"></video><button class="fsbtn" id="fs" type="button">Tam ekran</button></div>
+      <div class="stage" id="st" style="aspect-ratio:${AR[pv.f] || '9/16'}"><video id="v" playsinline preload="metadata" controls controlslist="nofullscreen nodownload noplaybackrate" disablepictureinpicture src="${esc(pv.url)}"></video><button class="fsbtn" id="fs" type="button">Tam ekran</button></div>
       <div class="cps" id="cps" aria-label="Bölüm kontrolleri"></div><p class="note" id="hint">${resumed ? `Kaldığın yerden devam ediyorsun.${!L.quiz ? ' <button type="button" id="rst" style="min-height:32px;padding:4px 10px;font-size:13px;margin-left:6px">Baştan izle</button>' : ''}` : cps.length ? 'Oynat düğmesine bas. Video bölüm sonlarında soru sormak için duracak.' : 'Oynat düğmesine bas.'}</p>`;
     video = document.getElementById('v'); stage = document.getElementById('st');
     const rst = document.getElementById('rst'); if (rst) rst.onclick = () => { video.currentTime = 0; video.play().catch(() => { }); rst.remove(); };

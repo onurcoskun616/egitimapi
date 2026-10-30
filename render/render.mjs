@@ -42,7 +42,7 @@ async function main() {
   // Supabase ücretsiz planında dosya sınırı 50 MB: uzun videolarda bit hızını süreye göre sınırla
   const vKbps = videoKbps(n / FPS);
   console.log(`Video bit hızı tavanı: ${vKbps} kbps`);
-  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-maxrate', vKbps + 'k', '-bufsize', vKbps * 2 + 'k', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-t', (n / FPS).toFixed(3), '-movflags', '+faststart', out);
+  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '25', '-maxrate', vKbps + 'k', '-bufsize', vKbps * 2 + 'k', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-t', (n / FPS).toFixed(3), '-movflags', '+faststart', out);
   const ff = spawn('ffmpeg', args, { stdio: ['pipe', 'inherit', 'inherit'] });
   const ffDone = new Promise((ok, no) => ff.on('close', code => code === 0 ? ok() : no(new Error('ffmpeg çıkış kodu ' + code))));
 
@@ -117,6 +117,6 @@ async function ambient(input, output) {
 }
 
 const MAX_BYTES = 46 * 1048576;
-function videoKbps(sec) { return Math.max(600, Math.min(8000, Math.floor(MAX_BYTES * 8 / 1000 / Math.max(sec, 1) - 140))); }
+function videoKbps(sec) { return Math.max(600, Math.min(2800, Math.floor(MAX_BYTES * 8 / 1000 / Math.max(sec, 1) - 140))); }
 
 main().catch(async e => { console.error(e); try { await post('status', { status: 'failed', error: e.message }); } catch { } process.exit(1); });

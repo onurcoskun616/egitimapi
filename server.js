@@ -546,7 +546,7 @@ on('GET', '/api/projects/:id', async (req, res, { id }) => {
   const at = await db.one('audio_tracks', `project_id=eq.${q(id)}&order=created_at.desc&select=created_at`);
   const done = await db.select('render_jobs', `project_id=eq.${q(id)}&status=eq.done&order=created_at.desc&select=format,output_path,created_at`);
   const videos = []; const seen = new Set();
-  for (const j of done) { const f = j.format || 'dikey'; if (seen.has(f) || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; seen.add(f); videos.push({ format: f, label: FORMATS[f] || f, url: await storage.signedUrl(j.output_path, 24 * 3600) }); }
+  for (const j of done) { const f = j.format || 'dikey'; if (seen.has(f) || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; seen.add(f); videos.push({ format: f, label: FORMATS[f] || f, url: await thumbUrl(j.output_path) }); }
   const main = videos.find(v => v.format === (p.format || 'dikey')) || videos[0];
   const videoUrl = main ? main.url : null;
   const sources = await db.select('project_sources', `project_id=eq.${q(id)}&select=name,chars,created_at&order=created_at.asc`);
@@ -679,7 +679,7 @@ on('GET', '/api/l/:sid', async (req, res, { sid }) => {
   const { p, v } = L;
   const at = await db.one('audio_tracks', `project_id=eq.${q(p.id)}&order=created_at.desc&select=created_at`);
   const done = await db.select('render_jobs', `project_id=eq.${q(p.id)}&status=eq.done&order=created_at.desc&select=format,output_path,created_at`);
-  const videos = {}; for (const j of done) { const f = j.format || 'dikey'; if (videos[f] || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; videos[f] = await storage.signedUrl(j.output_path, 6 * 3600); }
+  const videos = {}; for (const j of done) { const f = j.format || 'dikey'; if (videos[f] || !j.output_path || (at && new Date(j.created_at) < new Date(at.created_at))) continue; videos[f] = await thumbUrl(j.output_path); }
   if (!Object.keys(videos).length) return send(res, 404, { error: 'Dersin videosu henüz hazır değil' });
   const bundle = await bundleFor(p.id, true, p.format || 'dikey'); delete bundle.audioUrl;
   let resume = null;

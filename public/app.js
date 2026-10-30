@@ -526,7 +526,7 @@
     const others = Object.keys(F).filter(k => !vids.some(v => v.format === k));
     const links = vids.map(v => `<a class="btn" href="${esc(v.url)}" download>${esc(v.label)} indir</a>`).join('');
     const more = others.length ? `<label for="nf2">Başka biçimde de üret</label><select id="nf2">${others.map(k => `<option value="${esc(k)}">${esc(F[k])}</option>`).join('')}</select><div class="btns"><button data-act="render-format">Bu biçimde üret</button></div><p class="note">İçerik, görseller ve ses aynı kalır; yalnızca video yeni ölçüde hazırlanır.</p>` : '';
-    return `<div class="player"><div><div class="canvasWrap" style="aspect-ratio:${ASPECT[d.mainFormat] || '9/16'}"><video controls playsinline src="${esc(d.videoUrl)}"></video></div></div>
+    return `<div class="player"><div><div class="canvasWrap" style="aspect-ratio:${ASPECT[d.mainFormat] || '9/16'}"><video controls playsinline preload="metadata" src="${esc(d.videoUrl)}"></video></div></div>
       <div><div class="card"><strong>Video hazır</strong><p class="note">60 FPS, seslendirme gömülü. İndirme bağlantıları 24 saat geçerlidir; sayfayı yenileyince yenisi oluşur.</p>
       <div class="btns">${links}</div>${more}
       <label for="sr">Anlatım hızı</label><select id="sr">${SR_OPTS(d.project.speech_rate)}</select><p class="note">Hızı değiştirip "Yeniden seslendir"e basarsanız aynı görsellerle yeni hızda ses ve video üretilir.</p>
