@@ -3,7 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { db, storage, q } = require('./lib/supa');
+const { db, storage, q, R2 } = require('./lib/supa');
 const claude = require('./lib/claude');
 const { TONES, voiceForTone } = require('./lib/tones');
 const eleven = require('./lib/eleven');
@@ -254,9 +254,9 @@ async function runVoiceAndRender(id) {
   const { audio, alignment } = await eleven.tts(text, voice, speed);
   await logUsage(id, 'elevenlabs', text.length, 'tts', { voice, speed, pace: p.speech_rate || 'normal', seconds: +(alignment.character_end_times_seconds.at(-1) || 0).toFixed(1) });
   const audioPath = `audio/${id}/${Date.now()}.mp3`;
-  await storage.upload(audioPath, audio, 'audio/mpeg');
+  const audioKey = await storage.upload(audioPath, audio, 'audio/mpeg');
   const tm = eleven.timings(vis.data.scenes, marks, alignment, pace);
-  await db.insert('audio_tracks', { project_id: id, path: audioPath, alignment: { timings: tm.timings, cuts: tm.cuts, visuals_version: vis.version }, duration_s: +tm.end.toFixed(3) });
+  await db.insert('audio_tracks', { project_id: id, path: audioKey, alignment: { timings: tm.timings, cuts: tm.cuts, visuals_version: vis.version }, duration_s: +tm.end.toFixed(3) });
   await startRender(id);
 }
 
@@ -390,6 +390,29 @@ async function apkAvailable() {
 on('GET', '/api/app-info', async (req, res) => send(res, 200, { apk: await apkAvailable() ? APK_URL : null, play: process.env.APP_PLAY_URL || null, ios: process.env.APP_IOS_URL || null }), 'public');
 const SERIES = require('./lib/series')({ on, db, q, send, readBody, isAdmin, activeLimits, monthUsage, background, FORMATS, TONES, now });
 require('./lib/ortak')({ series: SERIES, storage, on, db, q, send, readBody, isAdmin, claude, ctxFor, logClaude, now, shortId: () => shortId(), publicBase });
+/* ---------- R2 taşıma: Supabase'deki videoları ve sesleri Cloudflare R2'ye kopyalar (asıllar silinmez) ---------- */
+const R2MIG = { running: false, done: 0, failed: 0, total: 0, bytes: 0, last: null, errors: [] };
+async function r2Migrate() {
+  if (R2MIG.running) return; Object.assign(R2MIG, { running: true, done: 0, failed: 0, total: 0, bytes: 0, errors: [], started: now() });
+  try {
+    const vids = await db.select('render_jobs', 'status=eq.done&output_path=not.is.null&output_path=not.like.r2:*&select=id,output_path');
+    const auds = await db.select('audio_tracks', 'path=not.like.r2:*&select=id,path');
+    const list = [...vids.map(x => ['render_jobs', 'output_path', x.id, x.output_path, 'video/mp4']), ...auds.map(x => ['audio_tracks', 'path', x.id, x.path, 'audio/mpeg'])];
+    R2MIG.total = list.length;
+    for (const [table, col, id, path, type] of list) {
+      try {
+        const r = await fetch(await storage.signedUrl(path, 900)); if (!r.ok) throw new Error('indirme ' + r.status);
+        const buf = Buffer.from(await r.arrayBuffer()); const key = await R2.put(path, buf, type);
+        await db.update(table, `id=eq.${q(id)}`, { [col]: key }); THUMBS.delete(path); R2MIG.done++; R2MIG.bytes += buf.length; R2MIG.last = path;
+      } catch (e) { R2MIG.failed++; R2MIG.errors.push(`${path}: ${String(e.message).slice(0, 120)}`); if (R2MIG.errors.length > 20) R2MIG.errors.shift(); }
+    }
+  } catch (e) { R2MIG.errors.push('genel: ' + e.message); }
+  R2MIG.running = false; R2MIG.finished = now();
+}
+on('GET', '/api/admin/r2', async (req, res) => send(res, 200, { enabled: R2.enabled(), ...R2MIG }), 'admin');
+on('POST', '/api/admin/r2/migrate', async (req, res) => { if (!R2.enabled()) return send(res, 400, { error: 'R2 ayarları Render ortam değişkenlerinde eksik (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET)' }); r2Migrate(); send(res, 202, { ok: true }); }, 'admin');
+on('POST', '/api/admin/r2/test', async (req, res) => { if (!R2.enabled()) return send(res, 400, { error: 'R2 ayarları eksik' }); try { const key = await R2.put('videos/_test.txt', Buffer.from('ok ' + now()), 'text/plain'); const r = await fetch(await storage.signedUrl(key, 300)); send(res, 200, { ok: r.ok, read: (await r.text()).slice(0, 40) }); } catch (e) { send(res, 500, { error: e.message }); } }, 'admin');
+
 /* ---------- hesaplar ---------- */
 on('POST', '/api/auth/register', async (req, res) => {
   const b = await readBody(req, 8000); const ip = ipOf(req); if (auth.tooMany(ip)) return send(res, 429, { error: 'Çok fazla deneme, biraz sonra tekrar deneyin' });
@@ -826,7 +849,7 @@ on('POST', '/api/render/:jobId/upload-url', async (req, res, { jobId }) => {
   const job = await jobAuth(req, jobId); if (!job) return send(res, 403, { error: 'Geçersiz iş' });
   const b = await readBody(req).catch(() => ({}));
   const p = b && b.kind === 'thumb' ? `covers/${job.project_id}.jpg` : `videos/${job.project_id}/${job.id}.mp4`;
-  send(res, 200, { url: await storage.signedUploadUrl(p), path: p });
+  send(res, 200, await storage.uploadTarget(p));
 }, true);
 on('POST', '/api/render/:jobId/status', async (req, res, { jobId }) => {
   const job = await jobAuth(req, jobId); if (!job) return send(res, 403, { error: 'Geçersiz iş' });
