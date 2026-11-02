@@ -19,6 +19,7 @@
   PALETTES.hikaye = Object.assign({}, PALETTES.teknik, { bg: '#141a33', fg: '#f2efe8', muted: '#9aa3c0', dim: '#3a4266', red: '#e8826a', hv: '#f0a64b', yel: '#f0c35b', lv: '#6f9be0', cool: '#7cc6c0', green: '#5f9e6e', paper: '#e9dfc8', ink: '#141a33', hl: '#e8826a' });
   PALETTES.deney = Object.assign({}, PALETTES.teknik, { bg: '#2a2380', fg: '#ffffff', yel: '#ffc93c', cool: '#4fd8e8', muted: '#b7b3e6', dim: '#5a54a8', paper: '#2a2380', ink: '#ffffff' });
   PALETTES.pastel = Object.assign({}, PALETTES.sade, { bg: '#f6efe4', paper: '#f6efe4', fg: '#3d2a22', ink: '#4a2e24', muted: '#a0907f', dim: '#e7dccb', hv: '#c96a43', red: '#c0583c', yel: '#e9b44c', green: '#86a982', lv: '#6c8fae', cool: '#8fbab3', copper: '#c27a45', violet: '#a585b8', steel: '#a9a29a', leaf: '#86a982', hl: '#f5cf6a' });
+  PALETTES.fikra = Object.assign({}, PALETTES.teknik, { bg: '#1d1840', paper: '#1d1840', fg: '#ffffff', ink: '#ffffff', hl: '#ffd23f', yel: '#ffd23f' });
   Object.assign(C, PALETTES.teknik);
   let STYLE = 'teknik';
   const FS = '"Inter","Noto Sans","DejaVu Sans",system-ui,sans-serif';
@@ -33,6 +34,7 @@
   const tarih = () => STYLE === 'tarih';
   const nasil = () => STYLE === 'nasil';
   const hikaye = () => STYLE === 'hikaye';
+  const fikra = () => STYLE === 'fikra';
   let c = null; // aktif 2D bağlam
 
   /* ---------- yardımcılar ---------- */
@@ -208,7 +210,7 @@
     glow('rgba(255,110,20,.8)', 40, () => { f(-50 * s, 140 * s, 240 * s * fl(1), '#ff5a1f'); f(50 * s, 140 * s, 220 * s * fl(2), '#ff5a1f'); f(0, 170 * s, 300 * s * fl(3), '#ff5a1f'); }); f(0, 110 * s, 200 * s * fl(4), '#ff9b2e'); f(0, 70 * s, 130 * s * fl(5), '#ffd45a'); }
   function hero(fn, u, sc = 1, dy = 0, cy = 800) { const k = 1.04 - .04 * e3(cl(u / 6)); c.save(); c.translate(F.hx + Math.sin(u * .3) * 6, F.hy + (cy - 800 + dy) * F.hs + Math.cos(u * .25) * 4); c.scale(sc * k * F.hs, sc * k * F.hs); fn(); c.restore(); }
 
-  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, globe, ring, ball, sun, person, cast, pres, kid, kids, desk, chatter, waves, bubble, picon, mcard, clockf, dialf, tick, bars, plabel, trail, limb, inkFill, FN, FH, INK, tag, crossX, qmark, tablet, sack, pot, wheat, scroll, reed, pyramid, palm, river, region, sea, comic, FC, mlabel, FSER, planet, figure, reticle, cloud, mountain, wave, lantern, starfield, ctx: () => c };
+  const LIB = { C, W, H, FD, FM, FS, ink, cam, inset, leader, seeded, grow, part, cl, ease, e3, outB, lerp, fade, rr, txt, wrap, withA, poly, smooth, lg, rg, glow, shadeHex, line, circle, arrow, box3d, cylV, cylH, bolt, panel, cable, busbar, pill, callout, flowLine, pulse, badgeText, wheel, car, multimeter, gauge, screen, connector, warnTriangle, gear, flame, hero, globe, ring, ball, sun, person, cast, pres, kid, kids, desk, chatter, waves, bubble, picon, mcard, clockf, dialf, tick, bars, plabel, trail, limb, inkFill, FN, FH, INK, toon, face, vein, sweat, huh, zzz, ficon, room, bed, bus, tag, crossX, qmark, tablet, sack, pot, wheat, scroll, reed, pyramid, palm, river, region, sea, comic, FC, mlabel, FSER, planet, figure, reticle, cloud, mountain, wave, lantern, starfield, ctx: () => c };
   const LIB_NAMES = Object.keys(LIB);
 
   function compileScene(code) {
@@ -226,6 +228,7 @@
     if (bundle.style === 'hikaye' && bundle.series && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: 4.5, outro: true, code: '' });
     if (bundle.style === 'tarih' && (bundle.next || bundle.ask) && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: 4, outro: true, code: '' });
     if (bundle.style === 'pastel' && bundle.ask && bundle.ask.text && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SORU', title: 'Soru', cap: [], capT: [], capR: [], dur: 4, outro: true, code: '' });
+    if (bundle.style === 'fikra' && bundle.moral && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'DERS', title: 'Ders', cap: [], capT: [], capR: [], dur: 4.5, outro: true, code: '' });
     if (bundle.style === 'deney' && (bundle.next || bundle.series || bundle.ask) && !scenes.some(s => s.outro)) scenes.push({ k: 'son', ch: 'SIRADAKİ', title: 'Sıradaki', cap: [], capT: [], capR: [], dur: bundle.ask ? 4.5 : 3.2, outro: true, code: '' });
     let acc = 0; scenes.forEach(s => { s.s = acc; acc += s.dur; s.e = acc; s.fn = compileScene(s.code || ''); });
     return { scenes, total: acc };
@@ -256,7 +259,7 @@
     dikey45: { hx: 450, hy: 565, hs: .74, kwY: 240, kwMax: 60, labelY: 848, capY: 920, capW: 800, capFont: 34, capLh: 46 },
   };
   let F = FORMATS.dikey;
-  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = pastel() ? Object.assign({}, b, PASTEL[name] || PASTEL.dikey) : sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : deney() ? Object.assign({}, b, DENEY[name] || DENEY.dikey) : tarih() ? Object.assign({}, b, TARIH[name] || TARIH.dikey) : nasil() ? Object.assign({}, b, NASIL[name] || NASIL.dikey) : hikaye() ? Object.assign({}, b, HIKAYE[name] || HIKAYE.dikey) : b; return F; }
+  function setFormat(name) { const b = FORMATS[name] || FORMATS.dikey; F = fikra() ? Object.assign({}, b, FIKRA[name] || FIKRA.dikey) : pastel() ? Object.assign({}, b, PASTEL[name] || PASTEL.dikey) : sade() ? Object.assign({}, b, SADE[name] || SADE.dikey) : deney() ? Object.assign({}, b, DENEY[name] || DENEY.dikey) : tarih() ? Object.assign({}, b, TARIH[name] || TARIH.dikey) : nasil() ? Object.assign({}, b, NASIL[name] || NASIL.dikey) : hikaye() ? Object.assign({}, b, HIKAYE[name] || HIKAYE.dikey) : b; return F; }
 
   /* ---------- çerçeve ---------- */
   function bgGrid() { c.fillStyle = 'rgba(120,150,210,.12)'; for (let x = 38; x < F.W; x += 76) for (let y = 38; y < F.H; y += 76) { c.fillRect(x - 6, y - 1, 12, 2); c.fillRect(x - 1, y - 6, 2, 12); } }
@@ -1149,11 +1152,180 @@
     pastelBg(u, Lp); SAFE = { x: 14 * F.S, y: 14 * F.S, w: (F.W - 28) * F.S, h: (F.H - 28) * F.S }; runScene(sc, u); SAFE = null; if (bare) return;
     pastelBadge(P, Lp, u); pastelStep(sc, Lp, u); pastelChips(sc, Lp, u); pastelCaption(sc, u, Lp);
   }
+  /* ---------- "Fıkra" stili: koyu mor gece paleti, düz çizgi karakterler, anı paneli (ampullü çerçeve), toplanan eşya şeridi, konuşana göre renkli kelime kelime altyazı ---------- */
+  const FIKRA = {
+    dikey: { hx: 450, hy: 690, hs: 1.3, capY: .765, hookY: .06 },
+    yatay: { hx: 800, hy: 375, hs: .78, capY: .86, hookY: .08 },
+    kare: { hx: 450, hy: 365, hs: .72, capY: .845, hookY: .07 },
+    dikey45: { hx: 450, hy: 470, hs: .8, capY: .82, hookY: .06 },
+  };
+  const shadeH = (col, k) => shadeHex(col, k);
+  // toon(x, ayakY, ölçek, {look, mood, pose, talk, u, dir, shirt, hair, skin}) — düz çizgi karakter (boy ≈ 340·ölçek)
+  // look: man | woman | hoca (kavuk, sakal) | temel (kara saç, iri burun) | kid | old | teacher ; mood: calm | happy | angry | sad | shock | sly | cry | sleep
+  // pose: idle | point | arms (kollar yana açık) | shrug | wave | hip | think | cover (yatakta: yalnızca baş)
+  function toon(x, y, s = 1, o = {}) {
+    const u = o.u || 0, look = o.look || 'man', mood = o.mood || 'calm', pose = o.pose || 'idle', dir = o.dir === -1 ? -1 : 1;
+    const skin = o.skin || ({ temel: '#e2a77c', hoca: '#d99a6c', old: '#e2b08a' }[look] || '#e8a878'), hair = o.hair || ({ woman: '#6b3a2a', hoca: '#f2efe6', temel: '#1f1a22', kid: '#c27a3a', old: '#d8d4cc', teacher: '#3a2a24' }[look] || '#2a2230');
+    const shirt = o.shirt || ({ woman: '#c8466e', hoca: '#3f7a5a', temel: '#3c6fa0', kid: '#e0a33a', old: '#7a6a5a', teacher: '#5a6aa8' }[look] || '#6c7f92');
+    c.save(); c.translate(x, y); c.scale(s * dir, s);
+    const half = (draw, col) => { draw(); c.fillStyle = col; c.fill(); c.save(); draw(); c.clip(); c.fillStyle = 'rgba(0,0,0,.14)'; c.fillRect(0, -600, 300, 1200); c.restore(); };
+    if (pose !== 'cover') {
+      c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(0, 2, 62, 10, 0, 0, Math.PI * 2); c.fill();
+      const long = look === 'woman' || look === 'hoca';
+      if (!long) { c.fillStyle = '#2b2733'; rr(-30, -112, 24, 112, 8); c.fill(); rr(6, -112, 24, 112, 8); c.fill(); c.fillStyle = '#17141c'; [[-18, -2], [18, -2]].forEach(([a, b]) => { c.beginPath(); c.ellipse(a, b, 20, 9, 0, 0, Math.PI * 2); c.fill(); }); }
+      const top = -250, bot = long ? -6 : -100;
+      half(() => { c.beginPath(); c.moveTo(-50, bot); c.lineTo(-44, top + 30); c.quadraticCurveTo(0, top - 6, 44, top + 30); c.lineTo(long ? 60 : 50, bot); c.closePath(); }, shirt);
+      const arm = (sx, sy, ex, ey, hx, hy) => { c.strokeStyle = shadeH(shirt, -.08); c.lineWidth = 20; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); c.moveTo(sx, sy); c.lineTo(ex, ey); c.lineTo(hx, hy); c.stroke(); c.fillStyle = skin; c.beginPath(); c.arc(hx, hy, 11, 0, Math.PI * 2); c.fill(); };
+      const w = Math.sin(u * 8) * 10;
+      const A = { idle: [[-40, -220, -52, -170, -50, -128], [40, -220, 52, -170, 50, -128]], point: [[-40, -220, -52, -170, -50, -128], [40, -220, 90, -200, 138, -196]], arms: [[-40, -220, -96, -230, -132, -250], [40, -220, 96, -230, 132, -250]], shrug: [[-40, -220, -70, -170, -104, -196], [40, -220, 70, -170, 104, -196]], wave: [[-40, -220, -52, -170, -50, -128], [40, -220, 82, -262, 92 + w, -318]], hip: [[-40, -220, -84, -180, -46, -146], [40, -220, 84, -180, 46, -146]], think: [[-40, -220, -52, -170, -50, -128], [40, -220, 70, -190, 22, -262]], up: [[-40, -220, -70, -280, -60 + w * .5, -340], [40, -220, 70, -280, 60 - w * .5, -340]] }[pose] || [];
+      A.forEach(a => arm(...a));
+    }
+    // baş
+    const hy = pose === 'cover' ? -40 : -300, r = 52, bob = o.talk ? Math.sin(u * 14) * 1.2 : 0;
+    c.save(); c.translate(0, hy + bob);
+    if (look === 'woman') { c.fillStyle = hair; c.beginPath(); c.ellipse(0, 6, r + 8, r + 14, 0, 0, Math.PI * 2); c.fill(); if (pose !== 'cover') { rr(-r - 8, 0, 2 * r + 16, 70, 18); c.fill(); } }
+    half(() => { c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); }, mood === 'angry' ? shadeH(skin, -.04) : skin);
+    if (mood === 'angry') { c.fillStyle = 'rgba(220,60,50,.28)'; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = hair;
+    if (look === 'hoca') { c.beginPath(); c.moveTo(-r * .85, 6); c.quadraticCurveTo(-r * .7, r * 1.25, 0, r * 1.3); c.quadraticCurveTo(r * .7, r * 1.25, r * .85, 6); c.quadraticCurveTo(0, 26, -r * .85, 6); c.fill(); c.fillStyle = '#f4f1ea'; c.beginPath(); c.ellipse(0, -r * .62, r * 1.08, r * .5, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c9c3b6'; for (let k = -2; k <= 2; k++) { c.fillRect(-r * .95, -r * .62 + k * 7 - 1, r * 1.9, 2); } c.fillStyle = '#b84a3a'; c.beginPath(); c.ellipse(0, -r * 1.05, r * .38, r * .3, 0, 0, Math.PI * 2); c.fill(); }
+    else if (look === 'temel') { c.beginPath(); c.arc(0, -6, r + 2, Math.PI * 1.05, Math.PI * 1.95); c.lineTo(r * .3, -r * .55); c.lineTo(-r * .2, -r * .4); c.closePath(); c.fill(); }
+    else if (look === 'old') { c.beginPath(); c.arc(-r * .8, -r * .2, r * .3, 0, Math.PI * 2); c.arc(r * .8, -r * .2, r * .3, 0, Math.PI * 2); c.fill(); }
+    else if (look !== 'woman') { c.beginPath(); c.arc(0, -4, r + 2, Math.PI * 1.08, Math.PI * 1.92); c.quadraticCurveTo(0, -r * .5, -r * .95, -r * .4); c.closePath(); c.fill(); }
+    else { c.beginPath(); c.arc(0, -6, r + 4, Math.PI * 1.02, Math.PI * 1.98); c.quadraticCurveTo(r * .3, -r * .55, -r * .2, -r * .5); c.quadraticCurveTo(-r * .7, -r * .35, -r - 2, -6); c.fill(); }
+    // yüz
+    const ey = -2, blink = (u % 4.1) < .12 || mood === 'sleep';
+    if (mood === 'cry' || mood === 'sad') { c.strokeStyle = '#2a1e22'; c.lineWidth = 3.5; c.beginPath(); c.moveTo(-26, -20); c.lineTo(-10, -26); c.moveTo(26, -20); c.lineTo(10, -26); c.stroke(); }
+    if (mood === 'angry') { c.strokeStyle = '#2a1e22'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(-28, -24); c.lineTo(-8, -14); c.moveTo(28, -24); c.lineTo(8, -14); c.stroke(); }
+    if (mood === 'shock') { c.strokeStyle = '#2a1e22'; c.lineWidth = 3.5; c.beginPath(); c.arc(-18, -30, 10, Math.PI * 1.1, Math.PI * 1.9); c.arc(18, -30, 10, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); }
+    [-18, 18].forEach(ex => { if (blink) { c.strokeStyle = '#2a1e22'; c.lineWidth = 3; c.beginPath(); c.moveTo(ex - 7, ey); c.quadraticCurveTo(ex, ey + (mood === 'sly' ? -4 : 4), ex + 7, ey); c.stroke(); } else { c.fillStyle = '#ffffff'; c.beginPath(); c.arc(ex, ey, mood === 'shock' ? 10 : 7.5, 0, Math.PI * 2); c.fill(); c.fillStyle = '#2a1e22'; c.beginPath(); c.arc(ex + 1.5, ey + 1, mood === 'shock' ? 4 : 4.5, 0, Math.PI * 2); c.fill(); } });
+    if (mood === 'sly') { c.strokeStyle = '#2a1e22'; c.lineWidth = 3; c.beginPath(); c.moveTo(-26, -10); c.lineTo(-10, -12); c.moveTo(26, -10); c.lineTo(10, -12); c.stroke(); }
+    c.fillStyle = 'rgba(230,90,90,.35)'; [-30, 30].forEach(ex => { c.beginPath(); c.arc(ex, 16, 7, 0, Math.PI * 2); c.fill(); });
+    if (look === 'temel') { c.fillStyle = shadeH(skin, -.12); c.beginPath(); c.ellipse(6, 12, 13, 18, .2, 0, Math.PI * 2); c.fill(); }
+    if (look === 'man' || look === 'teacher') { c.fillStyle = '#2a1e22'; c.beginPath(); c.ellipse(-9, 17, 10, 4, .2, 0, Math.PI * 2); c.ellipse(9, 17, 10, 4, -.2, 0, Math.PI * 2); c.fill(); }
+    const my = 33, open = o.talk ? Math.abs(Math.sin(u * 13)) : 0; c.fillStyle = '#7a2e2a'; c.strokeStyle = '#2a1e22'; c.lineWidth = 3;
+    if (mood === 'shock' || mood === 'cry') { c.beginPath(); c.ellipse(0, my, 9, 12, 0, 0, Math.PI * 2); c.fill(); }
+    else if (o.talk) { c.beginPath(); c.ellipse(0, my, 10, 3 + 8 * open, 0, 0, Math.PI * 2); c.fill(); }
+    else if (mood === 'happy' || mood === 'sly') { c.beginPath(); c.arc(0, my - 6, 12, .15 * Math.PI, .85 * Math.PI); c.stroke(); }
+    else if (mood === 'angry' || mood === 'sad') { c.beginPath(); c.arc(0, my + 10, 10, 1.2 * Math.PI, 1.8 * Math.PI); c.stroke(); }
+    else { c.beginPath(); c.moveTo(-8, my); c.lineTo(8, my); c.stroke(); }
+    if (mood === 'cry') { c.fillStyle = 'rgba(120,190,255,.9)'; const k = (u * 1.5) % 1; [-18, 18].forEach(ex => { c.beginPath(); c.ellipse(ex, 10 + k * 30, 4, 7, 0, 0, Math.PI * 2); c.fill(); }); }
+    c.restore(); c.restore();
+  }
+  // face(x, y, r, {look, mood, u, talk}) yakın çekim büyük yüz (vurucu son için) — toon başının büyütülmüşü
+  function face(x, y, r = 200, o = {}) { const k = r / 52; c.save(); c.translate(x, y + 300 * k); c.scale(k, k); toon(0, 0, 1, Object.assign({}, o, { pose: 'idle' })); c.restore(); }
+  // vein(x, y, ölçek) kızgınlık işareti; sweat(x, y, ölçek, u) ter damlası; huh(x, y, ölçek) soru işareti; zzz(x, y, u)
+  function vein(x, y, s = 1) { c.save(); c.translate(x, y); c.scale(s, s); c.strokeStyle = '#e8322f'; c.lineWidth = 9; c.lineCap = 'round'; [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([a, b]) => { c.beginPath(); c.moveTo(a * 10, b * 34); c.quadraticCurveTo(a * 10, b * 10, a * 34, b * 10); c.stroke(); }); c.restore(); }
+  function sweat(x, y, s = 1, u = 0) { c.save(); c.translate(x, y + ((u * .8) % 1) * 12); c.scale(s, s); c.fillStyle = '#7fd0ff'; c.beginPath(); c.moveTo(0, -14); c.quadraticCurveTo(10, 2, 0, 8); c.quadraticCurveTo(-10, 2, 0, -14); c.fill(); c.restore(); }
+  function huh(x, y, s = 1) { txt('?', x, y, `900 ${Math.round(60 * s)}px ${FN}`, '#f2c14e', 'center'); }
+  function zzz(x, y, u = 0) { for (let k = 0; k < 3; k++) { const p = (u * .5 + k / 3) % 1; withA(Math.sin(p * Math.PI), () => txt('z', x + p * 40, y - p * 70, `900 ${Math.round(22 + 16 * p)}px ${FN}`, '#cfd3ff', 'center')); } }
+  // ficon(ad, x, y, ölçek): eşya simgesi — pizza, hanger, pants, shirt, coin, key, gift, cup, shoe, hat, book, phone, fish, egg, bread, pot, umbrella, letter
+  function ficon(name, x, y, s = 1) {
+    c.save(); c.translate(x, y); c.scale(s, s); const F2 = col => { c.fillStyle = col; c.fill(); };
+    switch (name) {
+      case 'pizza': rr(-24, -24, 48, 48, 4); F2('#d8a45c'); c.beginPath(); c.arc(0, 0, 18, 0, Math.PI * 2); F2('#f2c14e'); [[-7, -6], [8, -2], [-2, 9]].forEach(([a, b]) => { c.beginPath(); c.arc(a, b, 4, 0, Math.PI * 2); F2('#d2453a'); }); break;
+      case 'hanger': c.strokeStyle = '#e8e8f0'; c.lineWidth = 3; c.beginPath(); c.arc(0, -16, 6, Math.PI, 2.2 * Math.PI); c.moveTo(0, -10); c.lineTo(-24, 6); c.lineTo(24, 6); c.closePath(); c.stroke(); c.beginPath(); c.moveTo(-16, 8); c.lineTo(16, 8); c.lineTo(0, 22); c.closePath(); F2('#222'); break;
+      case 'pants': c.beginPath(); c.moveTo(-14, -24); c.lineTo(14, -24); c.lineTo(16, 24); c.lineTo(4, 24); c.lineTo(0, -4); c.lineTo(-4, 24); c.lineTo(-16, 24); c.closePath(); F2('#3a6fc4'); break;
+      case 'shirt': c.beginPath(); c.moveTo(-10, -22); c.lineTo(-26, -12); c.lineTo(-20, 0); c.lineTo(-14, -4); c.lineTo(-14, 22); c.lineTo(14, 22); c.lineTo(14, -4); c.lineTo(20, 0); c.lineTo(26, -12); c.lineTo(10, -22); c.closePath(); F2('#e8a33a'); c.strokeStyle = '#b8722a'; c.lineWidth = 2; for (let k = -10; k <= 10; k += 7) { c.beginPath(); c.moveTo(k, -18); c.lineTo(k, 20); c.stroke(); } break;
+      case 'coin': c.beginPath(); c.arc(0, 0, 20, 0, Math.PI * 2); F2('#f2c14e'); c.beginPath(); c.arc(0, 0, 14, 0, Math.PI * 2); c.strokeStyle = '#c8962a'; c.lineWidth = 3; c.stroke(); break;
+      case 'key': c.beginPath(); c.arc(-10, 0, 10, 0, Math.PI * 2); c.strokeStyle = '#f2c14e'; c.lineWidth = 5; c.stroke(); c.beginPath(); c.moveTo(0, 0); c.lineTo(24, 0); c.moveTo(18, 0); c.lineTo(18, 8); c.stroke(); break;
+      case 'gift': rr(-20, -10, 40, 32, 3); F2('#d2453a'); rr(-24, -18, 48, 10, 3); F2('#e8604f'); c.fillStyle = '#f2c14e'; c.fillRect(-4, -18, 8, 40); break;
+      case 'cup': rr(-14, -16, 28, 32, 6); F2('#f2ede4'); c.beginPath(); c.arc(16, 0, 8, -Math.PI / 2, Math.PI / 2); c.strokeStyle = '#f2ede4'; c.lineWidth = 4; c.stroke(); c.fillStyle = '#7a4a2a'; c.fillRect(-11, -13, 22, 6); break;
+      case 'shoe': c.beginPath(); c.moveTo(-24, 10); c.lineTo(-22, -8); c.lineTo(-6, -8); c.quadraticCurveTo(4, 2, 22, 4); c.lineTo(24, 12); c.closePath(); F2('#6a3a2a'); break;
+      case 'hat': c.beginPath(); c.ellipse(0, 10, 28, 8, 0, 0, Math.PI * 2); F2('#3a3440'); rr(-16, -18, 32, 28, 8); F2('#3a3440'); break;
+      case 'book': rr(-20, -24, 40, 48, 3); F2('#4a7ac4'); c.fillStyle = '#f2ede4'; c.fillRect(-16, -20, 4, 40); break;
+      case 'phone': rr(-14, -24, 28, 48, 6); F2('#222'); rr(-11, -19, 22, 36, 3); F2('#5fb0ff'); break;
+      case 'fish': c.beginPath(); c.ellipse(-4, 0, 20, 11, 0, 0, Math.PI * 2); F2('#7fb0d0'); c.beginPath(); c.moveTo(14, 0); c.lineTo(26, -10); c.lineTo(26, 10); c.closePath(); F2('#7fb0d0'); c.beginPath(); c.arc(-14, -3, 2.5, 0, Math.PI * 2); F2('#222'); break;
+      case 'egg': c.beginPath(); c.ellipse(0, 2, 15, 20, 0, 0, Math.PI * 2); F2('#f6efe0'); break;
+      case 'bread': c.beginPath(); c.ellipse(0, 0, 26, 13, 0, 0, Math.PI * 2); F2('#d9a05a'); c.strokeStyle = '#a8702a'; c.lineWidth = 2; [-10, 0, 10].forEach(k => { c.beginPath(); c.moveTo(k - 4, -8); c.lineTo(k + 4, 6); c.stroke(); }); break;
+      case 'pot': c.beginPath(); c.moveTo(-24, -10); c.lineTo(24, -10); c.lineTo(20, 18); c.lineTo(-20, 18); c.closePath(); F2('#8a8f98'); c.fillStyle = '#6a6f78'; c.fillRect(-28, -14, 56, 6); break;
+      case 'umbrella': c.beginPath(); c.arc(0, 0, 26, Math.PI, 0); c.closePath(); F2('#d2453a'); c.strokeStyle = '#ddd'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 22); c.arc(-5, 22, 5, 0, Math.PI); c.stroke(); break;
+      case 'letter': rr(-24, -16, 48, 32, 3); F2('#f2ede4'); c.strokeStyle = '#b8b0a0'; c.lineWidth = 2; c.beginPath(); c.moveTo(-24, -16); c.lineTo(0, 4); c.lineTo(24, -16); c.stroke(); break;
+      default: c.beginPath(); c.arc(0, 0, 16, 0, Math.PI * 2); F2('#aaa');
+    }
+    c.restore();
+  }
+  // room(tür, u): sahne arka planı (geniş çizilir, motor gerekeni kırpar). tür: bedroom | living | bathroom | kitchen | street | rain | day | classroom | cafe | village | sea | shop
+  function room(kind = 'living', u = 0) {
+    const wall = (col, stripes) => { c.fillStyle = col; c.fillRect(-1400, -1400, 2800, 1730); if (stripes) { c.fillStyle = 'rgba(0,0,0,.12)'; for (let x = -1400; x < 1400; x += 60) c.fillRect(x, -1400, 26, 1730); } };
+    const floor = col => { c.fillStyle = col; c.fillRect(-1400, 300, 2800, 1100); c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(-1400, 300, 2800, 8); };
+    const win = (x, y, w, h, night = true) => { rr(x - w / 2 - 14, y - h / 2 - 8, w + 28, h + 16, 6); c.fillStyle = '#5a3f8a'; c.fill(); c.fillStyle = night ? '#141a3a' : '#9fd0f0'; c.fillRect(x - w / 2, y - h / 2, w, h); if (night) circle(x + w * .25, y - h * .25, Math.min(w, h) * .12, '#f3e7b0'); c.fillStyle = '#5a3f8a'; c.fillRect(x - 4, y - h / 2, 8, h); c.fillRect(x - w / 2, y - 4, w, 8); };
+    const lamp = (x, y) => { c.fillStyle = rg(x, y + 30, 0, 260, [[0, 'rgba(255,190,110,.28)'], [1, 'rgba(255,190,110,0)']]); c.fillRect(x - 260, y - 230, 520, 520); c.fillStyle = '#3a2a2a'; c.fillRect(x - 3, y, 6, 330); rr(x - 26, y - 46, 52, 50, 4); c.fillStyle = '#f0a050'; c.fill(); };
+    if (kind === 'bedroom') { wall('#3a3478'); floor('#2a2552'); win(-40, -250, 230, 200); c.fillStyle = '#7a5a3a'; c.fillRect(380, -330, 26, 640); c.fillStyle = rg(330, -100, 0, 260, [[0, 'rgba(255,220,170,.22)'], [1, 'rgba(255,220,170,0)']]); c.fillRect(60, -400, 520, 600); }
+    else if (kind === 'living') { wall('#6a2f45', true); floor('#3a1f2a'); win(-60, -250, 220, 190); lamp(300, -130); rr(-420, 150, 200, 150, 20); c.fillStyle = '#8a3a3e'; c.fill(); }
+    else if (kind === 'bathroom') { wall('#4f8a82'); c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; for (let x = -1400; x < 1400; x += 56) { c.beginPath(); c.moveTo(x, -1400); c.lineTo(x, 300); c.stroke(); } for (let y = -1400; y < 300; y += 56) { c.beginPath(); c.moveTo(-1400, y); c.lineTo(1400, y); c.stroke(); } floor('#2f5a55'); c.fillStyle = '#c9c4b8'; c.fillRect(-60, -300, 8, 260); c.fillRect(-160, -300, 108, 8); for (let k = 0; k < 4; k++) withA(.18, () => circle(-260 + k * 60 + Math.sin(u + k) * 10, -150 - ((u * 20 + k * 40) % 120), 40, '#ffffff')); }
+    else if (kind === 'kitchen') { wall('#b0763c'); floor('#5a3a22'); rr(-420, 80, 840, 220, 6); c.fillStyle = '#e8dcc8'; c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-420, 60, 840, 24); win(140, -220, 200, 160, false); }
+    else if (kind === 'classroom') { wall('#3f6a5a'); floor('#4a3a2a'); rr(-330, -330, 560, 260, 8); c.fillStyle = '#22382e'; c.fill(); c.strokeStyle = '#8a6a3a'; c.lineWidth = 10; c.stroke(); }
+    else if (kind === 'cafe') { wall('#5a3a2a', true); floor('#2e1f18'); win(-200, -240, 200, 170); win(180, -240, 200, 170); rr(-120, 160, 240, 18, 6); c.fillStyle = '#8a5a3a'; c.fill(); }
+    else if (kind === 'village' || kind === 'day') { c.fillStyle = lg(0, -1400, 0, 300, [[0, '#7fb8e0'], [1, '#d8eef6']]); c.fillRect(-1400, -1400, 2800, 1700); cloud(-260 + (u * 6) % 200, -300, 1.2, .9); mountain(100, 300, 1200, 320, '#7fa86a'); floor('#9a7a4a'); if (kind === 'village') { rr(-380, 40, 220, 260, 6); c.fillStyle = '#e8d8b8'; c.fill(); c.beginPath(); c.moveTo(-400, 40); c.lineTo(-270, -60); c.lineTo(-140, 40); c.closePath(); c.fillStyle = '#b8523a'; c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-300, 160, 60, 140); } }
+    else if (kind === 'sea') { c.fillStyle = lg(0, -1400, 0, 300, [[0, '#2a4a7a'], [1, '#7fb0d8']]); c.fillRect(-1400, -1400, 2800, 1700); wave(120, '#2c5d8a', u, 8); wave(200, '#24507a', u * 1.3, 6); }
+    else if (kind === 'shop') { wall('#d8c8a8'); floor('#6a5a4a'); for (let k = 0; k < 3; k++) { c.fillStyle = '#8a6a4a'; c.fillRect(-420, -260 + k * 120, 840, 12); } rr(-200, 120, 400, 180, 6); c.fillStyle = '#a8784a'; c.fill(); }
+    else { // street / rain (gece şehir)
+      c.fillStyle = lg(0, -1400, 0, 300, [[0, '#14122a'], [1, '#3a3450']]); c.fillRect(-1400, -1400, 2800, 1700);
+      for (let k = 0; k < 14; k++) { const bx = -900 + k * 140, bh = 260 + seeded(k + 3) * 300; c.fillStyle = '#1e1b30'; c.fillRect(bx, 300 - bh, 120, bh); for (let i = 0; i < 3; i++) for (let j = 0; j < Math.floor(bh / 60); j++) if (seeded(k * 9 + i * 3 + j) > .45) { c.fillStyle = '#f2c86a'; c.fillRect(bx + 14 + i * 34, 300 - bh + 20 + j * 56, 18, 26); } }
+      floor('#2a2838'); c.fillStyle = '#2e2a26'; c.fillRect(-30, -260, 8, 560); circle(-26, -270, 14, '#ffe2a0'); c.fillStyle = rg(-26, -270, 0, 200, [[0, 'rgba(255,220,150,.3)'], [1, 'rgba(255,220,150,0)']]); c.fillRect(-226, -470, 400, 400);
+      if (kind === 'rain') { c.strokeStyle = 'rgba(200,215,240,.35)'; c.lineWidth = 2; c.beginPath(); for (let i = 0; i < 120; i++) { const x = (seeded(i + 1) * 2400 + u * 60) % 2400 - 1200, y = (seeded(i + 7) * 1700 + u * 900) % 1700 - 1400; c.moveTo(x, y); c.lineTo(x - 6, y + 26); } c.stroke(); }
+    }
+  }
+  // bed(x, y, genişlik, renk): üstünde yorgan olan yatak; yatakta yatan kişileri ÖNCE toon(..., {pose:'cover'}) ile çiz, sonra bed() yorganı onların üstüne örter
+  function bed(x, y, w = 520, col = '#c86aa0') { c.fillStyle = '#6a4a32'; rr(x - w / 2 - 10, y - 150, 30, 160, 6); c.fill(); c.fillStyle = '#f2e8f0'; rr(x - w / 2 + 10, y - 104, w - 20, 40, 14); c.fill(); c.fillStyle = col; rr(x - w / 2, y - 80, w, 120, 20); c.fill(); c.fillStyle = 'rgba(0,0,0,.12)'; c.fillRect(x, y - 80, w / 2, 120); }
+  function bus(x, y, s = 1) { c.save(); c.translate(x, y); c.scale(s, s); rr(-200, -160, 400, 150, 18); c.fillStyle = '#e8a83a'; c.fill(); c.fillStyle = '#2a3048'; for (let k = 0; k < 5; k++) c.fillRect(-180 + k * 74, -140, 60, 54); circle(-120, -8, 26, '#222'); circle(120, -8, 26, '#222'); c.restore(); }
+
+  function fikraPanel(Lf) { const w = Math.min(810 * F.hs, F.W - 50), h = Math.min(680 * F.hs, F.H * (Lf.capY - .04) - 30); return { x: F.hx - w / 2, y: Math.max(25, F.hy + 330 * F.hs - h - 10), w, h }; }
+  function fikraBulbs(R) { const n = Math.round((R.w + R.h) * 2 / 30); const pts = []; const per = 2 * (R.w + R.h);
+    for (let i = 0; i < n; i++) { let d = i / n * per, x, y; if (d < R.w) { x = R.x + d; y = R.y; } else if ((d -= R.w) < R.h) { x = R.x + R.w; y = R.y + d; } else if ((d -= R.h) < R.w) { x = R.x + R.w - d; y = R.y + R.h; } else { d -= R.w; x = R.x; y = R.y + R.h - d; } pts.push([x, y]); }
+    pts.forEach(([x, y], i) => { c.beginPath(); c.arc(x, y, 11 + (i % 2) * 2, 0, Math.PI * 2); c.fillStyle = '#efe6d8'; c.fill(); }); }
+  function fikraItems(sc, R, u) { const it = sc.items || []; if (!it.length) return; const bh = 84, x0 = R.x + 30, w = R.w - 60, y0 = R.y + 30;
+    rr(x0, y0, w, bh, 18); c.fillStyle = 'rgba(22,18,48,.82)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 3; c.stroke();
+    const n = Math.max(4, it.length), gap = w / n; it.forEach((name, i) => { const isNew = i === it.length - 1 && sc.newItem; const k = isNew ? outB(cl((u - (sc.capT[sc.newAt || 0] || 0) - .2) / .35)) : 1; if (k <= 0) return; ficon(name, x0 + gap * (i + .5), y0 + bh / 2, 1.2 * k); });
+    for (let i = it.length; i < n; i++) circle(x0 + gap * (i + .5), y0 + bh / 2, 3, 'rgba(255,255,255,.3)'); }
+  // altyazı: konuşana göre renk (anlatıcı beyaz, karakterler kendi renginde); konuşulan kelime sarı kutuda
+  function fikraCaption(P, sc, u, Lf) {
+    let idx = -1; sc.capT.forEach((x, i) => { if (u >= x - .05) idx = i; }); if (idx < 0) return;
+    const s = sc.cap[idx] || '', rate = sc.capR ? sc.capR[idx] : CPS, el = (u - sc.capT[idx]) * rate;
+    const end = sc.capT[idx] + s.length / rate + .45, nx = sc.capT[idx + 1]; if (u > end + .4 && (nx == null || u < nx)) return;
+    const who = (sc.who || [])[idx], cast = (P.cast || []).find(x => x.id === who), base = cast ? cast.color || '#ffb3c8' : '#ffffff';
+    const ch = chunks(s); let acc = 0, ci = 0; for (let i = 0; i < ch.length; i++) { if (el >= acc - 2) ci = i; acc += ch[i].length + 1; } let start = 0; for (let i = 0; i < ci; i++) start += ch[i].length + 1;
+    const U = Math.min(F.W, F.H), size = Math.round(U * .062), f = `900 ${size}px ${FN}`; c.font = f; const lines = wrap(ch[ci] || '', F.W * .86).slice(0, 2);
+    let pos = start; const y0 = F.H * Lf.capY - (lines.length - 1) * size * .62;
+    lines.forEach((ln, li) => { const ws = ln.split(' '), sp = c.measureText(' ').width, wd = ws.map(w => c.measureText(w).width), tw = wd.reduce((a, b) => a + b, 0) + sp * (ws.length - 1); let x = F.W / 2 - tw / 2; const y = y0 + li * size * 1.25;
+      ws.forEach((w, i) => { const st = pos, en = pos + w.length; pos = en + 1; const cur = el >= st - .5 && el < en + 1, done = el >= en + 1;
+        if (cur) { rr(x - size * .12, y - size * .86, wd[i] + size * .24, size * 1.1, size * .2); c.fillStyle = '#ffd23f'; c.fill(); }
+        c.save(); if (!cur) { c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 6; } txt(w, x, y, f, cur ? '#1a1530' : done ? base : shadeHex(base === '#ffffff' ? '#9a98b8' : base, -.35)); c.restore(); x += wd[i] + sp; }); });
+  }
+  function drawFikra(P, L, i, u, t, bare) {
+    const sc = L.scenes[i], Lf = FIKRA[P.format] || FIKRA.dikey;
+    if (sc.outro) { const pv = L.scenes[i - 1]; if (pv) drawFikra(P, L, i - 1, pv.dur - .01, t, true); else { c.fillStyle = '#1d1840'; c.fillRect(0, 0, F.W, F.H); } fikraMoral(P, u); return; }
+    c.fillStyle = lg(0, 0, 0, F.H, [[0, '#1d1840'], [1, '#120f26']]); c.fillRect(0, 0, F.W, F.H);
+    const R = fikraPanel(Lf), floorY = F.hy + 330 * F.hs;
+    c.save();
+    if (sc.flash) { const k = outB(cl(u / .35)); c.translate(F.W / 2, R.y + R.h / 2); c.scale(.92 + .08 * k, .92 + .08 * k); c.translate(-F.W / 2, -(R.y + R.h / 2)); rr(R.x, R.y, R.w, R.h, 34); c.clip(); }
+    else { c.beginPath(); c.rect(0, 0, F.W, floorY); c.clip(); }
+    SAFE = null; runScene(sc, u);
+    if (sc.flash) { c.fillStyle = 'rgba(240,220,200,.08)'; c.fillRect(0, 0, F.W, F.H); }
+    c.restore();
+    if (!sc.flash) { c.fillStyle = lg(0, floorY - 40, 0, floorY + 10, [[0, 'rgba(18,15,38,0)'], [1, 'rgba(18,15,38,1)']]); c.fillRect(0, floorY - 40, F.W, 50); }
+    if (sc.flash) { const k = outB(cl(u / .35)); c.save(); c.translate(F.W / 2, R.y + R.h / 2); c.scale(.92 + .08 * k, .92 + .08 * k); c.translate(-F.W / 2, -(R.y + R.h / 2)); fikraBulbs(R); fikraItems(sc, R, u); c.restore(); }
+    if (bare) return;
+    if (i === 0 && P.hook) { const end = sc.capT[1] != null ? sc.capT[1] : sc.dur; const a = Math.min(fade(u, .1, .3), 1 - fade(u, end - .3, .3)); const U = Math.min(F.W, F.H), size = Math.round(U * .068); c.font = `900 ${size}px ${FN}`; withA(a, () => wrap(P.hook, F.W * .8).slice(0, 2).forEach((l, j) => { c.save(); c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 10; txt(l, F.W / 2, F.H * Lf.hookY + size + j * size * 1.15, `900 ${size}px ${FN}`, '#ffffff', 'center'); c.restore(); })); }
+    fikraCaption(P, sc, u, Lf);
+  }
+  // kapanış kartı: "Fıkradan ders" (moral)
+  function fikraMoral(P, u) {
+    const m = P.moral; if (!m) return; const U = Math.min(F.W, F.H), k = outB(cl((u - .15) / .4)); if (k <= 0) return;
+    withA(cl(u / .3) * .6, () => { c.fillStyle = '#120f26'; c.fillRect(0, 0, F.W, F.H); });
+    const w = Math.min(F.W * .84, U * .88), sz = Math.round(U * .058), lab = Math.round(U * .032); c.font = `900 ${sz}px ${FN}`; const ls = wrap(m, w - sz * 1.4).slice(0, 4);
+    const h = lab * 2.6 + ls.length * sz * 1.18 + sz * .9;
+    c.save(); c.translate(F.W / 2, F.H * .44); c.scale(.7 + .3 * k, .7 + .3 * k); rr(-w / 2, -h / 2, w, h, 30); c.fillStyle = '#2a2458'; c.fill(); c.strokeStyle = '#ffd23f'; c.lineWidth = 5; c.stroke();
+    const lt = (P.moralLabel || 'FIKRADAN DERS').toLocaleUpperCase('tr'); c.font = `900 ${lab}px ${FN}`; const lw = c.measureText(lt).width + lab * 1.6; rr(-lw / 2, -h / 2 - lab * .9, lw, lab * 1.8, lab * .9); c.fillStyle = '#ffd23f'; c.fill(); txt(lt, 0, -h / 2 + lab * .36, `900 ${lab}px ${FN}`, '#1a1530', 'center');
+    let y = -h / 2 + lab * 2.2; ls.forEach(l => { y += sz; txt(l, 0, y, `900 ${sz}px ${FN}`, '#ffffff', 'center'); y += sz * .18; });
+    c.restore();
+  }
   function drawScene(P, L, i, u, t) { const sc = L.scenes[i]; if (sade()) return drawSade(P, L, i, u, t); if (P.__bare) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore(); } else background(); try { sc.fn(u, sc.capT, { dur: sc.dur, k: sc.k }); } catch (e) { const E = root.EVEngine && root.EVEngine.errors; if (E && !E[sc.k]) { E[sc.k] = String(e.message).slice(0, 160); console.warn('Sahne ' + sc.k + ' çizim hatası:', e.message); } c.setTransform(F.S, 0, 0, F.S, 0, 0); if (root.__EV_PREVIEW) txt('Çizim hatası: ' + String(e.message).slice(0, 40), F.hx, F.hy, `700 24px ${FM}`, C.red, 'center'); } c.setTransform(F.S, 0, 0, F.S, 0, 0); c.globalAlpha = 1; c.shadowBlur = 0; c.setLineDash([]); if (P.__bare) return; header(P, sc, i, u, t); bigNum(sc, u); caption(P, sc, u, t, L.total); }
 
   function createPlayer(canvas, bundle) {
     if (bundle.style === 'tarih' && typeof document !== 'undefined' && document.fonts) document.fonts.load('400 40px "Lilita One"').catch(() => {});
     if (bundle.style === 'hikaye' && typeof document !== 'undefined' && document.fonts) document.fonts.load('400 40px "DM Serif Display"').catch(() => {});
+    if (bundle.style === 'fikra' && typeof document !== 'undefined' && document.fonts) document.fonts.load('900 40px Nunito').catch(() => {});
     if (bundle.style === 'pastel' && typeof document !== 'undefined' && document.fonts) { document.fonts.load('900 40px Nunito').catch(() => {}); document.fonts.load('700 40px Caveat').catch(() => {}); }
     const ST = setStyle(bundle.style); setFormat(bundle.format); const FF = F; const CS = {}; (bundle.cast || []).forEach(x => { if (x && x.id) CS[x.id] = x; }); CAST = CS;
     canvas.width = Math.round(FF.W * FF.S); canvas.height = Math.round(FF.H * FF.S); c = canvas.getContext('2d'); c.setTransform(FF.S, 0, 0, FF.S, 0, 0);
@@ -1171,6 +1343,7 @@
       setStyle(ST); F = FF; CAST = CS; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0); t = cl(t, 0, L.total - .001);
       let si = L.scenes.findIndex(s => t >= s.s && t < s.e); if (si < 0) si = L.scenes.length - 1; const u = t - L.scenes[si].s, TR = .6;
       const ox = F.W / 2, oy = F.H / 2, RM = Math.hypot(F.W, F.H) * .62;
+      if (fikra()) { drawFikra(bundle, L, si, u, t); if (u < .4 && si > 0 && !L.scenes[si].outro) withA(1 - e3(u / .4), () => drawFikra(bundle, L, si - 1, L.scenes[si - 1].dur - .4 + u, t)); return si; }
       if (pastel()) { drawPastel(bundle, L, si, u, t); if (u < .35 && si > 0 && !L.scenes[si].outro) withA(1 - e3(u / .35), () => drawPastel(bundle, L, si - 1, L.scenes[si - 1].dur - .35 + u, t)); return si; }
       if (hikaye()) { drawHikaye(bundle, L, si, u, t); const pu = si > 0 ? u : 99; if (pu < .45) { withA(1 - pu / .45, () => { c.fillStyle = '#0b0f22'; c.fillRect(0, 0, F.W, F.H); }); } const left = L.scenes[si].dur - u; if (si < L.scenes.length - 1 && left < .35) withA(1 - left / .35, () => { c.fillStyle = '#0b0f22'; c.fillRect(0, 0, F.W, F.H); }); return si; }
       if (nasil()) { drawNasil(bundle, L, si, u, t); if (u < .12 && si > 0) withA(1 - u / .12, () => { c.fillStyle = '#000'; c.fillRect(0, 0, F.W, F.H); }); return si; }
@@ -1187,7 +1360,8 @@
     function still(k, frac) {
       setStyle(ST); F = FF; CAST = CS; c = canvas.getContext('2d'); c.setTransform(F.S, 0, 0, F.S, 0, 0);
       const i = L.scenes.findIndex(s => s.k === String(k)); if (i < 0) return null;
-      const sc = L.scenes[i]; if (pastel()) { drawPastel(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
+      const sc = L.scenes[i]; if (fikra()) { drawFikra(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: 0, y: 0, w: F.W * F.S, h: Math.min(F.H, (F.hy + 345 * F.hs)) * F.S }; }
+      if (pastel()) { drawPastel(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
       if (hikaye()) { drawHikaye(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
       if (nasil()) { drawNasil(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
       if (tarih()) { drawTarih(bundle, L, i, sc.dur * (frac == null ? .9 : frac), sc.s, true); return { x: (F.hx - 410 * F.hs) * F.S, y: (F.hy - 340 * F.hs) * F.S, w: 820 * F.hs * F.S, h: 690 * F.hs * F.S }; }
