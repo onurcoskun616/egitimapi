@@ -869,13 +869,6 @@ on('POST', '/api/render/:jobId/status', async (req, res, { jobId }) => {
 }, true);
 
 /* ---------- sunucu ---------- */
-// Tek seferlik temizlik (8 Kasım 2026, kullanıcı onayıyla): depo kotası için tüm MP4'ler ve kontrol kareleri silinir.
-// Videolar kayıtlı ses + sahnelerden yeniden üretilebilir. Liste sabittir; tekrar çalışması zararsızdır.
-async function purgeOnce() {
-  let list = []; try { list = require('./lib/purge-once.json'); } catch { return; }
-  let n = 0; for (let i = 0; i < list.length; i += 100) { try { const r = await storage.remove(list.slice(i, i + 100)); n += (r || []).length; } catch (e) { console.error('purge parti', i, e.message); } }
-  console.log(`purge: ${n}/${list.length} dosya silindi`);
-}
 http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
@@ -917,4 +910,4 @@ http.createServer(async (req, res) => {
     res.writeHead(200, hdr);
     fs.createReadStream(file).pipe(res);
   } catch (e) { console.error(e); if (!res.headersSent) send(res, 500, { error: e.message }); }
-}).listen(PORT, () => { console.log('Sunucu hazır: ' + PORT); seedAdmin().catch(e => console.error('seedAdmin', e)); resumePending().catch(e => console.error('resume', e)); resumeQuiz().catch(e => console.error('resumeQuiz', e)); purgeOnce().catch(e => console.error('purge', e)); });
+}).listen(PORT, () => { console.log('Sunucu hazır: ' + PORT); seedAdmin().catch(e => console.error('seedAdmin', e)); resumePending().catch(e => console.error('resume', e)); resumeQuiz().catch(e => console.error('resumeQuiz', e)); });
