@@ -606,6 +606,7 @@
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    film: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="m3 8 3.5-4.5L21 4 17.5 8M8.5 3.7 6 8M14 3.8 11.5 8"/>',
   };
   const icon = k => `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
   const THEMES = ['', 'light', 'dark'], THEME_L = { '': 'Tema: otomatik', light: 'Tema: açık', dark: 'Tema: koyu' }, THEME_I = { '': '◐', light: '☀', dark: '☾' };
@@ -626,7 +627,7 @@
         links = ['<a href="#/projeler">Videolar</a>', '<a href="#/egitimler">Eğitimlerim</a>', '<a href="#/ortak-sinav">Ortak sınav</a>', `<a href="#/talepler">Talepler${ME.pending ? ` <b class="badge">${ME.pending}</b>` : ''}</a>`, '<a href="#/sonuclar">Sonuçlar</a>', '<a href="#/paketim">Paketim</a>'];
         tabs = [['#/projeler', 'video', 'Videolar'], ['#/egitimler', 'layers', 'Eğitimler'], ['#/talepler', 'inbox', 'Talepler', ME.pending], ['#/sonuclar', 'chart', 'Sonuçlar'], ['#/profil', 'user', 'Profil']];
       } else tabs = [['#/', 'home', 'Ana sayfa'], ['#/profil', 'user', 'Profil']];
-      if (u.role === 'admin') links.push('<a href="#/yonetim">Yönetim</a>', '<a href="/sinema">🎬 Sinema</a>');
+      if (u.role === 'admin') { links.push('<a href="#/yonetim">Yönetim</a>', '<a href="/sinema">🎬 Sinema</a>'); tabs.splice(tabs.length - 1, 0, ['/sinema', 'film', 'Sinema']); }
       links.push(`<a href="#/profil" title="Profil">${esc(u.name)}</a>`, '<button type="button" id="logout" class="linkbtn">Çıkış</button>');
     }
     if (!isStandalone()) links.push(`<a href="#/uygulama" class="appl" title="Telefon uygulaması">📱 Uygulama</a>`);
@@ -807,7 +808,7 @@
   async function viewProfile() {
     setSub('Profil');
     const u = ME.user;
-    const qlinks = [u.role !== 'student' && isTeacher() ? ['#/paketim', 'Paketim'] : null, u.role === 'admin' ? ['#/yonetim', 'Yönetim'] : null, u.role === 'student' ? ['#/derslerim', 'Derslerim'] : ['#/projeler', 'Videolar'], ['#/', 'Eğitim vitrini'], isStandalone() ? null : ['#/uygulama', 'Telefon uygulaması']].filter(Boolean);
+    const qlinks = [u.role !== 'student' && isTeacher() ? ['#/paketim', 'Paketim'] : null, u.role === 'admin' ? ['#/yonetim', 'Yönetim'] : null, u.role === 'admin' ? ['/sinema', '🎬 Sinema'] : null, u.role === 'student' ? ['#/derslerim', 'Derslerim'] : ['#/projeler', 'Videolar'], ['#/', 'Eğitim vitrini'], isStandalone() ? null : ['#/uygulama', 'Telefon uygulaması']].filter(Boolean);
     app.innerHTML = `<h1>Profil</h1>
       <div class="card qcard"><div class="qlinks">${qlinks.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}<button type="button" class="btn danger" id="lo2">Çıkış yap</button></div>
       <label for="thm">Görünüm</label><select id="thm"><option value="">Otomatik (telefonun ayarı)</option><option value="light">Açık</option><option value="dark">Koyu</option></select></div>
