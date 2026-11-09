@@ -411,6 +411,37 @@ async function r2Migrate() {
   } catch (e) { R2MIG.errors.push('genel: ' + e.message); }
   R2MIG.running = false; R2MIG.finished = now();
 }
+// Taşınamayan (dosyası olmayan) videolar: aynı metin ve sahnelerle yeniden seslendirip yeniden üretme kuyruğu
+const REPRO = { running: false, total: 0, done: 0, failed: 0, current: null, errors: [] };
+async function missingVideos() {
+  const ps = await db.select('projects', 'status=eq.delivered&select=id,title,updated_at&order=updated_at.desc');
+  const out = [];
+  for (const p of ps) {
+    const j = await db.one('render_jobs', `project_id=eq.${q(p.id)}&status=eq.done&select=output_path&order=created_at.desc`);
+    let ok = false;
+    if (j && j.output_path) { if (String(j.output_path).startsWith('r2:')) ok = true; else if (LOCAL.enabled()) ok = await fs.promises.access(LOCAL.file(j.output_path)).then(() => true, () => false); else ok = true; }
+    if (ok) continue;
+    const u = await db.one('usage', `project_id=eq.${q(p.id)}&provider=eq.elevenlabs&select=units&order=created_at.desc`);
+    out.push({ id: p.id, title: p.title, chars: u ? +u.units : 0 });
+  }
+  return out;
+}
+on('GET', '/api/admin/missing', async (req, res) => { const list = await missingVideos(); send(res, 200, { list, chars: list.reduce((a, b) => a + b.chars, 0), ...REPRO }); }, 'admin');
+on('POST', '/api/admin/missing/run', async (req, res) => {
+  if (REPRO.running) return send(res, 409, { error: 'Zaten çalışıyor' });
+  const b = await readBody(req).catch(() => ({})); let list = await missingVideos(); if (Array.isArray(b.ids) && b.ids.length) list = list.filter(x => b.ids.includes(x.id));
+  Object.assign(REPRO, { running: true, total: list.length, done: 0, failed: 0, current: null, errors: [] }); send(res, 202, { ok: true, total: list.length });
+  for (const it of list) {
+    REPRO.current = it.title;
+    if (RUNNING.has(it.id)) { REPRO.done++; continue; }
+    RUNNING.add(it.id);
+    try { await db.update('projects', `id=eq.${q(it.id)}`, { pending: { stage: 'voice', args: [] } }); await runVoiceAndRender(it.id); await db.update('projects', `id=eq.${q(it.id)}`, { pending: null }); }
+    catch (e) { REPRO.failed++; REPRO.errors.push(`${it.title}: ${e.message}`.slice(0, 300)); await setStatus(it.id, 'failed', { error: `voice|${e.message}`.slice(0, 900), pending: null }).catch(() => {}); }
+    finally { RUNNING.delete(it.id); }
+    REPRO.done++;
+  }
+  REPRO.running = false; REPRO.current = null;
+}, 'admin');
 on('GET', '/api/admin/r2', async (req, res) => send(res, 200, { enabled: R2.enabled(), ...R2MIG }), 'admin');
 on('POST', '/api/admin/r2/migrate', async (req, res) => { if (!R2.enabled()) return send(res, 400, { error: 'R2 ayarları Render ortam değişkenlerinde eksik (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET)' }); r2Migrate(); send(res, 202, { ok: true }); }, 'admin');
 on('POST', '/api/admin/r2/test', async (req, res) => { if (!R2.enabled()) return send(res, 400, { error: 'R2 ayarları eksik' }); try { const key = await R2.put('videos/_test.txt', Buffer.from('ok ' + now()), 'text/plain'); const r = await fetch(await storage.signedUrl(key, 300)); send(res, 200, { ok: r.ok, read: (await r.text()).slice(0, 40) }); } catch (e) { send(res, 500, { error: e.message }); } }, 'admin');

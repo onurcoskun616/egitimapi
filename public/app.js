@@ -935,14 +935,21 @@
     const el = document.getElementById('ad'), msg = t => { document.getElementById('m').textContent = t; };
     const act = async (path, body, okMsg) => { try { const r = await api(path, { method: 'POST', body }); if (r.password) prompt('Yeni geçici şifre (kopyalayıp kullanıcıya iletin; giriş yaptıktan sonra Profil sayfasından değiştirebilir):', r.password); else if (okMsg) msg(okMsg); viewAdmin(); } catch (e) { msg(e.message); } };
     if (tab === 'depo') {
-      const draw = async () => { const r = await api('/api/admin/r2');
+      const draw = async () => { const r = await api('/api/admin/r2'); r.miss = await api('/api/admin/missing').catch(() => ({}));
         el.innerHTML = `<div class="card"><h3 style="margin-top:0">Cloudflare R2</h3><p>${r.enabled ? '<b style="color:var(--green)">Bağlı.</b> Yeni videolar ve sesler R2\'ye kaydediliyor (indirme trafiği ücretsiz).' : '<b style="color:var(--yel)">Bağlı değil.</b> Render ortam değişkenlerine R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY ve R2_BUCKET girilmeli.'}</p>
           ${r.enabled ? `<div class="btns"><button id="r2t">Bağlantıyı dene</button><button class="primary" id="r2m" ${r.running ? 'disabled' : ''}>Eski videoları ve sesleri R2'ye taşı</button></div>` : ''}
           ${r.total ? `<p>${r.running ? '⏳ Taşınıyor' : 'Son taşıma'}: <b>${r.done}/${r.total}</b> dosya · ${(r.bytes / 1048576).toFixed(0)} MB${r.failed ? ` · <span class="err-t">${r.failed} hata</span>` : ''}</p>${r.errors.length ? `<details><summary class="note">Hatalar</summary><pre class="note" style="white-space:pre-wrap">${esc(r.errors.join('\n'))}</pre></details>` : ''}` : ''}
-          <p class="note">Taşıma dosyaların kopyasını alır; Supabase'deki asıllar silinmez.</p></div>`;
+          <p class="note">Taşıma dosyaların kopyasını alır; Supabase'deki asıllar silinmez.</p></div>
+          <div class="card"><h3 style="margin-top:0">Eksik videolar</h3>${(() => { const x = r.miss || {}; const n = (x.list || []).length;
+            if (!n && !x.running) return '<p><b style="color:var(--green)">Bütün teslim edilmiş videoların dosyası yerinde.</b></p>';
+            return `<p>Dosyası bulunmayan <b>${n}</b> video var (Supabase'ten alınamayanlar). Aynı metin ve sahnelerle yeniden seslendirilip yeniden üretilebilir: yaklaşık <b>${Math.round((x.chars || 0) / 1000)} bin</b> ElevenLabs karakteri harcanır.</p>
+            ${x.total ? `<p>${x.running ? '⏳ Üretiliyor' : 'Son çalışma'}: <b>${x.done}/${x.total}</b>${x.current ? ` · ${esc(x.current)}` : ''}${x.failed ? ` · <span class="err-t">${x.failed} hata</span>` : ''}</p>${(x.errors || []).length ? `<details><summary class="note">Hatalar</summary><pre class="note" style="white-space:pre-wrap">${esc(x.errors.join('\n'))}</pre></details>` : ''}` : ''}
+            <div class="btns"><button class="primary" id="rpAll" ${x.running ? 'disabled' : ''}>Hepsini yeniden üret</button></div>
+            <details><summary class="note">Liste</summary><ul class="note">${(x.list || []).map(v => `<li>${esc(v.title)} · ${Math.round(v.chars / 100) / 10} bin karakter</li>`).join('')}</ul></details>`; })()}</div>`;
         const t = document.getElementById('r2t'); if (t) t.onclick = async () => { t.disabled = true; try { const x = await api('/api/admin/r2/test', { method: 'POST' }); msg(x.ok ? 'R2 bağlantısı çalışıyor ✓' : 'R2 okunamadı'); } catch (e) { msg(e.message); } t.disabled = false; };
         const m = document.getElementById('r2m'); if (m) m.onclick = async () => { if (!confirm('Mevcut videolar ve sesler R2\'ye kopyalansın mı?')) return; m.disabled = true; try { await api('/api/admin/r2/migrate', { method: 'POST' }); draw(); } catch (e) { msg(e.message); m.disabled = false; } };
-        if (r.running) pollTimer = setTimeout(() => { if (location.hash.includes('t=depo')) draw(); }, 4000); };
+        const ra = document.getElementById('rpAll'); if (ra) ra.onclick = async () => { if (!confirm(`Eksik ${(r.miss.list || []).length} video sırayla yeniden seslendirilip üretilsin mi? ElevenLabs kredisi harcanır.`)) return; ra.disabled = true; try { await api('/api/admin/missing/run', { method: 'POST' }); setTimeout(draw, 1500); } catch (e) { msg(e.message); ra.disabled = false; } };
+        if (r.running || (r.miss && r.miss.running)) pollTimer = setTimeout(() => { if (location.hash.includes('t=depo')) draw(); }, 4000); };
       return draw();
     }
     if (tab === 'ogretmen' || tab === 'kullanici') {
