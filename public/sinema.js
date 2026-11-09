@@ -59,6 +59,7 @@ function newView() {
     <label>Süre</label>${chipGroup('duration', [[30, '30 sn'], [60, '1 dk'], [90, '1,5 dk'], [120, '2 dk'], [180, '3 dk']], 90)}
     <label>Format</label>${chipGroup('aspect', [['1:1', 'Kare 1:1 (Instagram)'], ['16:9', 'Yatay 16:9 (YouTube)'], ['9:16', 'Dikey 9:16 (Reels / Shorts)']], '1:1')}
     <label>Ton</label>${chipGroup('tone', [['duygusal, epik tarih draması', 'Duygusal tarih draması'], ['belgesel, sakin ve bilgilendirici', 'Belgesel'], ['destansı, coşkulu', 'Destansı'], ['merak uyandıran, gizemli', 'Merak uyandıran'], ['belgesel drama: sessiz, ağır tempolu, duygusal; simge nesneler, sıradan insanların tepkileri ve gerçek belgelerle anlatım', 'Belgesel drama']], 'duygusal, epik tarih draması')}
+    <label>Kurgu temposu</label>${chipGroup('tempo', [['uzun', 'Uzun planlar (az ve ağır akan planlar)'], ['dengeli', 'Dengeli'], ['hizli', 'Hızlı kesmeler']], 'dengeli')}
     <label class="switch"><input type="checkbox" id="narration"> Seslendirme ekle: dış ses, karakter replikleri, radyo anonsları (ElevenLabs)</label>
     <label class="switch"><input type="checkbox" id="bridge"> Sonunda günümüze bağla (ör. "Dedemin babası o sabah on yaşındaymış")</label>
     <label>Ek istekler (isteğe bağlı)</label><textarea id="notes" rows="2" placeholder="Örnek: kış mevsimi, gün batımı ışığı; sonunda bayraklı çocuklar olsun; ekranda tarih yazsın."></textarea>
@@ -69,7 +70,7 @@ function newView() {
   $('#f').onsubmit = async e => {
     e.preventDefault(); $('#go').disabled = true;
     try {
-      const p = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, notes: $('#notes').value, auto: $('#auto').checked } });
+      const p = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), notes: $('#notes').value, auto: $('#auto').checked } });
       route('#/p/' + p.id);
     } catch (er) { toast(er.message, true); $('#go').disabled = false; }
   };
@@ -178,7 +179,8 @@ const STAGE_VIEW = {
     const chars = p.characters || [];
     el.innerHTML = `<p class="mute">${sc.length} sahne · yaklaşık ${total} sn ham görüntü. Her sahnede önce ilk kare fotoğraf olarak, sonra kısa video üretilir. Metinleri doğrudan düzenleyebilirsiniz.</p>
     <div class="stack">${sc.map((s, i) => `<div class="card sc" data-i="${i}"><div class="num">${s.n}</div><div>
-      <div class="row"><div style="flex:3"><label>Ne oluyor</label><input data-k="what" value="${esc(s.what)}"></div><div style="flex:1;min-width:110px"><label>Süre</label><select data-k="sec"><option value="5" ${s.sec == 5 ? 'selected' : ''}>5 sn</option><option value="10" ${s.sec == 10 ? 'selected' : ''}>10 sn</option></select></div></div>
+      <div class="row"><div style="flex:3"><label>Ne oluyor</label><input data-k="what" value="${esc(s.what)}"></div><div style="flex:1;min-width:110px"><label>Süre</label><select data-k="sec">${[...new Set([3, 4, 5, 6, 8, 10, 12, 15, +s.sec])].sort((a, b) => a - b).map(v => `<option value="${v}" ${s.sec == v ? 'selected' : ''}>${v} sn</option>`).join('')}</select></div></div>
+      <label class="switch" style="margin-top:6px"><input type="checkbox" data-k="card" ${s.card ? 'checked' : ''}> Siyah kart (görüntü yok, yalnızca ekran yazısı)</label>
       <div class="row"><div><label>Ekran yazısı <span class="dim">(her satır ayrı satırda görünür)</span></label><textarea data-k="overlay" rows="${Math.max(1, (s.overlay || '').split('\n').length)}" placeholder="(yok)">${esc(s.overlay)}</textarea></div>${p.opts.narration ? `<div style="flex:2"><label>Söz</label><input data-k="narration" value="${esc(s.narration)}" placeholder="(sessiz plan)"></div><div style="flex:1;min-width:130px"><label>Kim söylüyor</label><select data-k="speaker">${speakerOpts(p, s.speaker)}</select></div>` : ''}</div>
       <div><label>Ses efekti <span class="dim">(İngilizce; boşsa yok)</span></label><input data-k="sfx_en" value="${esc(s.sfx_en || '')}" placeholder="ör. grandfather clock ticking in a silent hall"></div>
       <div class="small mute" style="margin-top:8px">Karakterler: ${chars.map(c => `<label style="display:inline-flex;gap:4px;margin:0 10px 0 0;color:var(--ink)"><input type="checkbox" style="width:auto" data-ch="${esc(c.id)}" ${s.chars.includes(c.id) ? 'checked' : ''}>${esc(c.name)}</label>`).join('') || '—'}</div>
@@ -187,7 +189,7 @@ const STAGE_VIEW = {
     <div class="card" style="margin-top:14px"><h3>Claude'a düzeltme yaptır</h3><textarea id="fb" rows="2" placeholder="Örnek: Daha fazla yakın plan olsun; 5. sahneyi çıkar; sona bayrak dalgalanan bir kapanış ekle."></textarea><div style="margin-top:8px"><button id="regen" ${working() ? 'disabled' : ''}>Düzeltmeyle yeniden yaz</button></div></div>
     <p class="dim small">Video üretimi tahmini maliyeti: ≈ $${p.video_estimate.toFixed(2)} (${esc(p.video_model.split('/').slice(1, 3).join(' '))}). Görseller sahne başı ≈ $0,08.</p>
     ${bar(`<button id="save" ${working() ? 'disabled' : ''}>Değişiklikleri kaydet</button>`)}`;
-    const collect = () => ({ action: 'save', scenes: sc.map((s, i) => { const box = el.querySelector(`[data-i="${i}"]`); const o = { n: s.n }; box.querySelectorAll('[data-k]').forEach(x => o[x.dataset.k] = x.dataset.k === 'sec' ? +x.value : x.value); o.chars = [...box.querySelectorAll('[data-ch]')].filter(x => x.checked).map(x => x.dataset.ch); return o; }) });
+    const collect = () => ({ action: 'save', scenes: sc.map((s, i) => { const box = el.querySelector(`[data-i="${i}"]`); const o = { n: s.n }; box.querySelectorAll('[data-k]').forEach(x => o[x.dataset.k] = x.type === 'checkbox' ? x.checked : x.dataset.k === 'sec' ? +x.value : x.value); o.chars = [...box.querySelectorAll('[data-ch]')].filter(x => x.checked).map(x => x.dataset.ch); return o; }) });
     $('#save').onclick = () => act(collect(), 'Kaydedildi');
     $('#regen').onclick = () => { const fb = $('#fb').value.trim(); if (!fb) return toast('Ne değişsin, yazın', true); act({ action: 'regenerate', feedback: fb }, 'Claude planı yeniden yazıyor…'); };
     bindApprove(async () => { await api(`/projects/${p.id}/action`, { method: 'POST', body: collect() }); });
@@ -195,7 +197,7 @@ const STAGE_VIEW = {
 
   frames(p, el) {
     el.innerHTML = `<p class="mute">Her sahnenin ilk karesi. Videolar bu karelerden üretilecek; beğenmediğinizi tarifini düzeltip yeniden üretin.</p>
-    <div class="grid">${(p.scenes || []).map(s => `<div class="card media"><div class="vis"><span class="n">${s.n}</span>${s.image ? `<img src="${esc(s.image)}" loading="lazy">` : `<div class="ph">${s.status === 'working' ? '<div class="spin" style="margin:auto"></div>' : 'Bekliyor'}</div>`}</div>
+    <div class="grid">${(p.scenes || []).map(s => `<div class="card media"><div class="vis"><span class="n">${s.n}</span>${s.card ? `<div class="ph" style="background:#000;color:#fff;text-align:center;padding:10px">${esc(s.overlay || 'Siyah kart')}</div>` : s.image ? `<img src="${esc(s.image)}" loading="lazy">` : `<div class="ph">${s.status === 'working' ? '<div class="spin" style="margin:auto"></div>' : 'Bekliyor'}</div>`}</div>
       <div class="bd"><div class="small">${esc(s.what)}</div>${s.overlay ? `<div class="dim small">Yazı: ${esc(s.overlay)}</div>` : ''}${s.error ? `<div class="err">${esc(s.error)}</div>` : ''}
       <details style="margin-top:6px"><summary>Tarifi düzelt / yeniden üret</summary><textarea rows="5" data-pr="${s.n}">${esc(s.image_en)}</textarea><button class="small" style="margin-top:6px" data-redo="${s.n}" ${working() ? 'disabled' : ''}>Yeniden üret</button></details></div></div>`).join('')}</div>
     ${bar(itemErrors(p) ? `<button onclick="act({action:'retry'})">Eksikleri tamamla</button>` : '')}`;
@@ -225,7 +227,7 @@ const STAGE_VIEW = {
 
   videos(p, el) {
     el.innerHTML = `<p class="mute">Her sahnenin videosu. Bozuk görünen (yüz bozulması, garip hareket) klibi hareket tarifini sadeleştirip yeniden üretin.</p>
-    <div class="grid">${(p.scenes || []).map(s => `<div class="card media"><div class="vis"><span class="n">${s.n}</span>${s.video ? `<video src="${esc(s.video)}" controls muted loop playsinline preload="metadata" poster="${esc(s.image || '')}"></video>` : s.image ? `<img src="${esc(s.image)}" style="opacity:.45">${s.status === 'working' ? '<div class="spin" style="position:absolute"></div>' : ''}` : '<div class="ph">Kare yok</div>'}</div>
+    <div class="grid">${(p.scenes || []).map(s => `<div class="card media"><div class="vis"><span class="n">${s.n}</span>${s.card ? `<div class="ph" style="background:#000;color:#fff;text-align:center;padding:10px">${esc(s.overlay || 'Siyah kart')}</div>` : s.video ? `<video src="${esc(s.video)}" controls muted loop playsinline preload="metadata" poster="${esc(s.image || '')}"></video>` : s.image ? `<img src="${esc(s.image)}" style="opacity:.45">${s.status === 'working' ? '<div class="spin" style="position:absolute"></div>' : ''}` : '<div class="ph">Kare yok</div>'}</div>
       <div class="bd"><div class="small">${esc(s.what)}</div>${s.error ? `<div class="err">${esc(s.error)}</div>` : ''}
       <details style="margin-top:6px"><summary>Hareketi düzelt / yeniden üret</summary><textarea rows="3" data-pr="${s.n}">${esc(s.motion_en)}</textarea><button class="small" data-redo="${s.n}" style="margin-top:6px" ${working() ? 'disabled' : ''}>Yeniden üret</button></details></div></div>`).join('')}</div>
     ${bar(itemErrors(p) ? `<button onclick="act({action:'retry'})">Eksikleri tamamla</button>` : '', 'Onayla ve kurguya geç →')}`;

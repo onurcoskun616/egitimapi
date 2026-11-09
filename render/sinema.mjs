@@ -62,8 +62,9 @@ async function main() {
   const parts = [];
   for (let i = 0; i < n; i++) {
     const s = m.scenes[i];
-    const src = await fetchTo(s.video, path.join(dir, `in${i}.mp4`));
-    const clip = probeSec(src) || s.video_sec || 5;
+    // Siyah kart (görüntüsüz, yalnızca yazı): klip yerine siyah görüntü üretilir
+    const src = s.card ? null : await fetchTo(s.video, path.join(dir, `in${i}.mp4`));
+    const clip = s.card ? Math.max(1.5, s.video_sec || 4) : (probeSec(src) || s.video_sec || 5);
     const want = Math.max(Math.min(clip, s.video_sec || clip), (s.voice_sec || 0) + 0.6) + (i < n - 1 ? 0 : 0.5);
     const D = +Math.max(1.5, want).toFixed(3);
     const extra = Math.max(0, D - clip);
@@ -80,7 +81,7 @@ async function main() {
       const sizes = lines.map((ln, k) => Math.min(k === 0 ? fs1 : fsN, Math.floor(W * 0.9 / (Math.max(1, ln.length) * 0.56))));
       const gap = Math.round(H / 90);
       const block = sizes.reduce((a, b) => a + b, 0) + gap * (lines.length - 1);
-      const y0 = i === 0 || i === n - 1 ? Math.round(H / 2 - block / 2) : Math.round(H * 0.80 - block);
+      const y0 = i === 0 || i === n - 1 || s.card ? Math.round(H / 2 - block / 2) : Math.round(H * 0.80 - block);
       const t1 = 0.4, t2 = Math.max(t1 + 1.2, D - 0.5);
       const alpha = `if(lt(t\\,${t1})\\,0\\,if(lt(t\\,${t1 + 0.6})\\,(t-${t1})/0.6\\,if(lt(t\\,${t2 - 0.6})\\,1\\,if(lt(t\\,${t2})\\,(${t2}-t)/0.6\\,0))))`;
       let y = y0;
@@ -106,7 +107,8 @@ async function main() {
       }
     }
     const out = path.join(dir, `p${i}.mp4`);
-    ff(['-i', src, '-an', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', out], `Sahne ${s.n}`);
+    if (s.card) vf = vf.replace(GRADES[m.grade] || '\u0000', '').replace(GRAINS[m.grain] || '\u0000', '');
+    ff([...(s.card ? ['-f', 'lavfi', '-i', `color=c=black:s=${W}x${H}:r=${fps}:d=${D}`] : ['-i', src]), '-an', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', out], `Sahne ${s.n}`);
     parts.push({ file: out, D: probeSec(out) || D, voice: s.voice, voice_sec: s.voice_sec, radio: !!s.radio, sfx: s.sfx });
     log(`Sahne ${i + 1}/${n} hazır (${D.toFixed(1)} sn)`); step(i + 1, n);
   }
