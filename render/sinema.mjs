@@ -38,6 +38,13 @@ async function fetchTo(src, dest) {
   }
   throw new Error('İndirilemedi: ' + src);
 }
+// Renk tonları ve film dokusu (ayarlar: Sinema → Ayarlar → Kurgu)
+const GRADES = {
+  sepya: ',hue=s=0.32,colorbalance=rs=.10:gs=.04:bs=-.10:rm=.07:gm=.02:bm=-.07,eq=contrast=1.05:gamma=0.97',
+  soluk: ',eq=saturation=0.55:contrast=1.04',
+  'siyah-beyaz': ',hue=s=0,eq=contrast=1.08',
+};
+const GRAINS = { hafif: ',noise=alls=7:allf=t,vignette=PI/5', belirgin: ',noise=alls=15:allf=t,vignette=PI/4' };
 const esc = s => s.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/%/g, '\\%').replace(/,/g, '\\,');
 
 async function main() {
@@ -63,6 +70,9 @@ async function main() {
     let vf = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${fps},setsar=1`;
     if (extra > 0.02) vf += `,tpad=stop_mode=clone:stop_duration=${extra.toFixed(3)}`;
     vf += `,trim=duration=${D},setpts=PTS-STARTPTS`;
+    // Renk tonu ve film dokusu (yazılardan önce; yazılar temiz kalsın)
+    vf += GRADES[m.grade] || '';
+    vf += GRAINS[m.grain] || '';
     if (s.overlay && s.overlay.trim() && font) {
       const lines = s.overlay.replace(/\\n/g, '\n').replace(/\s*\|\s*/g, '\n').split(/\r?\n/).map(x => x.trim()).filter(Boolean).slice(0, 4);
       const fs1 = Math.round(H / (i === 0 ? 17 : 22)), fsN = Math.round(H / 30);
@@ -81,9 +91,23 @@ async function main() {
         y += sizes[k] + gap;
       }
     }
+    // Konuşma altyazısı: sesin süresince alt kısımda, küçük ve sade
+    if (m.subtitles && s.text && s.text.trim() && s.voice && font) {
+      const fsz = Math.round(Math.min(W, H) / 26), maxc = Math.max(14, Math.floor(W * 0.84 / (fsz * 0.52)));
+      const words = s.text.trim().split(/\s+/), lines = [''];
+      for (const w of words) { const cur = lines[lines.length - 1]; if ((cur + ' ' + w).trim().length > maxc && cur) lines.push(w); else lines[lines.length - 1] = (cur + ' ' + w).trim(); }
+      const ls = lines.slice(0, 3), gap = Math.round(fsz * 0.3), block = ls.length * fsz + (ls.length - 1) * gap;
+      const a = 0.25, b = Math.min(D - 0.1, a + (s.voice_sec || 2) + 0.35);
+      let y = Math.round(H * 0.93 - block);
+      for (let k = 0; k < ls.length; k++) {
+        const tf = path.join(dir, `s${i}_${k}.txt`); await writeFile(tf, ls[k]);
+        vf += `,drawtext=fontfile='${font}':textfile='${tf}':fontsize=${fsz}:expansion=none:fontcolor=white@0.95:x=(w-text_w)/2:y=${y}:shadowcolor=black@0.85:shadowx=2:shadowy=2:enable='between(t\\,${a}\\,${b.toFixed(2)})'`;
+        y += fsz + gap;
+      }
+    }
     const out = path.join(dir, `p${i}.mp4`);
     ff(['-i', src, '-an', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', out], `Sahne ${s.n}`);
-    parts.push({ file: out, D: probeSec(out) || D, voice: s.voice, voice_sec: s.voice_sec });
+    parts.push({ file: out, D: probeSec(out) || D, voice: s.voice, voice_sec: s.voice_sec, radio: !!s.radio, sfx: s.sfx });
     log(`Sahne ${i + 1}/${n} hazır (${D.toFixed(1)} sn)`); step(i + 1, n);
   }
 
@@ -117,7 +141,19 @@ async function main() {
   for (let i = 0; i < n; i++) if (parts[i].voice) {
     const f = await fetchTo(parts[i].voice, path.join(dir, `v${i}.mp3`));
     ain.push('-i', f); const d = Math.round((starts[i] + 0.25) * 1000);
-    fl.push(`[${k}:a]aresample=44100,aformat=channel_layouts=stereo,adelay=${d}|${d}[va${k}]`); voices.push(`[va${k}]`); k++;
+    const radio = parts[i].radio ? 'highpass=f=350,lowpass=f=3000,acompressor=threshold=0.125:ratio=3,volume=1.6,' : '';
+    fl.push(`[${k}:a]${radio}aresample=44100,aformat=channel_layouts=stereo,adelay=${d}|${d}[va${k}]`); voices.push(`[va${k}]`); k++;
+  }
+  // Ses efektleri: her sahnenin başında, sahne süresince, yumuşak giriş/çıkışla
+  const sfxs = [];
+  for (let i = 0; i < n; i++) if (parts[i].sfx) {
+    try {
+      const f = await fetchTo(parts[i].sfx, path.join(dir, `fx${i}.mp3`));
+      const D = parts[i].D, d = Math.round(starts[i] * 1000), fo = Math.max(0.2, D - 0.6).toFixed(2);
+      ain.push('-i', f);
+      fl.push(`[${k}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${D.toFixed(2)},asetpts=PTS-STARTPTS,afade=t=in:d=0.3,afade=t=out:st=${fo}:d=0.6,volume=${m.sfx_volume || 0.5},adelay=${d}|${d}[fx${k}]`);
+      sfxs.push(`[fx${k}]`); k++;
+    } catch (e) { log('Ses efekti atlandı: ' + e.message); }
   }
   let musicLab = null;
   if (m.music) {
@@ -130,7 +166,7 @@ async function main() {
   const final = OUT || path.join(dir, 'final.mp4');
   const kbps = Math.round(Math.max(1500, Math.min(6000, (180 * 8 * 1024) / total * 0.92 - 192))); // ≤ ~180 MB
   const vargs = ['-c:v', 'libx264', '-preset', 'veryfast', '-b:v', kbps + 'k', '-maxrate', Math.round(kbps * 1.4) + 'k', '-bufsize', kbps * 2 + 'k', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
-  if (!voices.length && !musicLab) {
+  if (!voices.length && !musicLab && !sfxs.length) {
     ff(['-i', vidOnly, ...vargs, '-an', final], 'Son kodlama');
   } else {
     let mix;
@@ -139,10 +175,12 @@ async function main() {
       if (musicLab) {
         fl.push(`[vo]asplit=2[vo1][vo2]`);
         fl.push(`${musicLab}[vo1]sidechaincompress=threshold=0.03:ratio=6:attack=40:release=600[duck]`);
-        fl.push(`[duck][vo2]amix=inputs=2:normalize=0,alimiter=limit=0.95[a]`);
-      } else fl.push(`[vo]alimiter=limit=0.95[a]`);
-      mix = '[a]';
-    } else { fl.push(`${musicLab}anull[a]`); mix = '[a]'; }
+        fl.push(`[duck][vo2]amix=inputs=2:normalize=0[a0]`);
+      } else fl.push(`[vo]anull[a0]`);
+    } else fl.push(`${musicLab || ''}${musicLab ? 'anull' : 'anullsrc=r=44100:cl=stereo,atrim=0:' + total}[a0]`);
+    if (sfxs.length) fl.push(`[a0]${sfxs.join('')}amix=inputs=${sfxs.length + 1}:normalize=0:dropout_transition=0,alimiter=limit=0.95[a]`);
+    else fl.push(`[a0]alimiter=limit=0.95[a]`);
+    mix = '[a]';
     ff(['-i', vidOnly, ...ain, '-filter_complex', fl.join(';'), '-map', '0:v', '-map', mix, ...vargs, '-c:a', 'aac', '-b:a', '160k', '-t', String(total), final], 'Ses karışımı');
   }
   const size = (await stat(final)).size;

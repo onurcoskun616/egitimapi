@@ -58,8 +58,9 @@ function newView() {
     <textarea id="topic" rows="4" placeholder="Örnek: 27 Aralık 1919'da Mustafa Kemal'in Heyet-i Temsiliye ile Ankara'ya gelişi; Dikmen sırtlarında halkın karşılaması, zeybek gösterisi, Hacı Bayram Camii önünde çocuklarla karşılaşma."></textarea>
     <label>Süre</label>${chipGroup('duration', [[30, '30 sn'], [60, '1 dk'], [90, '1,5 dk'], [120, '2 dk'], [180, '3 dk']], 90)}
     <label>Format</label>${chipGroup('aspect', [['1:1', 'Kare 1:1 (Instagram)'], ['16:9', 'Yatay 16:9 (YouTube)'], ['9:16', 'Dikey 9:16 (Reels / Shorts)']], '1:1')}
-    <label>Ton</label>${chipGroup('tone', [['duygusal, epik tarih draması', 'Duygusal tarih draması'], ['belgesel, sakin ve bilgilendirici', 'Belgesel'], ['destansı, coşkulu', 'Destansı'], ['merak uyandıran, gizemli', 'Merak uyandıran']], 'duygusal, epik tarih draması')}
-    <label class="switch"><input type="checkbox" id="narration"> Dış ses anlatımı ekle (ElevenLabs)</label>
+    <label>Ton</label>${chipGroup('tone', [['duygusal, epik tarih draması', 'Duygusal tarih draması'], ['belgesel, sakin ve bilgilendirici', 'Belgesel'], ['destansı, coşkulu', 'Destansı'], ['merak uyandıran, gizemli', 'Merak uyandıran'], ['belgesel drama: sessiz, ağır tempolu, duygusal; simge nesneler, sıradan insanların tepkileri ve gerçek belgelerle anlatım', 'Belgesel drama']], 'duygusal, epik tarih draması')}
+    <label class="switch"><input type="checkbox" id="narration"> Seslendirme ekle: dış ses, karakter replikleri, radyo anonsları (ElevenLabs)</label>
+    <label class="switch"><input type="checkbox" id="bridge"> Sonunda günümüze bağla (ör. "Dedemin babası o sabah on yaşındaymış")</label>
     <label>Ek istekler (isteğe bağlı)</label><textarea id="notes" rows="2" placeholder="Örnek: kış mevsimi, gün batımı ışığı; sonunda bayraklı çocuklar olsun; ekranda tarih yazsın."></textarea>
     <label class="switch"><input type="checkbox" id="auto"> Tam otomatik: onay beklemeden sonuna kadar ilerle</label>
     <div class="row tight" style="margin-top:16px"><button class="gold" id="go">Başlat →</button><span class="dim small">İlk adımda Claude senaryoyu yazar (1–3 dk).</span></div>
@@ -68,7 +69,7 @@ function newView() {
   $('#f').onsubmit = async e => {
     e.preventDefault(); $('#go').disabled = true;
     try {
-      const p = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, notes: $('#notes').value, auto: $('#auto').checked } });
+      const p = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, notes: $('#notes').value, auto: $('#auto').checked } });
       route('#/p/' + p.id);
     } catch (er) { toast(er.message, true); $('#go').disabled = false; }
   };
@@ -143,6 +144,7 @@ const STAGE_VIEW = {
         <div class="row"><div><label>Ad</label><input data-k="name" value="${esc(c.name)}"></div><div><label>Rol</label><input data-k="role" value="${esc(c.role)}"></div></div>
         <label>Tanım</label><input data-k="about" value="${esc(c.about)}">
         <label>Görünüş (İngilizce, görsel üretimi için — gerçek ad yazılmaz)</label><textarea data-k="look_en" rows="3">${esc(c.look_en)}</textarea>
+        <div class="row"><div><label>Ses türü</label><select data-k="voice">${VOICE_TYPES.map(([v, n]) => `<option value="${v}" ${c.voice === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
         <label class="switch"><input type="checkbox" data-k="ref" ${c.ref ? 'checked' : ''}> Referans görseli üret (birden çok sahnede görünecekse)</label></div>`).join('')}</div></div>
       <div class="card" style="margin-top:14px"><h3>Claude'a düzeltme yaptır</h3><textarea id="fb" rows="2" placeholder="Örnek: Zeybek sahnesini çıkar, karşılamaya Ankara'nın ileri gelenlerini ekle; daha az karakter olsun."></textarea>
       <div class="row tight" style="margin-top:8px"><button id="regen" ${working() ? 'disabled' : ''}>Düzeltmeyle yeniden yaz</button></div></div>
@@ -177,7 +179,8 @@ const STAGE_VIEW = {
     el.innerHTML = `<p class="mute">${sc.length} sahne · yaklaşık ${total} sn ham görüntü. Her sahnede önce ilk kare fotoğraf olarak, sonra kısa video üretilir. Metinleri doğrudan düzenleyebilirsiniz.</p>
     <div class="stack">${sc.map((s, i) => `<div class="card sc" data-i="${i}"><div class="num">${s.n}</div><div>
       <div class="row"><div style="flex:3"><label>Ne oluyor</label><input data-k="what" value="${esc(s.what)}"></div><div style="flex:1;min-width:110px"><label>Süre</label><select data-k="sec"><option value="5" ${s.sec == 5 ? 'selected' : ''}>5 sn</option><option value="10" ${s.sec == 10 ? 'selected' : ''}>10 sn</option></select></div></div>
-      <div class="row"><div><label>Ekran yazısı <span class="dim">(her satır ayrı satırda görünür)</span></label><textarea data-k="overlay" rows="${Math.max(1, (s.overlay || '').split('\n').length)}" placeholder="(yok)">${esc(s.overlay)}</textarea></div>${p.opts.narration ? `<div style="flex:2"><label>Anlatım</label><input data-k="narration" value="${esc(s.narration)}"></div>` : ''}</div>
+      <div class="row"><div><label>Ekran yazısı <span class="dim">(her satır ayrı satırda görünür)</span></label><textarea data-k="overlay" rows="${Math.max(1, (s.overlay || '').split('\n').length)}" placeholder="(yok)">${esc(s.overlay)}</textarea></div>${p.opts.narration ? `<div style="flex:2"><label>Söz</label><input data-k="narration" value="${esc(s.narration)}" placeholder="(sessiz plan)"></div><div style="flex:1;min-width:130px"><label>Kim söylüyor</label><select data-k="speaker">${speakerOpts(p, s.speaker)}</select></div>` : ''}</div>
+      <div><label>Ses efekti <span class="dim">(İngilizce; boşsa yok)</span></label><input data-k="sfx_en" value="${esc(s.sfx_en || '')}" placeholder="ör. grandfather clock ticking in a silent hall"></div>
       <div class="small mute" style="margin-top:8px">Karakterler: ${chars.map(c => `<label style="display:inline-flex;gap:4px;margin:0 10px 0 0;color:var(--ink)"><input type="checkbox" style="width:auto" data-ch="${esc(c.id)}" ${s.chars.includes(c.id) ? 'checked' : ''}>${esc(c.name)}</label>`).join('') || '—'}</div>
       <details><summary>Görsel ve hareket tarifi (İngilizce)</summary><label>Plan</label><input data-k="shot" value="${esc(s.shot)}"><label>İlk kare</label><textarea data-k="image_en" rows="4">${esc(s.image_en)}</textarea><label>Hareket</label><textarea data-k="motion_en" rows="2">${esc(s.motion_en)}</textarea></details>
     </div></div>`).join('')}</div>
@@ -206,7 +209,9 @@ const STAGE_VIEW = {
       ${a.music ? `<audio controls src="${esc(a.music)}"></audio><div class="dim small">${a.uploaded ? 'Yüklediğiniz müzik' : 'ElevenLabs ile bestelendi'}</div>` : a.skipped ? '<div class="mute">Müziksiz devam edilecek.</div>' : a.error ? `<div class="err">${esc(a.error)}</div>` : '<div class="mute">Müzik henüz yok.</div>'}
       <details><summary>Müzik tarifini değiştir ve yeniden besteleyin</summary><textarea id="mp" rows="3">${esc(p.script && p.script.music)}</textarea><button class="small" id="remusic" style="margin-top:6px" ${working() ? 'disabled' : ''}>Yeniden bestele</button></details>
       <div class="row tight"><label class="btn small" style="margin:0;color:var(--ink)">Kendi müziğimi yükle<input type="file" id="up" accept="audio/*" hidden></label><button class="small" id="nomusic" ${working() ? 'disabled' : ''}>Müziksiz devam</button></div></div>
-    ${p.opts.narration ? `<h2 style="margin-top:20px">Anlatım</h2><div class="stack">${(p.scenes || []).filter(s => s.narration).map(s => `<div class="card sc"><div class="num">${s.n}</div><div><div class="small">${esc(s.narration)}</div>${s.voice ? `<audio controls src="${esc(s.voice)}"></audio><div class="dim small">${s.voice_sec} sn${s.sec === 10 ? ' · sahne 10 sn' : ''}</div>` : s.status === 'working' ? '<div class="spin"></div>' : ''}${s.error ? `<div class="err">${esc(s.error)}</div>` : ''}
+    ${(p.scenes || []).some(s => s.sfx_en) ? `<h2 style="margin-top:20px">Ses efektleri</h2><div class="stack">${(p.scenes || []).filter(s => s.sfx_en).map(s => `<div class="card sc"><div class="num">${s.n}</div><div><div class="dim small">${esc(s.sfx_en)}</div>${s.sfx ? `<audio controls src="${esc(s.sfx)}"></audio>` : s.sfx_error ? `<div class="err">${esc(s.sfx_error)}</div>` : '<div class="dim small">Henüz yok</div>'}
+      <details><summary>Tarifi düzelt / yeniden üret</summary><input data-fxp="${s.n}" value="${esc(s.sfx_en)}"><button class="small" data-fx="${s.n}" style="margin-top:6px" ${working() ? 'disabled' : ''}>Yeniden üret</button></details></div></div>`).join('')}</div>` : ''}
+    ${p.opts.narration ? `<h2 style="margin-top:20px">Seslendirme</h2><div class="stack">${(p.scenes || []).filter(s => s.narration).map(s => `<div class="card sc"><div class="num">${s.n}</div><div><div class="dim small">${esc(speakerName(p, s.speaker))}</div><div class="small">${esc(s.narration)}</div>${s.voice ? `<audio controls src="${esc(s.voice)}"></audio><div class="dim small">${s.voice_sec} sn${s.sec === 10 ? ' · sahne 10 sn' : ''}</div>` : s.status === 'working' ? '<div class="spin"></div>' : ''}${s.error ? `<div class="err">${esc(s.error)}</div>` : ''}
       <details><summary>Metni düzelt / yeniden seslendir</summary><textarea rows="2" data-pr="${s.n}">${esc(s.narration)}</textarea><button class="small" data-redo="${s.n}" style="margin-top:6px" ${working() ? 'disabled' : ''}>Yeniden seslendir</button></details></div></div>`).join('')}</div>` : ''}
     <p class="dim small" style="margin-top:16px">Sıradaki adım video klip üretimi: tahmini ≈ $${p.video_estimate.toFixed(2)} (fal.ai bakiyenizden düşer).</p>
     ${bar(itemErrors(p) ? `<button onclick="act({action:'retry'})">Eksikleri tamamla</button>` : '', 'Onayla ve videoları üret →')}`;
@@ -214,6 +219,7 @@ const STAGE_VIEW = {
     $('#nomusic').onclick = () => act({ action: 'nomusic' }, 'Müziksiz devam edilecek');
     $('#up').onchange = async e => { const f = e.target.files[0]; if (!f) return; toast('Yükleniyor…'); const r = await fetch(`/api/sinema/projects/${p.id}/music`, { method: 'POST', headers: { 'Content-Type': f.type || 'audio/mpeg' }, body: f }); if (r.ok) { toast('Müzik yüklendi'); projectView(p.id, true); } else toast('Yüklenemedi', true); };
     el.querySelectorAll('[data-redo]').forEach(b => b.onclick = () => act({ action: 'redo', kind: 'voice', id: +b.dataset.redo, prompt: el.querySelector(`[data-pr="${b.dataset.redo}"]`).value }, 'Yeniden seslendiriliyor…'));
+    el.querySelectorAll('[data-fx]').forEach(b => b.onclick = () => act({ action: 'redo', kind: 'sfx', id: +b.dataset.fx, prompt: el.querySelector(`[data-fxp="${b.dataset.fx}"]`).value }, 'Ses efekti yeniden üretiliyor…'));
     bindApprove(() => confirm(`Video klipler üretilecek (tahmini ≈ $${p.video_estimate.toFixed(2)}). Devam edilsin mi?`));
   },
 
@@ -264,13 +270,16 @@ const GROUPS = [
   ['eleven', 'ElevenLabs (anlatım ve müzik)', ''],
   ['kurgu', 'Kurgu', 'Son videonun görünümü.'],
 ];
+const VOICE_TYPES = [['erkek', 'Erkek'], ['yasli_erkek', 'Yaşlı erkek'], ['kadin', 'Kadın'], ['yasli_kadin', 'Yaşlı kadın'], ['cocuk', 'Çocuk'], ['spiker', 'Spiker']];
+function speakerName(p, sp) { if (!sp || sp === 'anlatici') return 'Anlatıcı'; if (sp === 'radyo') return 'Radyo / anons'; const c = (p.characters || []).find(c => c.id === sp); return c ? c.name : 'Anlatıcı'; }
+function speakerOpts(p, cur) { return [['anlatici', 'Anlatıcı'], ['radyo', 'Radyo / anons'], ...(p.characters || []).map(c => [c.id, c.name])].map(([v, n]) => `<option value="${esc(v)}" ${(cur || 'anlatici') === v ? 'selected' : ''}>${esc(n)}</option>`).join(''); }
 const TESTS = { fal: 'fal', eleven: 'eleven', claude: 'github' };
 async function panelView() {
   app.innerHTML = '<div class="spin"></div>';
   const { fields, keys } = await api('/settings');
   const by = g => fields.filter(f => f.group === g);
-  const fieldHtml = f => `<div><label>${esc(f.label)}</label>${f.k === 'eleven_voice'
-      ? `<div class="row tight" style="flex-wrap:nowrap"><select data-f="${f.k}" style="flex:1"><option value="${esc(f.value)}">${esc(f.value || '— platformun varsayılan sesi —')}</option></select><button class="small" id="voices" type="button">Sesleri getir</button></div>`
+  const fieldHtml = f => `<div><label>${esc(f.label)}</label>${f.k.startsWith('eleven_voice')
+      ? `<div class="row tight" style="flex-wrap:nowrap"><select data-f="${f.k}" data-voice style="flex:1"><option value="${esc(f.value)}">${esc(f.value || (f.k === 'eleven_voice' ? '— platformun varsayılan sesi —' : '— anlatıcı sesi —'))}</option></select>${f.k === 'eleven_voice' ? '<button class="small" id="voices" type="button">Sesleri getir</button>' : ''}</div>`
       : f.options ? `<select data-f="${f.k}">${[...new Set([...f.options, f.value].filter(Boolean))].map(o => `<option ${o === f.value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
       : `<input data-f="${f.k}" value="${esc(f.value)}">`}${f.help ? `<div class="help">${esc(f.help)}</div>` : ''}</div>`;
   const key = (ok, name) => `<span class="conn"><span class="dot ${ok ? 'ok' : 'bad'}"></span>${ok ? `${name} tanımlı` : `<span class="err">${name} eksik</span>`}</span>`;
@@ -292,8 +301,9 @@ async function panelView() {
   $('#savep').onclick = async () => { try { await api('/settings', { method: 'POST', body: collect() }); toast('Kaydedildi'); panelView(); } catch (e) { toast(e.message, true); } };
   $('#voices').onclick = async () => {
     try {
-      const v = await api('/voices'); const sel = document.querySelector('[data-f=eleven_voice]'); const cur = sel.value;
-      sel.innerHTML = '<option value="">— platformun varsayılan sesi —</option>' + v.map(x => `<option value="${esc(x.id)}" ${x.id === cur ? 'selected' : ''}>${esc(x.name)}${x.labels.gender ? ' · ' + esc(x.labels.gender) : ''}${x.labels.accent ? ' · ' + esc(x.labels.accent) : ''}</option>`).join('');
+      const v = await api('/voices');
+      document.querySelectorAll('[data-voice]').forEach(sel => { const cur = sel.value;
+        sel.innerHTML = `<option value="">${sel.dataset.f === 'eleven_voice' ? '— platformun varsayılan sesi —' : '— anlatıcı sesi —'}</option>` + v.map(x => `<option value="${esc(x.id)}" ${x.id === cur ? 'selected' : ''}>${esc(x.name)}${x.labels.gender ? ' · ' + esc(x.labels.gender) : ''}${x.labels.age ? ' · ' + esc(x.labels.age) : ''}${x.labels.accent ? ' · ' + esc(x.labels.accent) : ''}</option>`).join(''); });
       toast(v.length + ' ses getirildi; seçip Kaydet’e basın');
     } catch (e) { toast(e.message, true); }
   };
