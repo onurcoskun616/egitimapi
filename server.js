@@ -3,7 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { db, storage, q, R2 } = require('./lib/supa');
+const { db, storage, q, R2, LOCAL } = require('./lib/supa');
 const claude = require('./lib/claude');
 const { TONES, voiceForTone } = require('./lib/tones');
 const eleven = require('./lib/eleven');
@@ -869,6 +869,28 @@ on('POST', '/api/render/:jobId/status', async (req, res, { jobId }) => {
 }, true);
 
 /* ---------- sunucu ---------- */
+// Yerel disk dosyaları: imzalı GET (video için Range desteğiyle) ve imzalı PUT (render yüklemesi)
+const FMIME = { mp4: 'video/mp4', mp3: 'audio/mpeg', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', json: 'application/json' };
+async function serveFile(req, res, url) {
+  let p; try { p = decodeURIComponent(url.pathname.slice(7)); } catch { return send(res, 400, 'Geçersiz'); }
+  const m = url.searchParams.get('m') === 'put' ? 'put' : 'get';
+  if (!LOCAL.check(p, url.searchParams.get('e'), url.searchParams.get('s'), m)) return send(res, 403, { error: 'Bağlantının süresi dolmuş' });
+  let f; try { f = LOCAL.file(p); } catch { return send(res, 400, 'Geçersiz'); }
+  if (m === 'put') {
+    if (req.method !== 'PUT' && req.method !== 'POST') return send(res, 405, 'PUT');
+    await fs.promises.mkdir(path.dirname(f), { recursive: true }); const tmp = f + '.yukleniyor';
+    await new Promise((ok, no) => { const w = fs.createWriteStream(tmp); req.pipe(w); w.on('finish', ok); w.on('error', no); req.on('error', no); });
+    await fs.promises.rename(tmp, f); return send(res, 200, { Key: p });
+  }
+  let st; try { st = await fs.promises.stat(f); } catch { return send(res, 404, { error: 'Dosya yok' }); }
+  const type = FMIME[(p.split('.').pop() || '').toLowerCase()] || 'application/octet-stream', size = st.size;
+  const hd = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=3600' };
+  const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+  if (r) { let a = r[1] === '' ? size - +r[2] : +r[1], b = r[1] === '' || r[2] === '' ? size - 1 : Math.min(+r[2], size - 1); if (a < 0) a = 0;
+    if (a > b || a >= size) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
+    res.writeHead(206, { ...hd, 'Content-Range': `bytes ${a}-${b}/${size}`, 'Content-Length': b - a + 1 }); if (req.method === 'HEAD') return res.end(); return fs.createReadStream(f, { start: a, end: b }).pipe(res); }
+  res.writeHead(200, { ...hd, 'Content-Length': size }); if (req.method === 'HEAD') return res.end(); fs.createReadStream(f).pipe(res);
+}
 http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
@@ -894,6 +916,7 @@ http.createServer(async (req, res) => {
       return send(res, 404, { error: 'Yok' });
     }
     if (url.pathname === '/healthz') return send(res, 200, 'ok');
+    if (url.pathname.startsWith('/files/') && LOCAL.enabled()) return serveFile(req, res, url);
     // Android uygulaması (TWA) alan adı doğrulaması: uygulama imza parmak izi ortam değişkeninden
     if (url.pathname === '/.well-known/assetlinks.json') {
       const fps = String(process.env.ANDROID_CERT_SHA256 || 'F8:55:D1:5C:DC:50:F8:82:F3:9D:CA:DB:90:38:98:A6:AF:FC:91:DE:D1:E4:70:D1:62:FD:AF:1E:86:FF:2D:ED').split(',').map(s => s.trim()).filter(Boolean);
