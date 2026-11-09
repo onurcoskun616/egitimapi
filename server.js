@@ -117,8 +117,18 @@ const ctxFor = (projectId, kind) => ({
     if (!task) {
       const token = crypto.randomBytes(24).toString('hex');
       task = await db.insert('gen_tasks', { project_id: projectId, kind, items, model, token });
-      await dispatch('generate.yml', { task_id: task.id, token });
-    } else console.log('Var olan Claude görevi kullanılıyor:', task.id);
+      try { await dispatch('generate.yml', { task_id: task.id, token }); }
+      catch (e) { await db.update('gen_tasks', `id=eq.${task.id}`, { status: 'failed', error: e.message.slice(0, 500), consumed: true }).catch(() => {}); throw e; }
+    } else {
+      console.log('Var olan Claude görevi kullanılıyor:', task.id);
+      // Hiç başlamamış (örn. önceki başlatma hata verdiyse) görevi GitHub'da yeniden başlat
+      if (task.status === 'queued' && Date.now() - new Date(task.created_at) > 2 * 60 * 1000) {
+        const full = await db.one('gen_tasks', `id=eq.${task.id}&select=token`);
+        await dispatch('generate.yml', { task_id: task.id, token: full.token });
+        await db.update('gen_tasks', `id=eq.${task.id}`, { created_at: now() });
+        task.created_at = now();
+      }
+    }
     const deadline = new Date(task.created_at || Date.now()).getTime() + 45 * 60 * 1000;
     while (Date.now() < deadline) {
       const t = await db.one('gen_tasks', `id=eq.${task.id}&select=status,results,error`);
