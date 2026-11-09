@@ -64,7 +64,7 @@ async function main() {
     if (extra > 0.02) vf += `,tpad=stop_mode=clone:stop_duration=${extra.toFixed(3)}`;
     vf += `,trim=duration=${D},setpts=PTS-STARTPTS`;
     if (s.overlay && s.overlay.trim() && font) {
-      const lines = s.overlay.replace(/\\n/g, '\n').split('\n').map(x => x.trim()).filter(Boolean).slice(0, 4);
+      const lines = s.overlay.replace(/\\n/g, '\n').replace(/\s*\|\s*/g, '\n').split(/\r?\n/).map(x => x.trim()).filter(Boolean).slice(0, 4);
       const fs1 = Math.round(H / (i === 0 ? 17 : 22)), fsN = Math.round(H / 30);
       // Uzun satırlar ekrana sığsın: yaklaşık karakter genişliği ≈ 0,56 × yazı boyu
       const sizes = lines.map((ln, k) => Math.min(k === 0 ? fs1 : fsN, Math.floor(W * 0.9 / (Math.max(1, ln.length) * 0.56))));

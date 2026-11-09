@@ -177,7 +177,7 @@ const STAGE_VIEW = {
     el.innerHTML = `<p class="mute">${sc.length} sahne · yaklaşık ${total} sn ham görüntü. Her sahnede önce ilk kare fotoğraf olarak, sonra kısa video üretilir. Metinleri doğrudan düzenleyebilirsiniz.</p>
     <div class="stack">${sc.map((s, i) => `<div class="card sc" data-i="${i}"><div class="num">${s.n}</div><div>
       <div class="row"><div style="flex:3"><label>Ne oluyor</label><input data-k="what" value="${esc(s.what)}"></div><div style="flex:1;min-width:110px"><label>Süre</label><select data-k="sec"><option value="5" ${s.sec == 5 ? 'selected' : ''}>5 sn</option><option value="10" ${s.sec == 10 ? 'selected' : ''}>10 sn</option></select></div></div>
-      <div class="row"><div><label>Ekran yazısı</label><input data-k="overlay" value="${esc(s.overlay)}" placeholder="(yok)"></div>${p.opts.narration ? `<div style="flex:2"><label>Anlatım</label><input data-k="narration" value="${esc(s.narration)}"></div>` : ''}</div>
+      <div class="row"><div><label>Ekran yazısı <span class="dim">(her satır ayrı satırda görünür)</span></label><textarea data-k="overlay" rows="${Math.max(1, (s.overlay || '').split('\n').length)}" placeholder="(yok)">${esc(s.overlay)}</textarea></div>${p.opts.narration ? `<div style="flex:2"><label>Anlatım</label><input data-k="narration" value="${esc(s.narration)}"></div>` : ''}</div>
       <div class="small mute" style="margin-top:8px">Karakterler: ${chars.map(c => `<label style="display:inline-flex;gap:4px;margin:0 10px 0 0;color:var(--ink)"><input type="checkbox" style="width:auto" data-ch="${esc(c.id)}" ${s.chars.includes(c.id) ? 'checked' : ''}>${esc(c.name)}</label>`).join('') || '—'}</div>
       <details><summary>Görsel ve hareket tarifi (İngilizce)</summary><label>Plan</label><input data-k="shot" value="${esc(s.shot)}"><label>İlk kare</label><textarea data-k="image_en" rows="4">${esc(s.image_en)}</textarea><label>Hareket</label><textarea data-k="motion_en" rows="2">${esc(s.motion_en)}</textarea></details>
     </div></div>`).join('')}</div>
@@ -239,9 +239,20 @@ const STAGE_VIEW = {
       <span class="dim small">${f.sec ? f.sec + ' sn · ' : ''}${f.mb ? f.mb + ' MB' : ''}</span>
       <button class="small" id="reedit">Kurguyu yeniden yap</button>
       ${f.cleaned ? '' : '<button class="small" id="clean">Ara dosyaları sil (depolama aç)</button>'}</div>
-      <p class="dim small">Bir sahneyi değiştirmek için yukarıdaki aşama çizgisinden ilgili aşamaya dönün; onayladığınızda yalnızca değişen kısımlar yeniden üretilir.</p></div>`
+      <p class="dim small">Bir sahneyi değiştirmek için yukarıdaki aşama çizgisinden ilgili aşamaya dönün; onayladığınızda yalnızca değişen kısımlar yeniden üretilir.</p>
+      ${f.cleaned ? '' : `<details class="card"><summary style="font-size:15px;color:var(--ink)"><b>Ekran yazılarını düzelt</b> <span class="dim">— yeni üretim yapmadan, yalnızca kurgu yeniden yapılır (ücretsiz)</span></summary>
+        <div class="stack" style="margin-top:12px">${(p.scenes || []).map(s => `<div class="sc"><div class="num" style="font-size:18px">${s.n}</div><div><div class="dim small">${esc(s.what)}</div><textarea data-ov="${s.n}" rows="${Math.max(1, (s.overlay || '').split('\n').length)}" placeholder="(yazı yok)">${esc(s.overlay)}</textarea></div></div>`).join('')}</div>
+        <div style="margin-top:12px"><button class="gold" id="ovsave">Kaydet ve kurguyu yeniden yap</button></div></details>`}</div>`
       : '<div class="card mute">Video bulunamadı.</div>';
     const re = $('#reedit'); if (re) re.onclick = async () => { await api(`/projects/${p.id}/action`, { method: 'POST', body: { action: 'goto', stage: 'videos' } }); act({ action: 'approve' }, 'Kurgu yeniden başlatıldı'); };
+    const ov = $('#ovsave'); if (ov) ov.onclick = async () => {
+      const scenes = (p.scenes || []).map(s => ({ n: s.n, overlay: el.querySelector(`[data-ov="${s.n}"]`).value }));
+      try {
+        await api(`/projects/${p.id}/action`, { method: 'POST', body: { action: 'save', scenes } });
+        await api(`/projects/${p.id}/action`, { method: 'POST', body: { action: 'goto', stage: 'videos' } });
+        act({ action: 'approve' }, 'Yazılar kaydedildi, kurgu yeniden yapılıyor…');
+      } catch (e) { toast(e.message, true); }
+    };
     const cl = $('#clean'); if (cl) cl.onclick = async () => { if (!confirm('Klipler, sesler ve müzik silinecek (kareler ve son video kalır). Sonradan kurguyu yeniden yapmak için klipleri tekrar üretmek gerekir. Emin misiniz?')) return; const r = await api(`/projects/${p.id}/action`, { method: 'POST', body: { action: 'cleanup' } }); toast(r.ok ? `${r.removed} dosya silindi` : 'Silinemedi: ' + r.error, !r.ok); projectView(p.id, true); };
   },
 };
