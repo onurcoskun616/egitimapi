@@ -265,11 +265,19 @@ async function panelView() {
   const key = (ok, name) => `<span class="conn"><span class="dot ${ok ? 'ok' : 'bad'}"></span>${ok ? `${name} tanımlı` : `<span class="err">${name} eksik</span>`}</span>`;
   app.innerHTML = `<h1>Sinema ayarları</h1><p class="mute">API anahtarları eğitim platformuyla ortaktır ve sunucudaki <code>.env</code> dosyasında durur; burada yalnızca modeller ve kurgu ayarları seçilir.</p>
   <div class="card row" style="gap:18px">${key(keys.fal, 'FAL_KEY')}${key(keys.eleven, 'ELEVENLABS_API_KEY')}${key(keys.github, 'GITHUB_TOKEN')}<span class="dim small">Depo: ${esc(keys.repo)}</span></div>
+  <div class="card" style="margin-top:14px"><h3>fal.ai anahtarı</h3>
+    <div class="mute small">${keys.fal ? `Kayıtlı (…${esc(keys.fal_tail)}). Değiştirmek için yenisini yapıştırın.` : '<span class="err">Girilmemiş.</span> <a target="_blank" href="https://fal.ai/dashboard/keys">fal.ai/dashboard/keys</a> sayfasında “Add key” → izin olarak <b>API</b> seçin → oluşan anahtarı buraya yapıştırın.'} Bu anahtar platformun tamamında (eğitim videolarının sinematik stili dahil) kullanılır.</div>
+    <div class="row tight" style="margin-top:10px;flex-wrap:nowrap"><input id="falkey" type="password" autocomplete="off" placeholder="fal.ai anahtarı (ör. 1a2b3c…:4d5e6f…)" style="flex:1"><button class="gold small" id="savefal" type="button">Anahtarı kaydet</button></div></div>
   <div class="grid wide" style="margin-top:14px;align-items:start">${GROUPS.map(([g, name, desc]) => `<div class="card"><h2>${esc(name)}</h2>${desc ? `<div class="mute small">${esc(desc)}</div>` : ''}
     ${by(g).map(fieldHtml).join('')}
     ${TESTS[g] ? `<div class="row tight" style="margin-top:14px"><button class="small" data-test="${g}" type="button">Test et</button><span class="conn" id="t-${g}"><span class="dot"></span><span class="dim">Test edilmedi</span></span></div>` : ''}</div>`).join('')}</div>
   <div class="bar"><button class="gold" id="savep">Kaydet</button></div>`;
   const collect = () => { const o = {}; document.querySelectorAll('[data-f]').forEach(i => o[i.dataset.f] = i.value); return o; };
+  $('#savefal').onclick = async () => {
+    const v = $('#falkey').value.trim(); if (!v) return toast('Anahtarı yapıştırın', true);
+    try { await api('/keys', { method: 'POST', body: { fal_key: v } }); const r = await api('/test/fal', { method: 'POST' }); toast(r.ok ? 'fal.ai anahtarı kaydedildi ve doğrulandı' : r.msg, !r.ok); panelView(); }
+    catch (e) { toast(e.message, true); }
+  };
   $('#savep').onclick = async () => { try { await api('/settings', { method: 'POST', body: collect() }); toast('Kaydedildi'); panelView(); } catch (e) { toast(e.message, true); } };
   $('#voices').onclick = async () => {
     try {
