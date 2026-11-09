@@ -42,3 +42,12 @@ Konu doğal dille yazılır; Claude içeriği hazırlar, kullanıcı onaylar; Cl
 | `CLAUDE_CODE_OAUTH_TOKEN` | `claude setup-token` ile üretilen abonelik jetonu. İçerik ve sahne kodu `generate.yml` iş akışında bu jetonla üretilir |
 
 Render ve generate işleri tek kullanımlık jetonla uygulamadan veriyi alır; videolar imzalı bağlantıyla yüklenir.
+
+## Sinematik film modülü (yalnızca yönetici)
+
+`/sinema` sayfası (menüde **🎬 Sinema**): konu yazılır; senaryo ve karakterler (Claude) → karakter referans görselleri (fal.ai) → sahne planı (Claude) → karakter referanslı sahne kareleri (fal.ai) → anlatım ve müzik (ElevenLabs) → görselden video klipler (fal.ai: Kling / Veo / Hailuo / Seedance) → kurgu (`sinema.yml` + `render/sinema.mjs`, ffmpeg) → MP4. Her aşamada onay, düzenleme ve tek öğe yeniden üretme; isteğe bağlı tam otomatik.
+
+- Kod: `lib/sinema.js` (aşama motoru + `/api/sinema/*`), `lib/sinema-prompts.js`, `public/sinema.{html,js,css}`.
+- Tablo: `sinema_projects` — kendi sunucuda açılışta `deploy/sinema.sql` psql ile otomatik uygulanır.
+- Claude adımları `generate.yml` (gen_tasks, kind `sinema`); kurgu `gen_tasks` kind `sinema_edit`.
+- Dosyalar depolamada `sinema/<proje>/...` altında; anahtarlar ortak (`FAL_KEY`, `ELEVENLABS_API_KEY`, `GITHUB_TOKEN`). Model ve kurgu ayarları `settings` tablosunda `key='sinema'`.

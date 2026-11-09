@@ -402,6 +402,8 @@ async function apkAvailable() {
 on('GET', '/api/app-info', async (req, res) => send(res, 200, { apk: await apkAvailable() ? APK_URL : null, play: process.env.APP_PLAY_URL || null, ios: process.env.APP_IOS_URL || null }), 'public');
 const SERIES = require('./lib/series')({ on, db, q, send, readBody, isAdmin, activeLimits, monthUsage, background, FORMATS, TONES, now });
 require('./lib/ortak')({ series: SERIES, storage, on, db, q, send, readBody, isAdmin, claude, ctxFor, logClaude, now, shortId: () => shortId(), publicBase });
+// Sinematik film modülü (yalnızca yönetici): /sinema sayfası ve /api/sinema/* uçları
+require('./lib/sinema')({ on, db, q, send, readBody, storage, ctxFor, logClaude, logUsage, dispatch, publicBase, now });
 /* ---------- R2 taşıma: Supabase'deki videoları ve sesleri Cloudflare R2'ye kopyalar (asıllar silinmez) ---------- */
 const R2MIG = { running: false, done: 0, failed: 0, total: 0, bytes: 0, last: null, errors: [] };
 async function r2Migrate() {
@@ -997,6 +999,7 @@ http.createServer(async (req, res) => {
     if (/^\/izle\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'izle.html');
     else if (/^\/test\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'test.html');
     else if (/^\/calisma\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'calisma.html');
+    else if (/^\/sinema\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'sinema.html');
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
     const hdr = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' };
     if (file.endsWith('sw.js')) hdr['Service-Worker-Allowed'] = '/';
