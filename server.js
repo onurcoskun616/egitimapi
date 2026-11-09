@@ -411,6 +411,36 @@ async function r2Migrate() {
   } catch (e) { R2MIG.errors.push('genel: ' + e.message); }
   R2MIG.running = false; R2MIG.finished = now();
 }
+// Yönetim: video projelerini listeleme ve seçerek silme (yalnızca dosyalar ya da projenin tamamı)
+async function filesOf(p) {
+  const out = []; if (!LOCAL.enabled()) return out;
+  for (const d of [`videos/${p.id}`, `audio/${p.id}`]) { try { for (const f of await fs.promises.readdir(LOCAL.file(d))) out.push(`${d}/${f}`); } catch {} }
+  if (p.thumb_path && !String(p.thumb_path).startsWith('r2:')) out.push(p.thumb_path);
+  return out;
+}
+on('GET', '/api/admin/videos', async (req, res) => {
+  const ps = await db.select('projects', 'select=id,title,status,created_at,updated_at,owner_id,visual_style,thumb_path&order=created_at.desc');
+  const us = await db.select('users', 'select=id,name,email'); const un = Object.fromEntries(us.map(u => [u.id, u.name || u.email]));
+  const list = [];
+  for (const p of ps) { let bytes = 0, n = 0; for (const f of await filesOf(p)) { try { bytes += (await fs.promises.stat(LOCAL.file(f))).size; n++; } catch {} }
+    list.push({ id: p.id, title: p.title, status: p.status, created_at: p.created_at, style: p.visual_style, owner: un[p.owner_id] || '—', files: n, mb: +(bytes / 1048576).toFixed(1), busy: RUNNING.has(p.id) }); }
+  send(res, 200, { list });
+}, 'admin');
+on('POST', '/api/admin/videos/delete', async (req, res) => {
+  const b = await readBody(req); const ids = (Array.isArray(b.ids) ? b.ids : []).filter(x => /^[0-9a-f-]{36}$/.test(x)); const all = b.mode === 'all';
+  if (!ids.length) return send(res, 400, { error: 'Seçim yok' });
+  let files = 0, projects = 0; const skipped = [];
+  for (const id of ids) {
+    if (RUNNING.has(id)) { skipped.push(id); continue; }
+    const p = await db.one('projects', `id=eq.${q(id)}&select=id,thumb_path`); if (!p) continue;
+    const fl = await filesOf(p); if (fl.length) { await storage.remove(fl); files += fl.length; }
+    if (LOCAL.enabled()) for (const d of [`videos/${id}`, `audio/${id}`]) await fs.promises.rm(LOCAL.file(d), { recursive: true, force: true }).catch(() => {});
+    if (all) { await db.remove('projects', `id=eq.${q(id)}`); projects++; }
+    else { await db.remove('render_jobs', `project_id=eq.${q(id)}`); await db.remove('audio_tracks', `project_id=eq.${q(id)}`); await db.update('projects', `id=eq.${q(id)}`, { thumb_path: null, thumb_at: null }); }
+  }
+  console.log(`yönetim silme (${all ? 'tamamı' : 'dosyalar'}): ${ids.length} seçim, ${files} dosya, ${projects} proje, ${skipped.length} atlandı`);
+  send(res, 200, { ok: true, files, projects, skipped: skipped.length });
+}, 'admin');
 // Taşınamayan (dosyası olmayan) videolar: aynı metin ve sahnelerle yeniden seslendirip yeniden üretme kuyruğu
 const REPRO = { running: false, total: 0, done: 0, failed: 0, current: null, errors: [] };
 async function missingVideos() {

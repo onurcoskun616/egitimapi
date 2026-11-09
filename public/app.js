@@ -928,12 +928,35 @@
   async function viewAdmin() {
     setSub('Yönetim');
     const tab = qsOf().get('t') || 'ogretmen';
-    const tabs = { ogretmen: 'Öğretmen başvuruları', kullanici: 'Kullanıcılar', proje: 'Video sahipleri', siparis: 'Siparişler', paket: 'Paketler', maliyet: 'Maliyet ve kâr', depo: 'Video deposu' };
+    const tabs = { ogretmen: 'Öğretmen başvuruları', kullanici: 'Kullanıcılar', proje: 'Video sahipleri', siparis: 'Siparişler', paket: 'Paketler', maliyet: 'Maliyet ve kâr', depo: 'Video deposu', videolar: 'Video silme' };
     let s = {}; try { s = await api('/api/admin/summary'); } catch (e) { app.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
     app.innerHTML = `<h1>Yönetim</h1><div class="stats"><div><b>${s.teachers}</b><span>öğretmen</span></div><div><b>${s.pendingTeachers}</b><span>başvuru</span></div><div><b>${s.students}</b><span>öğrenci</span></div><div><b>${s.courses}</b><span>yayında eğitim</span></div><div><b>${s.pendingOrders}</b><span>bekleyen sipariş</span></div><div><b>${s.unowned}</b><span>sahipsiz video</span></div></div>
       <div class="seg wide">${Object.entries(tabs).map(([k, v]) => `<a href="#/yonetim?t=${k}" aria-selected="${k === tab}">${v}</a>`).join('')}</div><div id="ad"><div class="empty">Yükleniyor…</div></div><p class="note err-t" id="m"></p>`;
     const el = document.getElementById('ad'), msg = t => { document.getElementById('m').textContent = t; };
     const act = async (path, body, okMsg) => { try { const r = await api(path, { method: 'POST', body }); if (r.password) prompt('Yeni geçici şifre (kopyalayıp kullanıcıya iletin; giriş yaptıktan sonra Profil sayfasından değiştirebilir):', r.password); else if (okMsg) msg(okMsg); viewAdmin(); } catch (e) { msg(e.message); } };
+    if (tab === 'videolar') {
+      const r = await api('/api/admin/videos'); const L = r.list; const sel = new Set();
+      const ST = { delivered: 'Teslim', archived: 'Arşiv', failed: 'Hata', draft: 'Taslak' };
+      const fdate = d => d ? new Date(d).toLocaleDateString('tr-TR') : '';
+      el.innerHTML = `<div class="card"><h3 style="margin-top:0">Video silme</h3>
+        <p class="note">İşaretlediğiniz videolar için iki seçenek var. <b>Dosyaları sil:</b> MP4, ses ve kapak silinir; metin, sahne ve sorular kalır, sonradan yeniden üretilebilir. <b>Tamamen sil:</b> proje; metinleri, sahneleri, soruları ve öğrenci sonuçlarıyla birlikte kalıcı olarak silinir. İki işlem de geri alınamaz.</p>
+        <div class="btns" style="align-items:center"><input id="vf" placeholder="Başlıkta ara" style="max-width:260px"><label style="display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;margin:0"><input type="checkbox" id="vall" style="width:18px;height:18px;padding:0;margin:0"> Görünenlerin hepsini seç</label><span class="note" id="vsel">0 seçili</span></div>
+        <div style="max-height:60vh;overflow:auto;margin:10px 0"><table class="tbl" style="width:100%"><thead><tr><th></th><th>Başlık</th><th>Sahibi</th><th>Durum</th><th>Tarih</th><th>Dosya</th></tr></thead><tbody id="vb"></tbody></table></div>
+        <div class="btns"><button id="vdf" disabled>Seçilenlerin dosyalarını sil</button><button id="vda" class="danger" disabled style="background:#c0392b;color:#fff">Seçilenleri tamamen sil</button></div></div>`;
+      const vb = document.getElementById('vb'), vf = document.getElementById('vf');
+      const visible = () => { const t = vf.value.trim().toLocaleLowerCase('tr'); return L.filter(v => !t || v.title.toLocaleLowerCase('tr').includes(t)); };
+      const upd = () => { document.getElementById('vsel').textContent = `${sel.size} seçili`; document.getElementById('vdf').disabled = document.getElementById('vda').disabled = !sel.size; };
+      const rows = () => { vb.innerHTML = visible().map(v => `<tr><td style="width:34px"><input type="checkbox" style="width:18px;height:18px;padding:0;margin:0" data-id="${v.id}" ${sel.has(v.id) ? 'checked' : ''} ${v.busy ? 'disabled title="Şu an işleniyor"' : ''}></td><td><a href="#/p/${v.id}">${esc(v.title)}</a></td><td>${esc(v.owner)}</td><td>${ST[v.status] || esc(v.status)}</td><td>${fdate(v.created_at)}</td><td>${v.files ? `${v.files} dosya · ${v.mb} MB` : '<span class="note">yok</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="note">Video yok</td></tr>';
+        vb.querySelectorAll('input[data-id]').forEach(c => c.onchange = () => { c.checked ? sel.add(c.dataset.id) : sel.delete(c.dataset.id); upd(); }); };
+      vf.oninput = rows; document.getElementById('vall').onchange = e => { visible().filter(v => !v.busy).forEach(v => e.target.checked ? sel.add(v.id) : sel.delete(v.id)); rows(); upd(); };
+      const del = async mode => { const n = sel.size;
+        if (mode === 'all') { if (prompt(`${n} video projesi metin, sahne, soru ve öğrenci sonuçlarıyla birlikte KALICI olarak silinecek. Onaylamak için SİL yazın:`) !== 'SİL') return; }
+        else if (!confirm(`${n} videonun MP4, ses ve kapak dosyaları silinsin mi? Metin ve sahneler kalır.`)) return;
+        try { const x = await api('/api/admin/videos/delete', { method: 'POST', body: { ids: [...sel], mode } }); msg(`${x.files} dosya${mode === 'all' ? `, ${x.projects} proje` : ''} silindi${x.skipped ? ` · ${x.skipped} işlenmekte olduğu için atlandı` : ''}.`); viewAdminKeep(); } catch (e) { msg(e.message); } };
+      const viewAdminKeep = async () => { const m = document.getElementById('m').textContent; await viewAdmin(); document.getElementById('m').textContent = m; };
+      document.getElementById('vdf').onclick = () => del('files'); document.getElementById('vda').onclick = () => del('all');
+      rows(); return;
+    }
     if (tab === 'depo') {
       const draw = async () => { const r = await api('/api/admin/r2'); r.miss = await api('/api/admin/missing').catch(() => ({}));
         el.innerHTML = `<div class="card"><h3 style="margin-top:0">Cloudflare R2</h3><p>${r.enabled ? '<b style="color:var(--green)">Bağlı.</b> Yeni videolar ve sesler R2\'ye kaydediliyor (indirme trafiği ücretsiz).' : '<b style="color:var(--yel)">Bağlı değil.</b> Render ortam değişkenlerine R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY ve R2_BUCKET girilmeli.'}</p>
