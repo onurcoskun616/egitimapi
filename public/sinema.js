@@ -59,6 +59,8 @@ function newView() {
     <label>Süre</label>${chipGroup('duration', [[30, '30 sn'], [60, '1 dk'], [90, '1,5 dk'], [120, '2 dk'], [180, '3 dk']], 90)}
     <label>Format</label>${chipGroup('aspect', [['1:1', 'Kare 1:1 (Instagram)'], ['16:9', 'Yatay 16:9 (YouTube)'], ['9:16', 'Dikey 9:16 (Reels / Shorts)']], '1:1')}
     <label>Ton</label>${chipGroup('tone', [['duygusal, epik tarih draması', 'Duygusal tarih draması'], ['belgesel, sakin ve bilgilendirici', 'Belgesel'], ['destansı, coşkulu', 'Destansı'], ['merak uyandıran, gizemli', 'Merak uyandıran'], ['tanıtım filmi: çağdaş, sıcak, umut dolu; doğal ışık, gerçek ve samimi insan anları, akıcı kamera hareketleri', 'Tanıtım filmi'], ['belgesel drama: sessiz, ağır tempolu, duygusal; simge nesneler, sıradan insanların tepkileri ve gerçek belgelerle anlatım', 'Belgesel drama']], 'duygusal, epik tarih draması')}
+    <label>Görsel dil</label>${chipGroup('look', [['', 'Gerçekçi (fotoğraf/film)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']], '')}
+    <label>Hareket</label>${chipGroup('motion', [['video', 'Video klipler (canlı hareket)'], ['kamera', 'Durağan kare + kamera kaydırması (çok daha ucuz)']], 'video')}
     <label>Kurgu temposu</label>${chipGroup('tempo', [['uzun', 'Uzun planlar (az ve ağır akan planlar)'], ['dengeli', 'Dengeli'], ['hizli', 'Hızlı kesmeler']], 'dengeli')}
     <label class="switch"><input type="checkbox" id="narration"> Seslendirme ekle: dış ses, karakter replikleri, radyo anonsları (ElevenLabs)</label>
     <label class="switch"><input type="checkbox" id="bridge"> Sonunda günümüze bağla (ör. "Dedemin babası o sabah on yaşındaymış")</label>
@@ -84,7 +86,7 @@ function newView() {
     try {
       const places = [];
       for (let i = 0; i < placeFiles.length; i++) { toast(`Mekân görseli yükleniyor (${i + 1}/${placeFiles.length})…`); const f = placeFiles[i]; const r = await api('/upload', { method: 'POST', body: f.file, headers: { 'Content-Type': f.file.type || 'image/jpeg' } }); places.push({ path: r.path, name: f.name, desc: f.desc }); }
-      const p = await api('/projects', { method: 'POST', body: { places, topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), notes: $('#notes').value, auto: $('#auto').checked } });
+      const p = await api('/projects', { method: 'POST', body: { places, topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), look: chipVal('look'), motion: chipVal('motion'), notes: $('#notes').value, auto: $('#auto').checked } });
       route('#/p/' + p.id);
     } catch (er) { toast(er.message, true); $('#go').disabled = false; }
   };

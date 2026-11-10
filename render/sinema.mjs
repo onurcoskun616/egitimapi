@@ -44,6 +44,7 @@ const GRADES = {
   soluk: ',eq=saturation=0.55:contrast=1.04',
   'siyah-beyaz': ',hue=s=0,eq=contrast=1.08',
 };
+const BOLD = ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'];
 const GRAINS = { hafif: ',noise=alls=7:allf=t,vignette=PI/5', belirgin: ',noise=alls=15:allf=t,vignette=PI/4' };
 const esc = s => s.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/%/g, '\\%').replace(/,/g, '\\,');
 
@@ -63,13 +64,22 @@ async function main() {
   for (let i = 0; i < n; i++) {
     const s = m.scenes[i];
     // Siyah kart (görüntüsüz, yalnızca yazı): klip yerine siyah görüntü üretilir
-    const src = s.card ? null : await fetchTo(s.video, path.join(dir, `in${i}.mp4`));
-    const clip = s.card ? Math.max(1.5, s.video_sec || 4) : (probeSec(src) || s.video_sec || 5);
-    const want = Math.max(Math.min(clip, s.video_sec || clip), (s.voice_sec || 0) + 0.6) + (i < n - 1 ? 0 : 0.5);
+    // Durağan kare (video klip yok): görsel, sahne boyunca yavaş kamera kaydırmasıyla gösterilir
+    const src = s.card ? null : s.still ? await fetchTo(s.still, path.join(dir, `in${i}.jpg`)) : await fetchTo(s.video, path.join(dir, `in${i}.mp4`));
+    const clip = s.card || s.still ? Math.max(1.5, s.video_sec || 4) : (probeSec(src) || s.video_sec || 5);
+    const want = s.still ? Math.max(2, (s.voice_sec || 0) + 0.5, s.voice ? 0 : clip) + (i < n - 1 ? 0 : 0.5) : Math.max(Math.min(clip, s.video_sec || clip), (s.voice_sec || 0) + 0.6) + (i < n - 1 ? 0 : 0.5);
     const D = +Math.max(1.5, want).toFixed(3);
-    const extra = Math.max(0, D - clip);
-    let vf = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${fps},setsar=1`;
-    if (extra > 0.02) vf += `,tpad=stop_mode=clone:stop_duration=${extra.toFixed(3)}`;
+    const extra = s.still ? 0 : Math.max(0, D - clip);
+    let vf;
+    if (s.still) {
+      // 1.18 kat büyütüp sahne boyunca kaydır; yön sahneden sahneye değişir (sola, sağa, yukarı, yakınlaşma)
+      const k = 1.18, BW = Math.round(W * k / 2) * 2, BH = Math.round(H * k / 2) * 2, dx = BW - W, dy = BH - H, T = D.toFixed(3);
+      const mv = [[`${dx}*t/${T}`, `${dy}/2`], [`${dx}*(1-t/${T})`, `${dy}/2`], [`${dx}/2`, `${dy}*(1-t/${T})`], [`${dx}/2`, `${dy}*t/${T}`]][i % 4];
+      vf = `scale=${BW}:${BH}:force_original_aspect_ratio=increase,crop=${BW}:${BH},fps=${fps},setsar=1,crop=${W}:${H}:x='${mv[0]}':y='${mv[1]}'`;
+    } else {
+      vf = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${fps},setsar=1`;
+      if (extra > 0.02) vf += `,tpad=stop_mode=clone:stop_duration=${extra.toFixed(3)}`;
+    }
     vf += `,trim=duration=${D},setpts=PTS-STARTPTS`;
     // Renk tonu ve film dokusu (yazılardan önce; yazılar temiz kalsın)
     vf += GRADES[m.grade] || '';
@@ -92,8 +102,18 @@ async function main() {
         y += sizes[k] + gap;
       }
     }
+    // Kelime grubu altyazısı (Reels tarzı): sesle eş zamanlı 2–4 kelimelik parçalar, ortanın biraz altında, kalın ve konturlu
+    const bold = BOLD.find(f => existsSync(f)) || font;
+    if (m.subtitles && m.sub_mode === 'chunks' && s.voice && bold && (s.chunks || []).length) {
+      const fsz = Math.round(Math.min(W, H) / 15), off = 0.25;
+      for (let k = 0; k < s.chunks.length; k++) {
+        const a = off + s.chunks[k].t, b = k + 1 < s.chunks.length ? off + s.chunks[k + 1].t : Math.min(D - 0.05, off + (s.voice_sec || 2) + 0.4);
+        const tf = path.join(dir, `c${i}_${k}.txt`); await writeFile(tf, s.chunks[k].txt);
+        vf += `,drawtext=fontfile='${bold}':textfile='${tf}':fontsize=${fsz}:expansion=none:fontcolor=white:borderw=${Math.max(3, Math.round(fsz / 10))}:bordercolor=black@0.9:x=(w-text_w)/2:y=h*0.64:enable='between(t\\,${a.toFixed(2)}\\,${b.toFixed(2)})'`;
+      }
+    }
     // Konuşma altyazısı: sesin süresince alt kısımda, küçük ve sade
-    if (m.subtitles && s.text && s.text.trim() && s.voice && font) {
+    else if (m.subtitles && s.text && s.text.trim() && s.voice && font) {
       const fsz = Math.round(Math.min(W, H) / 26), maxc = Math.max(14, Math.floor(W * 0.84 / (fsz * 0.52)));
       const words = s.text.trim().split(/\s+/), lines = [''];
       for (const w of words) { const cur = lines[lines.length - 1]; if ((cur + ' ' + w).trim().length > maxc && cur) lines.push(w); else lines[lines.length - 1] = (cur + ' ' + w).trim(); }
@@ -108,7 +128,7 @@ async function main() {
     }
     const out = path.join(dir, `p${i}.mp4`);
     if (s.card) vf = vf.replace(GRADES[m.grade] || '\u0000', '').replace(GRAINS[m.grain] || '\u0000', '');
-    ff([...(s.card ? ['-f', 'lavfi', '-i', `color=c=black:s=${W}x${H}:r=${fps}:d=${D}`] : ['-i', src]), '-an', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', out], `Sahne ${s.n}`);
+    ff([...(s.card ? ['-f', 'lavfi', '-i', `color=c=black:s=${W}x${H}:r=${fps}:d=${D}`] : s.still ? ['-loop', '1', '-framerate', String(fps), '-t', String(D), '-i', src] : ['-i', src]), '-an', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', out], `Sahne ${s.n}`);
     parts.push({ file: out, D: probeSec(out) || D, voice: s.voice, voice_sec: s.voice_sec, radio: !!s.radio, sfx: s.sfx });
     log(`Sahne ${i + 1}/${n} hazır (${D.toFixed(1)} sn)`); step(i + 1, n);
   }
