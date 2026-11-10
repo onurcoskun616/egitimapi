@@ -58,19 +58,33 @@ function newView() {
     <textarea id="topic" rows="4" placeholder="Örnek: 27 Aralık 1919'da Mustafa Kemal'in Heyet-i Temsiliye ile Ankara'ya gelişi; Dikmen sırtlarında halkın karşılaması, zeybek gösterisi, Hacı Bayram Camii önünde çocuklarla karşılaşma."></textarea>
     <label>Süre</label>${chipGroup('duration', [[30, '30 sn'], [60, '1 dk'], [90, '1,5 dk'], [120, '2 dk'], [180, '3 dk']], 90)}
     <label>Format</label>${chipGroup('aspect', [['1:1', 'Kare 1:1 (Instagram)'], ['16:9', 'Yatay 16:9 (YouTube)'], ['9:16', 'Dikey 9:16 (Reels / Shorts)']], '1:1')}
-    <label>Ton</label>${chipGroup('tone', [['duygusal, epik tarih draması', 'Duygusal tarih draması'], ['belgesel, sakin ve bilgilendirici', 'Belgesel'], ['destansı, coşkulu', 'Destansı'], ['merak uyandıran, gizemli', 'Merak uyandıran'], ['belgesel drama: sessiz, ağır tempolu, duygusal; simge nesneler, sıradan insanların tepkileri ve gerçek belgelerle anlatım', 'Belgesel drama']], 'duygusal, epik tarih draması')}
+    <label>Ton</label>${chipGroup('tone', [['duygusal, epik tarih draması', 'Duygusal tarih draması'], ['belgesel, sakin ve bilgilendirici', 'Belgesel'], ['destansı, coşkulu', 'Destansı'], ['merak uyandıran, gizemli', 'Merak uyandıran'], ['tanıtım filmi: çağdaş, sıcak, umut dolu; doğal ışık, gerçek ve samimi insan anları, akıcı kamera hareketleri', 'Tanıtım filmi'], ['belgesel drama: sessiz, ağır tempolu, duygusal; simge nesneler, sıradan insanların tepkileri ve gerçek belgelerle anlatım', 'Belgesel drama']], 'duygusal, epik tarih draması')}
     <label>Kurgu temposu</label>${chipGroup('tempo', [['uzun', 'Uzun planlar (az ve ağır akan planlar)'], ['dengeli', 'Dengeli'], ['hizli', 'Hızlı kesmeler']], 'dengeli')}
     <label class="switch"><input type="checkbox" id="narration"> Seslendirme ekle: dış ses, karakter replikleri, radyo anonsları (ElevenLabs)</label>
     <label class="switch"><input type="checkbox" id="bridge"> Sonunda günümüze bağla (ör. "Dedemin babası o sabah on yaşındaymış")</label>
+    <label>Kendi mekân görselleriniz (isteğe bağlı)</label>
+    <div class="dim small" style="margin-bottom:6px">Okul, bina ya da işletmenizin fotoğraf veya çizimleri. Film bu mekânlarda geçer; yapay zekâ mekânı aynen koruyup içine insanları yerleştirir, üzerindeki ölçü ve etiket yazılarını siler. En fazla 8 görsel.</div>
+    <input type="file" id="placeFiles" accept="image/jpeg,image/png,image/webp" multiple>
+    <div id="placeList" class="stack" style="margin:8px 0 12px"></div>
     <label>Ek istekler (isteğe bağlı)</label><textarea id="notes" rows="2" placeholder="Örnek: kış mevsimi, gün batımı ışığı; sonunda bayraklı çocuklar olsun; ekranda tarih yazsın."></textarea>
     <label class="switch"><input type="checkbox" id="auto"> Tam otomatik: onay beklemeden sonuna kadar ilerle</label>
     <div class="row tight" style="margin-top:16px"><button class="gold" id="go">Başlat →</button><span class="dim small">İlk adımda Claude senaryoyu yazar (1–3 dk).</span></div>
   </form>`;
   bindChips();
+  let placeFiles = [];
+  const drawPlaces = () => { $('#placeList').innerHTML = placeFiles.map((f, i) => `<div class="card" style="display:flex;gap:10px;align-items:flex-start;padding:10px"><img src="${f.url}" style="width:110px;height:74px;object-fit:cover;border-radius:6px">
+      <div style="flex:1"><input data-pn="${i}" value="${esc(f.name)}" placeholder="Mekân adı (ör. Koridor)"><input data-pd="${i}" value="${esc(f.desc)}" placeholder="Kısa açıklama (ör. derslik koridoru, dolaplar, tavanda yuvarlak ışıklar)" style="margin-top:6px"></div>
+      <button type="button" class="small" data-px="${i}">Kaldır</button></div>`).join('');
+    document.querySelectorAll('[data-pn]').forEach(x => x.oninput = () => placeFiles[+x.dataset.pn].name = x.value);
+    document.querySelectorAll('[data-pd]').forEach(x => x.oninput = () => placeFiles[+x.dataset.pd].desc = x.value);
+    document.querySelectorAll('[data-px]').forEach(x => x.onclick = () => { placeFiles.splice(+x.dataset.px, 1); drawPlaces(); }); };
+  $('#placeFiles').onchange = e => { for (const f of e.target.files) if (placeFiles.length < 8) placeFiles.push({ file: f, url: URL.createObjectURL(f), name: `Mekân ${placeFiles.length + 1}`, desc: '' }); e.target.value = ''; drawPlaces(); };
   $('#f').onsubmit = async e => {
     e.preventDefault(); $('#go').disabled = true;
     try {
-      const p = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), notes: $('#notes').value, auto: $('#auto').checked } });
+      const places = [];
+      for (let i = 0; i < placeFiles.length; i++) { toast(`Mekân görseli yükleniyor (${i + 1}/${placeFiles.length})…`); const f = placeFiles[i]; const r = await api('/upload', { method: 'POST', body: f.file, headers: { 'Content-Type': f.file.type || 'image/jpeg' } }); places.push({ path: r.path, name: f.name, desc: f.desc }); }
+      const p = await api('/projects', { method: 'POST', body: { places, topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), notes: $('#notes').value, auto: $('#auto').checked } });
       route('#/p/' + p.id);
     } catch (er) { toast(er.message, true); $('#go').disabled = false; }
   };
@@ -92,7 +106,8 @@ async function projectView(id, quiet) {
   const changed = !P || P.id !== p.id || JSON.stringify(P) !== JSON.stringify(p);
   P = p;
   if (changed && !(focused && p.status !== 'working')) {
-    app.innerHTML = header(p) + statusBox(p) + `<div id="stage"></div>`;
+    const pl = (p.opts && p.opts.places) || [];
+    app.innerHTML = header(p) + (pl.length ? `<div class="row tight" style="gap:8px;margin:0 0 12px;flex-wrap:wrap">${pl.map(m => `<div title="${esc(m.desc || '')}" style="width:120px"><img src="${esc(m.url || '')}" style="width:120px;height:80px;object-fit:cover;border-radius:6px"><div class="dim small">${esc(m.id)} · ${esc(m.name)}</div></div>`).join('')}</div>` : '') + statusBox(p) + `<div id="stage"></div>`;
     STAGE_VIEW[p.stage](p, $('#stage'));
     bindHeader(p);
     if (quiet) window.scrollTo(0, keepScroll);
@@ -181,6 +196,7 @@ const STAGE_VIEW = {
     <div class="stack">${sc.map((s, i) => `<div class="card sc" data-i="${i}"><div class="num">${s.n}</div><div>
       <div class="row"><div style="flex:3"><label>Ne oluyor</label><input data-k="what" value="${esc(s.what)}"></div><div style="flex:1;min-width:110px"><label>Süre</label><select data-k="sec">${[...new Set([3, 4, 5, 6, 8, 10, 12, 15, +s.sec])].sort((a, b) => a - b).map(v => `<option value="${v}" ${s.sec == v ? 'selected' : ''}>${v} sn</option>`).join('')}</select></div></div>
       <label class="switch" style="margin-top:6px"><input type="checkbox" data-k="card" ${s.card ? 'checked' : ''}> Siyah kart (görüntü yok, yalnızca ekran yazısı)</label>
+      ${((p.opts && p.opts.places) || []).length ? `<div><label>Mekân</label><select data-k="place"><option value="">— yapay zekâ oluştursun —</option>${p.opts.places.map(m => `<option value="${esc(m.id)}" ${s.place === m.id ? 'selected' : ''}>${esc(m.id)} · ${esc(m.name)}</option>`).join('')}</select></div>` : ''}
       <div class="row"><div><label>Ekran yazısı <span class="dim">(her satır ayrı satırda görünür)</span></label><textarea data-k="overlay" rows="${Math.max(1, (s.overlay || '').split('\n').length)}" placeholder="(yok)">${esc(s.overlay)}</textarea></div>${p.opts.narration ? `<div style="flex:2"><label>Söz</label><input data-k="narration" value="${esc(s.narration)}" placeholder="(sessiz plan)"></div><div style="flex:1;min-width:130px"><label>Kim söylüyor</label><select data-k="speaker">${speakerOpts(p, s.speaker)}</select></div>` : ''}</div>
       <div><label>Ses efekti <span class="dim">(İngilizce; boşsa yok)</span></label><input data-k="sfx_en" value="${esc(s.sfx_en || '')}" placeholder="ör. grandfather clock ticking in a silent hall"></div>
       <div class="small mute" style="margin-top:8px">Karakterler: ${chars.map(c => `<label style="display:inline-flex;gap:4px;margin:0 10px 0 0;color:var(--ink)"><input type="checkbox" style="width:auto" data-ch="${esc(c.id)}" ${s.chars.includes(c.id) ? 'checked' : ''}>${esc(c.name)}</label>`).join('') || '—'}</div>
