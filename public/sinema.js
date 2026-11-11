@@ -51,6 +51,16 @@ async function listView() {
 function chipGroup(name, items, val) { return `<div class="chips" data-chips="${name}">${items.map(([v, t]) => `<span class="chip ${v == val ? 'on' : ''}" data-v="${v}">${t}</span>`).join('')}</div>`; }
 function bindChips() { document.querySelectorAll('[data-chips]').forEach(g => g.onclick = e => { const c = e.target.closest('.chip'); if (!c) return; g.querySelectorAll('.chip').forEach(x => x.classList.remove('on')); c.classList.add('on'); }); }
 const chipVal = n => document.querySelector(`[data-chips="${n}"] .chip.on`)?.dataset.v;
+const LOOKS_UI = [['', 'Gerçekçi'], ['anime', 'Çizgi film (2B)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']];
+let lookTimer = null;
+async function loadLookSamples() {
+  clearTimeout(lookTimer);
+  try {
+    const r = await api('/look-samples');
+    for (const [k, url] of Object.entries(r.samples || {})) { const box = document.querySelector(`[data-lk="${k}"]`); if (box && url && !box.querySelector('img')) box.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`; }
+    if (r.generating && document.querySelector('[data-lk]')) lookTimer = setTimeout(loadLookSamples, 15000);
+  } catch {}
+}
 function newView() {
   app.innerHTML = `<h1>Yeni film</h1><p class="mute">Sadece konuyu yazın. Senaryo, karakterler, sahne planı, görseller, videolar, müzik ve kurgu sırayla hazırlanır; her aşamada onayınız istenir (isterseniz tam otomatik).</p>
   <form class="card" id="f" style="max-width:760px">
@@ -59,7 +69,8 @@ function newView() {
     <label>Süre</label>${chipGroup('duration', [[30, '30 sn'], [60, '1 dk'], [90, '1,5 dk'], [120, '2 dk'], [180, '3 dk']], 90)}
     <label>Format</label>${chipGroup('aspect', [['1:1', 'Kare 1:1 (Instagram)'], ['16:9', 'Yatay 16:9 (YouTube)'], ['9:16', 'Dikey 9:16 (Reels / Shorts)']], '1:1')}
     <label>Ton</label>${chipGroup('tone', [['duygusal, epik tarih draması', 'Duygusal tarih draması'], ['belgesel, sakin ve bilgilendirici', 'Belgesel'], ['destansı, coşkulu', 'Destansı'], ['merak uyandıran, gizemli', 'Merak uyandıran'], ['tanıtım filmi: çağdaş, sıcak, umut dolu; doğal ışık, gerçek ve samimi insan anları, akıcı kamera hareketleri', 'Tanıtım filmi'], ['belgesel drama: sessiz, ağır tempolu, duygusal; simge nesneler, sıradan insanların tepkileri ve gerçek belgelerle anlatım', 'Belgesel drama']], 'duygusal, epik tarih draması')}
-    <label>Görsel dil</label>${chipGroup('look', [['', 'Gerçekçi (fotoğraf/film)'], ['anime', 'Çizgi film (2B, elle çizilmiş)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']], '')}
+    <label>Görsel dil</label><div class="dim small" style="margin-bottom:6px">Örnek görseller aynı sahnenin her tarzda nasıl görüneceğini gösterir.</div>
+    <div class="chips looks" data-chips="look">${LOOKS_UI.map(([v, t]) => `<span class="chip look ${v === '' ? 'on' : ''}" data-v="${v}"><span class="lk-img" data-lk="${v || 'gercekci'}"><span class="dim small">Örnek hazırlanıyor…</span></span><span class="lk-t">${t}</span></span>`).join('')}</div>
     <label>Hareket</label>${chipGroup('motion', [['video', 'Video klipler (canlı hareket)'], ['kamera', 'Durağan kare + kamera kaydırması (çok daha ucuz)']], 'video')}
     <label>Kurgu temposu</label>${chipGroup('tempo', [['uzun', 'Uzun planlar (az ve ağır akan planlar)'], ['dengeli', 'Dengeli'], ['hizli', 'Hızlı kesmeler']], 'dengeli')}
     <label class="switch"><input type="checkbox" id="narration"> Seslendirme ekle: dış ses, karakter replikleri, radyo anonsları (ElevenLabs)</label>
@@ -80,7 +91,7 @@ function newView() {
     <label class="switch"><input type="checkbox" id="auto"> Tam otomatik: onay beklemeden sonuna kadar ilerle</label>
     <div class="row tight" style="margin-top:16px"><button class="gold" id="go">Başlat →</button><span class="dim small">İlk adımda Claude senaryoyu yazar (1–3 dk).</span></div>
   </form>`;
-  bindChips();
+  bindChips(); loadLookSamples();
   let placeFiles = [];
   const drawPlaces = () => { $('#placeList').innerHTML = placeFiles.map((f, i) => `<div class="card" style="display:flex;gap:10px;align-items:flex-start;padding:10px"><img src="${f.url}" style="width:110px;height:74px;object-fit:cover;border-radius:6px">
       <div style="flex:1"><input data-pn="${i}" value="${esc(f.name)}" placeholder="Mekân adı (ör. Koridor)"><input data-pd="${i}" value="${esc(f.desc)}" placeholder="Kısa açıklama (ör. derslik koridoru, dolaplar, tavanda yuvarlak ışıklar)" style="margin-top:6px"></div>
