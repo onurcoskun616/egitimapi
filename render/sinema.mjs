@@ -104,12 +104,12 @@ async function main() {
     }
     // Kelime grubu altyazısı (Reels tarzı): sesle eş zamanlı 2–4 kelimelik parçalar, ortanın biraz altında, kalın ve konturlu
     const bold = BOLD.find(f => existsSync(f)) || font;
-    if (m.subtitles && m.sub_mode === 'chunks' && s.voice && bold && (s.chunks || []).length) {
-      const fsz = Math.round(Math.min(W, H) / 15), off = 0.25;
+    if (m.subtitles && (m.sub_mode === 'chunks' || m.sub_mode === 'words') && s.voice && bold && (s.chunks || []).length) {
+      const one = m.sub_mode === 'words', fsz = Math.round(Math.min(W, H) / (one ? 12 : 15)), off = 0.25, col = one ? '0xFFE14D' : 'white';
       for (let k = 0; k < s.chunks.length; k++) {
         const a = off + s.chunks[k].t, b = k + 1 < s.chunks.length ? off + s.chunks[k + 1].t : Math.min(D - 0.05, off + (s.voice_sec || 2) + 0.4);
         const tf = path.join(dir, `c${i}_${k}.txt`); await writeFile(tf, s.chunks[k].txt);
-        vf += `,drawtext=fontfile='${bold}':textfile='${tf}':fontsize=${fsz}:expansion=none:fontcolor=white:borderw=${Math.max(3, Math.round(fsz / 10))}:bordercolor=black@0.9:x=(w-text_w)/2:y=h*0.64:enable='between(t\\,${a.toFixed(2)}\\,${b.toFixed(2)})'`;
+        vf += `,drawtext=fontfile='${bold}':textfile='${tf}':fontsize=${fsz}:expansion=none:fontcolor=${col}:borderw=${Math.max(3, Math.round(fsz / 10))}:bordercolor=black@0.9:x=(w-text_w)/2:y=h*0.64:enable='between(t\\,${a.toFixed(2)}\\,${b.toFixed(2)})'`;
       }
     }
     // Konuşma altyazısı: sesin süresince alt kısımda, küçük ve sade

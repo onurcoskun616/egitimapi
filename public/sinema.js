@@ -59,11 +59,15 @@ function newView() {
     <label>Süre</label>${chipGroup('duration', [[30, '30 sn'], [60, '1 dk'], [90, '1,5 dk'], [120, '2 dk'], [180, '3 dk']], 90)}
     <label>Format</label>${chipGroup('aspect', [['1:1', 'Kare 1:1 (Instagram)'], ['16:9', 'Yatay 16:9 (YouTube)'], ['9:16', 'Dikey 9:16 (Reels / Shorts)']], '1:1')}
     <label>Ton</label>${chipGroup('tone', [['duygusal, epik tarih draması', 'Duygusal tarih draması'], ['belgesel, sakin ve bilgilendirici', 'Belgesel'], ['destansı, coşkulu', 'Destansı'], ['merak uyandıran, gizemli', 'Merak uyandıran'], ['tanıtım filmi: çağdaş, sıcak, umut dolu; doğal ışık, gerçek ve samimi insan anları, akıcı kamera hareketleri', 'Tanıtım filmi'], ['belgesel drama: sessiz, ağır tempolu, duygusal; simge nesneler, sıradan insanların tepkileri ve gerçek belgelerle anlatım', 'Belgesel drama']], 'duygusal, epik tarih draması')}
-    <label>Görsel dil</label>${chipGroup('look', [['', 'Gerçekçi (fotoğraf/film)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']], '')}
+    <label>Görsel dil</label>${chipGroup('look', [['', 'Gerçekçi (fotoğraf/film)'], ['anime', 'Çizgi film (2B, elle çizilmiş)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']], '')}
     <label>Hareket</label>${chipGroup('motion', [['video', 'Video klipler (canlı hareket)'], ['kamera', 'Durağan kare + kamera kaydırması (çok daha ucuz)']], 'video')}
     <label>Kurgu temposu</label>${chipGroup('tempo', [['uzun', 'Uzun planlar (az ve ağır akan planlar)'], ['dengeli', 'Dengeli'], ['hizli', 'Hızlı kesmeler']], 'dengeli')}
     <label class="switch"><input type="checkbox" id="narration"> Seslendirme ekle: dış ses, karakter replikleri, radyo anonsları (ElevenLabs)</label>
     <label class="switch"><input type="checkbox" id="bridge"> Sonunda günümüze bağla (ör. "Dedemin babası o sabah on yaşındaymış")</label>
+    <label>Kendi karakterleriniz (isteğe bağlı)</label>
+    <div class="dim small" style="margin-bottom:6px">Bir kişinin fotoğrafını ya da bir çizimi yükleyin; yapay zekâ onu tanınır biçimde filmin görsel diline göre yeniden çizer ve her sahnede aynı karakter olarak kullanır (ör. serinin sabit sunucuları). Başkasının fotoğrafını yalnızca izniyle kullanın. En fazla 6.</div>
+    <input type="file" id="castFiles" accept="image/jpeg,image/png,image/webp" multiple>
+    <div id="castList" class="stack" style="margin:8px 0 12px"></div>
     <label>Kendi mekân görselleriniz (isteğe bağlı)</label>
     <div class="dim small" style="margin-bottom:6px">Okul, bina ya da işletmenizin fotoğraf veya çizimleri. Film bu mekânlarda geçer; yapay zekâ mekânı aynen koruyup içine insanları yerleştirir, üzerindeki ölçü ve etiket yazılarını siler. En fazla 8 görsel.</div>
     <input type="file" id="placeFiles" accept="image/jpeg,image/png,image/webp" multiple>
@@ -80,13 +84,23 @@ function newView() {
     document.querySelectorAll('[data-pn]').forEach(x => x.oninput = () => placeFiles[+x.dataset.pn].name = x.value);
     document.querySelectorAll('[data-pd]').forEach(x => x.oninput = () => placeFiles[+x.dataset.pd].desc = x.value);
     document.querySelectorAll('[data-px]').forEach(x => x.onclick = () => { placeFiles.splice(+x.dataset.px, 1); drawPlaces(); }); };
+  let castFiles = [];
+  const drawCast = () => { $('#castList').innerHTML = castFiles.map((f, i) => `<div class="card" style="display:flex;gap:10px;align-items:flex-start;padding:10px"><img src="${f.url}" style="width:74px;height:74px;object-fit:cover;border-radius:6px">
+      <div style="flex:1"><input data-cn="${i}" value="${esc(f.name)}" placeholder="Karakter adı (ör. Dayı)"><input data-cd="${i}" value="${esc(f.desc)}" placeholder="Kısa tanım (ör. bilge, esprili anlatıcı; kürk şapka, yeşil palto)" style="margin-top:6px"></div>
+      <button type="button" class="small" data-cx="${i}">Kaldır</button></div>`).join('');
+    document.querySelectorAll('[data-cn]').forEach(x => x.oninput = () => castFiles[+x.dataset.cn].name = x.value);
+    document.querySelectorAll('[data-cd]').forEach(x => x.oninput = () => castFiles[+x.dataset.cd].desc = x.value);
+    document.querySelectorAll('[data-cx]').forEach(x => x.onclick = () => { castFiles.splice(+x.dataset.cx, 1); drawCast(); }); };
+  $('#castFiles').onchange = e => { for (const f of e.target.files) if (castFiles.length < 6) castFiles.push({ file: f, url: URL.createObjectURL(f), name: `Karakter ${castFiles.length + 1}`, desc: '' }); e.target.value = ''; drawCast(); };
   $('#placeFiles').onchange = e => { for (const f of e.target.files) if (placeFiles.length < 8) placeFiles.push({ file: f, url: URL.createObjectURL(f), name: `Mekân ${placeFiles.length + 1}`, desc: '' }); e.target.value = ''; drawPlaces(); };
   $('#f').onsubmit = async e => {
     e.preventDefault(); $('#go').disabled = true;
     try {
+      const cast = [];
+      for (let i = 0; i < castFiles.length; i++) { toast(`Karakter görseli yükleniyor (${i + 1}/${castFiles.length})…`); const f = castFiles[i]; const r = await api('/upload', { method: 'POST', body: f.file, headers: { 'Content-Type': f.file.type || 'image/jpeg' } }); cast.push({ path: r.path, name: f.name, desc: f.desc }); }
       const places = [];
       for (let i = 0; i < placeFiles.length; i++) { toast(`Mekân görseli yükleniyor (${i + 1}/${placeFiles.length})…`); const f = placeFiles[i]; const r = await api('/upload', { method: 'POST', body: f.file, headers: { 'Content-Type': f.file.type || 'image/jpeg' } }); places.push({ path: r.path, name: f.name, desc: f.desc }); }
-      const p = await api('/projects', { method: 'POST', body: { places, topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), look: chipVal('look'), motion: chipVal('motion'), notes: $('#notes').value, auto: $('#auto').checked } });
+      const p = await api('/projects', { method: 'POST', body: { cast, places, topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), look: chipVal('look'), motion: chipVal('motion'), notes: $('#notes').value, auto: $('#auto').checked } });
       route('#/p/' + p.id);
     } catch (er) { toast(er.message, true); $('#go').disabled = false; }
   };
@@ -163,7 +177,9 @@ const STAGE_VIEW = {
         <label>Tanım</label><input data-k="about" value="${esc(c.about)}">
         <label>Görünüş (İngilizce, görsel üretimi için — gerçek ad yazılmaz)</label><textarea data-k="look_en" rows="3">${esc(c.look_en)}</textarea>
         <div class="row"><div><label>Ses türü</label><select data-k="voice">${VOICE_TYPES.map(([v, n]) => `<option value="${v}" ${c.voice === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
-        <label class="switch"><input type="checkbox" data-k="ref" ${c.ref ? 'checked' : ''}> Referans görseli üret (birden çok sahnede görünecekse)</label></div>`).join('')}</div></div>
+        <label class="switch"><input type="checkbox" data-k="ref" ${c.ref ? 'checked' : ''}> Referans görseli üret (birden çok sahnede görünecekse)</label>
+        <div class="row tight" style="align-items:center;gap:8px;margin-top:6px">${c.src_ref_url ? `<img src="${esc(c.src_ref_url)}" style="width:54px;height:54px;object-fit:cover;border-radius:6px"><span class="dim small">Yüklenen referans: bu kişi filmin tarzında yeniden çizilecek</span>` : '<span class="dim small">İsterseniz bir fotoğraf ya da çizim yükleyin; karakter ona benzetilerek çizilir.</span>'}
+          <label class="small" style="cursor:pointer;text-decoration:underline">${c.src_ref_url ? 'Değiştir' : 'Referans yükle'}<input type="file" accept="image/jpeg,image/png,image/webp" data-cref="${esc(c.id)}" style="display:none"></label>${c.src_ref_url ? `<button class="small" type="button" data-crx="${esc(c.id)}">Kaldır</button>` : ''}</div></div>`).join('')}</div></div>
       <div class="card" style="margin-top:14px"><h3>Claude'a düzeltme yaptır</h3><textarea id="fb" rows="2" placeholder="Örnek: Zeybek sahnesini çıkar, karşılamaya Ankara'nın ileri gelenlerini ekle; daha az karakter olsun."></textarea>
       <div class="row tight" style="margin-top:8px"><button id="regen" ${working() ? 'disabled' : ''}>Düzeltmeyle yeniden yaz</button></div></div>
       ${bar(`<button id="save" ${working() ? 'disabled' : ''}>Değişiklikleri kaydet</button>`)}`;
@@ -175,6 +191,9 @@ const STAGE_VIEW = {
     };
     $('#save').onclick = () => act(collect(), 'Kaydedildi');
     $('#regen').onclick = async () => { const fb = $('#fb').value.trim(); if (!fb) return toast('Ne değişsin, yazın', true); act({ action: 'regenerate', feedback: fb }, 'Claude yeniden yazıyor…'); };
+    el.querySelectorAll('[data-cref]').forEach(inp => inp.onchange = async () => { const f = inp.files[0]; if (!f) return;
+      try { toast('Referans yükleniyor…'); const r = await api('/upload', { method: 'POST', body: f, headers: { 'Content-Type': f.type || 'image/jpeg' } }); await act({ action: 'charref', id: inp.dataset.cref, path: r.path }, 'Referans eklendi; karakter görseli bir sonraki adımda buna göre çizilecek'); } catch (e) { toast(e.message, true); } });
+    el.querySelectorAll('[data-crx]').forEach(b => b.onclick = () => act({ action: 'charref', id: b.dataset.crx, path: null }, 'Referans kaldırıldı'));
     bindApprove(async () => { await api(`/projects/${p.id}/action`, { method: 'POST', body: collect() }); });
   },
 
