@@ -357,6 +357,21 @@ async function panelView() {
     catch (e) { toast(e.message, true); }
   };
   $('#savep').onclick = async () => { try { await api('/settings', { method: 'POST', body: collect() }); toast('Kaydedildi'); panelView(); } catch (e) { toast(e.message, true); } };
+  // Kütüphaneden ses bulma paneli (Anlatıcı sesi alanının altında)
+  { const host = document.querySelector('[data-f=eleven_voice]'); const fld = host && host.closest('.row') ? host.closest('.row').parentElement : null;
+    if (fld) fld.insertAdjacentHTML('afterend', `<div class="card" id="vlibBox" style="margin:8px 0;padding:12px"><div class="row tight" style="justify-content:space-between;align-items:center"><b>ElevenLabs kütüphanesinden ses bul</b><button class="small" type="button" id="vlibOpen">Türkçe sesleri göster</button></div>
+      <div id="vlib" style="display:none;margin-top:10px"><div class="row tight" style="gap:6px;flex-wrap:wrap"><select id="vg"><option value="">Cinsiyet: hepsi</option><option value="male">Erkek</option><option value="female">Kadın</option></select><select id="va"><option value="">Yaş: hepsi</option><option value="young">Genç</option><option value="middle_aged">Orta yaş</option><option value="old">Yaşlı</option></select><input id="vq" placeholder="Ara (ör. anlatıcı, sıcak, genç)" style="flex:1;min-width:140px"><button class="small" type="button" id="vgo">Ara</button></div>
+      <div class="dim small" style="margin:6px 0">▶ ile dinleyin, beğendiğinizi “Ekle” ile hesabınıza ekleyin; sonra yukarıdaki listelerden seçip Kaydet’e basın.</div><div id="vres" class="stack" style="max-height:420px;overflow:auto"></div></div></div>`); }
+  const vSearch = async () => { const box = $('#vres'); box.innerHTML = '<div class="spin"></div>';
+    try { const qs = new URLSearchParams({ lang: 'tr', gender: $('#vg').value, age: $('#va').value, q: $('#vq').value.trim() });
+      const L = await api('/voices/library?' + qs);
+      const AGE = { young: 'genç', middle_aged: 'orta yaş', old: 'yaşlı' }, G = { male: 'erkek', female: 'kadın' };
+      box.innerHTML = L.length ? L.map((v, i) => `<div class="card" style="padding:8px 10px"><div class="row tight" style="justify-content:space-between;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${esc(v.name)}</b> <span class="dim small">${[G[v.gender], AGE[v.age], v.accent, v.descriptive, v.use_case].filter(Boolean).map(esc).join(' · ')}</span>${v.description ? `<div class="dim small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.description)}</div>` : ''}</div><button class="small" type="button" data-vadd="${i}">Ekle</button></div>${v.preview ? `<audio controls preload="none" src="${esc(v.preview)}" style="width:100%;height:32px;margin-top:6px"></audio>` : ''}</div>`).join('') : '<div class="dim">Sonuç yok; filtreleri değiştirin.</div>';
+      box.querySelectorAll('[data-vadd]').forEach(b => b.onclick = async () => { const v = L[+b.dataset.vadd]; b.disabled = true;
+        try { await api('/voices/add', { method: 'POST', body: { owner: v.owner, voice_id: v.voice_id, name: v.name } }); toast(`${v.name} hesabınıza eklendi; listelerden seçebilirsiniz`); b.textContent = 'Eklendi'; $('#voices').click(); }
+        catch (e) { toast(e.message, true); b.disabled = false; } });
+    } catch (e) { box.innerHTML = `<div class="err">${esc(e.message)}</div>`; } };
+  if ($('#vlibOpen')) { $('#vlibOpen').onclick = () => { $('#vlib').style.display = 'block'; $('#vlibOpen').style.display = 'none'; vSearch(); }; $('#vgo').onclick = vSearch; $('#vq').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); vSearch(); } }; }
   $('#voices').onclick = async () => {
     try {
       const v = await api('/voices');
