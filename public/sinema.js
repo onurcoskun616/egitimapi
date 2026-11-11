@@ -4,6 +4,7 @@ const app = $('#app');
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let pollTimer = null;
 
+const speaksUI = s => !!(s.voice && s.speaker && s.speaker !== 'anlatici' && s.speaker !== 'radyo' && (s.chars || []).includes(s.speaker));
 async function api(path, opts = {}) {
   const r = await fetch('/api/sinema' + path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) }, body: opts.body && typeof opts.body !== 'string' && !(opts.body instanceof Blob) ? JSON.stringify(opts.body) : opts.body });
   const j = await r.json().catch(() => ({}));
@@ -282,12 +283,15 @@ const STAGE_VIEW = {
   },
 
   videos(p, el) {
+    const lipTodo = (p.scenes || []).filter(s => s.video && !s.still && !s.card && !s.lipsync && speaksUI(s));
     el.innerHTML = `<p class="mute">Her sahnenin videosu. Bozuk görünen (yüz bozulması, garip hareket) klibi hareket tarifini sadeleştirip yeniden üretin.</p>
+    ${lipTodo.length ? `<div class="card" style="margin-bottom:12px"><b>Dudak senkronu</b> <span class="dim small">— karakterin konuştuğu ${lipTodo.length} sahnede ağız hareketi sese göre yeniden işlenir (≈ $${(lipTodo.length * 0.07).toFixed(2)}).</span><div style="margin-top:8px"><button class="small gold" id="lipgo" ${working() ? 'disabled' : ''}>Konuşan sahnelere uygula</button></div></div>` : ''}
     <div class="grid">${(p.scenes || []).map(s => `<div class="card media"><div class="vis"><span class="n">${s.n}</span>${s.card ? `<div class="ph" style="background:#000;color:#fff;text-align:center;padding:10px">${esc(s.overlay || 'Siyah kart')}</div>` : s.still && !s.video ? `<div style="position:relative"><img src="${esc(s.image || '')}" style="width:100%;display:block"><span class="dim small" style="position:absolute;left:6px;bottom:6px;background:#000a;padding:2px 6px;border-radius:6px">Durağan kare</span></div>` : s.video ? `<video src="${esc(s.video)}" controls muted loop playsinline preload="metadata" poster="${esc(s.image || '')}"></video>` : s.image ? `<img src="${esc(s.image)}" style="opacity:.45">${s.status === 'working' ? '<div class="spin" style="position:absolute"></div>' : ''}` : '<div class="ph">Kare yok</div>'}</div>
-      <div class="bd"><div class="small">${esc(s.what)}</div>${s.error ? `<div class="err">${esc(s.error)}</div>` : ''}
+      <div class="bd"><div class="small">${esc(s.what)}</div>${s.error ? `<div class="err">${esc(s.error)}</div>` : ''}${s.lipsync ? '<div class="dim small">🗣 Dudak senkronlu</div>' : ''}${s.lip_note ? `<div class="dim small">⚠ ${esc(s.lip_note)}</div>` : ''}
       <details style="margin-top:6px"><summary>Hareketi düzelt / yeniden üret</summary><textarea rows="3" data-pr="${s.n}">${esc(s.motion_en)}</textarea><button class="small" data-redo="${s.n}" style="margin-top:6px" ${working() ? 'disabled' : ''}>Yeniden üret</button></details></div></div>`).join('')}</div>
     ${bar(itemErrors(p) ? `<button onclick="act({action:'retry'})">Eksikleri tamamla</button>` : '', 'Onayla ve kurguya geç →')}`;
     el.querySelectorAll('video').forEach(v => { v.onmouseenter = () => v.play().catch(() => {}); v.onmouseleave = () => v.pause(); });
+    const lg = $('#lipgo'); if (lg) lg.onclick = () => act({ action: 'lipsync' }, 'Dudak senkronu başlatıldı');
     el.querySelectorAll('[data-redo]').forEach(b => b.onclick = () => act({ action: 'redo', kind: 'video', id: +b.dataset.redo, prompt: el.querySelector(`[data-pr="${b.dataset.redo}"]`).value }, 'Yeniden üretiliyor…'));
     bindApprove();
   },
@@ -302,12 +306,14 @@ const STAGE_VIEW = {
       <div class="row tight"><a class="btn gold" href="${esc(f.url)}" download="${esc((p.title || 'video').replace(/[^\wığüşöçİĞÜŞÖÇ -]/g, ''))}.mp4" target="_blank">⬇ MP4 indir</a>
       <span class="dim small">${f.sec ? f.sec + ' sn · ' : ''}${f.mb ? f.mb + ' MB' : ''}</span>
       <button class="small" id="reedit">Kurguyu yeniden yap</button>
+      ${!f.cleaned && (p.scenes || []).some(s => s.video && !s.still && !s.card && !s.lipsync && speaksUI(s)) ? '<button class="small" id="lipfix">Dudak senkronu uygula</button>' : ''}
       ${f.cleaned ? '' : '<button class="small" id="clean">Ara dosyaları sil (depolama aç)</button>'}</div>
       <p class="dim small">Bir sahneyi değiştirmek için yukarıdaki aşama çizgisinden ilgili aşamaya dönün; onayladığınızda yalnızca değişen kısımlar yeniden üretilir.</p>
       ${f.cleaned ? '' : `<details class="card"><summary style="font-size:15px;color:var(--ink)"><b>Ekran yazılarını düzelt</b> <span class="dim">— yeni üretim yapmadan, yalnızca kurgu yeniden yapılır (ücretsiz)</span></summary>
         <div class="stack" style="margin-top:12px">${(p.scenes || []).map(s => `<div class="sc"><div class="num" style="font-size:18px">${s.n}</div><div><div class="dim small">${esc(s.what)}</div><textarea data-ov="${s.n}" rows="${Math.max(1, (s.overlay || '').split('\n').length)}" placeholder="(yazı yok)">${esc(s.overlay)}</textarea></div></div>`).join('')}</div>
         <div style="margin-top:12px"><button class="gold" id="ovsave">Kaydet ve kurguyu yeniden yap</button></div></details>`}</div>`
       : '<div class="card mute">Video bulunamadı.</div>';
+    const lf = $('#lipfix'); if (lf) lf.onclick = () => act({ action: 'lipsync' }, 'Dudak senkronu başlatıldı — bitince “Onayla ve kurguya geç”e basın');
     const re = $('#reedit'); if (re) re.onclick = async () => { await api(`/projects/${p.id}/action`, { method: 'POST', body: { action: 'goto', stage: 'videos' } }); act({ action: 'approve' }, 'Kurgu yeniden başlatıldı'); };
     const ov = $('#ovsave'); if (ov) ov.onclick = async () => {
       const scenes = (p.scenes || []).map(s => ({ n: s.n, overlay: el.querySelector(`[data-ov="${s.n}"]`).value }));
