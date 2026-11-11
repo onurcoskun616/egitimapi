@@ -27,7 +27,7 @@ jobs:
       - name: ffmpeg ve yazı tipleri
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core fonts-liberation > /dev/null
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core fonts-dejavu-extra fonts-liberation > /dev/null
       - name: Kurgu
         env:
           TASK_ID: ${{ inputs.task_id }}

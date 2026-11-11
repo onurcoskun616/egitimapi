@@ -102,9 +102,28 @@ async function main() {
         y += sizes[k] + gap;
       }
     }
+    // Karaoke altyazı: 3 kelimelik büyük harf gruplar, o an okunan kelime kırmızı (libass ile)
+    let assFile = null;
+    if (m.subtitles && m.sub_mode === 'karaoke' && s.voice && (s.chunks || []).length) {
+      const ws = s.chunks, off = 0.25, groups = []; let g = [];
+      ws.forEach((w, k) => { g.push(k); if (g.length >= 3 || /[.,;:!?…]$/.test(w.txt) || k === ws.length - 1) { groups.push(g); g = []; } });
+      const tc = x => { const h = Math.floor(x / 3600), mm = Math.floor(x / 60) % 60, ss = (x % 60).toFixed(2).padStart(5, '0'); return `${h}:${String(mm).padStart(2, '0')}:${ss}`; };
+      const up = t => t.toLocaleUpperCase('tr').replace(/[{}\\]/g, '');
+      const fs = Math.round(Math.min(W, H) / 14);
+      let ev = '';
+      groups.forEach((gr, gi) => gr.forEach((k, j) => {
+        const a = off + ws[k].t, b = j + 1 < gr.length ? off + ws[gr[j + 1]].t : gi + 1 < groups.length ? off + ws[groups[gi + 1][0]].t : Math.min(D - 0.05, off + (s.voice_sec || 2) + 0.4);
+        const line = gr.map(x => x === k ? `{\\c&H2A2AE8&}${up(ws[x].txt)}{\\c&HFFFFFF&}` : up(ws[x].txt)).join(' ');
+        ev += `Dialogue: 0,${tc(a)},${tc(Math.max(a + 0.05, b))},K,,0,0,0,,${line}\n`;
+      }));
+      assFile = path.join(dir, `k${i}.ass`);
+      await writeFile(assFile, `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: K,DejaVu Sans Condensed,${fs},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,${Math.max(3, Math.round(fs / 11))},2,2,${Math.round(W * 0.06)},${Math.round(W * 0.06)},${Math.round(H * 0.30)},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${ev}`);
+      vf += `,ass='${assFile}'`;
+    }
     // Kelime grubu altyazısı (Reels tarzı): sesle eş zamanlı 2–4 kelimelik parçalar, ortanın biraz altında, kalın ve konturlu
     const bold = BOLD.find(f => existsSync(f)) || font;
-    if (m.subtitles && (m.sub_mode === 'chunks' || m.sub_mode === 'words') && s.voice && bold && (s.chunks || []).length) {
+    if (assFile) {}
+    else if (m.subtitles && (m.sub_mode === 'chunks' || m.sub_mode === 'words') && s.voice && bold && (s.chunks || []).length) {
       const one = m.sub_mode === 'words', fsz = Math.round(Math.min(W, H) / (one ? 12 : 15)), off = 0.25, col = one ? '0xFFE14D' : 'white';
       for (let k = 0; k < s.chunks.length; k++) {
         const a = off + s.chunks[k].t, b = k + 1 < s.chunks.length ? off + s.chunks[k + 1].t : Math.min(D - 0.05, off + (s.voice_sec || 2) + 0.4);
