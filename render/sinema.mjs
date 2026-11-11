@@ -85,6 +85,8 @@ async function main() {
     vf += GRADES[m.grade] || '';
     vf += GRAINS[m.grain] || '';
     if (s.overlay && s.overlay.trim() && font) {
+      // Çizgi film / kelime altyazılı filmlerde başlıklar kalın yazıyla; ince serif zemin üstünde kayboluyordu
+      const ovFont = (m.look || ['words', 'karaoke', 'chunks'].includes(m.sub_mode)) ? (BOLD.find(f => existsSync(f)) || font) : font;
       const lines = s.overlay.replace(/\\n/g, '\n').replace(/\s*\|\s*/g, '\n').split(/\r?\n/).map(x => x.trim()).filter(Boolean).slice(0, 4);
       const fs1 = Math.round(H / (i === 0 ? 17 : 22)), fsN = Math.round(H / 30);
       // Uzun satırlar ekrana sığsın: yaklaşık karakter genişliği ≈ 0,56 × yazı boyu
@@ -98,7 +100,7 @@ async function main() {
       for (let k = 0; k < lines.length; k++) {
         const tf = path.join(dir, `t${i}_${k}.txt`);
         await writeFile(tf, lines[k]);
-        vf += `,drawtext=fontfile='${font}':textfile='${tf}':fontsize=${sizes[k]}:expansion=none:fontcolor=white:x=(w-text_w)/2:y=${y}:shadowcolor=black@0.7:shadowx=2:shadowy=2:alpha='${alpha}'`;
+        vf += `,drawtext=fontfile='${ovFont}':textfile='${tf}':fontsize=${sizes[k]}:expansion=none:fontcolor=white:x=(w-text_w)/2:y=${y}:borderw=${Math.max(2, Math.round(sizes[k] / 14))}:bordercolor=black@0.85:shadowcolor=black@0.6:shadowx=3:shadowy=3:alpha='${alpha}'`;
         y += sizes[k] + gap;
       }
     }
