@@ -68,7 +68,8 @@ async function main() {
     const src = s.card ? null : s.still ? await fetchTo(s.still, path.join(dir, `in${i}.jpg`)) : await fetchTo(s.video, path.join(dir, `in${i}.mp4`));
     const clip = s.card || s.still ? Math.max(1.5, s.video_sec || 4) : (probeSec(src) || s.video_sec || 5);
     const want = s.still ? Math.max(2, (s.voice_sec || 0) + 0.5, s.voice ? 0 : clip) + (i < n - 1 ? 0 : 0.5) : Math.max(Math.min(clip, s.video_sec || clip), (s.voice_sec || 0) + 0.6) + (i < n - 1 ? 0 : 0.5);
-    const D = +Math.max(1.5, want).toFixed(3);
+    // Ses kaydı modu: sahne süresi kayıttaki zamandan gelir (görüntü sese kilitlenir)
+    const D = s.dur ? +(+s.dur).toFixed(3) : +Math.max(1.5, want).toFixed(3);
     const extra = s.still ? 0 : Math.max(0, D - clip);
     let vf;
     if (s.still) {
@@ -106,15 +107,16 @@ async function main() {
     }
     // Karaoke altyazı: 3 kelimelik büyük harf gruplar, o an okunan kelime kırmızı (libass ile)
     let assFile = null;
-    if (m.subtitles && m.sub_mode === 'karaoke' && s.voice && (s.chunks || []).length) {
-      const ws = s.chunks, off = 0.25, groups = []; let g = [];
+    const spoken = s.voice || s.cap, off0 = s.cap ? 0 : 0.25, capEnd = x => s.cap ? Math.min(D - 0.05, s.cap_end || D) : Math.min(D - 0.05, x);
+    if (m.subtitles && m.sub_mode === 'karaoke' && spoken && (s.chunks || []).length) {
+      const ws = s.chunks, off = off0, groups = []; let g = [];
       ws.forEach((w, k) => { g.push(k); if (g.length >= 3 || /[.,;:!?…]$/.test(w.txt) || k === ws.length - 1) { groups.push(g); g = []; } });
       const tc = x => { const h = Math.floor(x / 3600), mm = Math.floor(x / 60) % 60, ss = (x % 60).toFixed(2).padStart(5, '0'); return `${h}:${String(mm).padStart(2, '0')}:${ss}`; };
       const up = t => t.toLocaleUpperCase('tr').replace(/[{}\\]/g, '');
       const fs = Math.round(Math.min(W, H) / 14);
       let ev = '';
       groups.forEach((gr, gi) => gr.forEach((k, j) => {
-        const a = off + ws[k].t, b = j + 1 < gr.length ? off + ws[gr[j + 1]].t : gi + 1 < groups.length ? off + ws[groups[gi + 1][0]].t : Math.min(D - 0.05, off + (s.voice_sec || 2) + 0.4);
+        const a = off + ws[k].t, b = j + 1 < gr.length ? off + ws[gr[j + 1]].t : gi + 1 < groups.length ? off + ws[groups[gi + 1][0]].t : capEnd(off + (s.voice_sec || 2) + 0.4);
         const line = gr.map(x => x === k ? `{\\c&H2A2AE8&}${up(ws[x].txt)}{\\c&HFFFFFF&}` : up(ws[x].txt)).join(' ');
         ev += `Dialogue: 0,${tc(a)},${tc(Math.max(a + 0.05, b))},K,,0,0,0,,${line}\n`;
       }));
@@ -125,21 +127,21 @@ async function main() {
     // Kelime grubu altyazısı (Reels tarzı): sesle eş zamanlı 2–4 kelimelik parçalar, ortanın biraz altında, kalın ve konturlu
     const bold = BOLD.find(f => existsSync(f)) || font;
     if (assFile) {}
-    else if (m.subtitles && (m.sub_mode === 'chunks' || m.sub_mode === 'words') && s.voice && bold && (s.chunks || []).length) {
-      const one = m.sub_mode === 'words', fsz = Math.round(Math.min(W, H) / (one ? 12 : 15)), off = 0.25, col = one ? '0xFFE14D' : 'white';
+    else if (m.subtitles && (m.sub_mode === 'chunks' || m.sub_mode === 'words') && spoken && bold && (s.chunks || []).length) {
+      const one = m.sub_mode === 'words', fsz = Math.round(Math.min(W, H) / (one ? 12 : 15)), off = off0, col = one ? '0xFFE14D' : 'white';
       for (let k = 0; k < s.chunks.length; k++) {
-        const a = off + s.chunks[k].t, b = k + 1 < s.chunks.length ? off + s.chunks[k + 1].t : Math.min(D - 0.05, off + (s.voice_sec || 2) + 0.4);
+        const a = off + s.chunks[k].t, b = k + 1 < s.chunks.length ? off + s.chunks[k + 1].t : capEnd(off + (s.voice_sec || 2) + 0.4);
         const tf = path.join(dir, `c${i}_${k}.txt`); await writeFile(tf, s.chunks[k].txt);
         vf += `,drawtext=fontfile='${bold}':textfile='${tf}':fontsize=${fsz}:expansion=none:fontcolor=${col}:borderw=${Math.max(3, Math.round(fsz / 10))}:bordercolor=black@0.9:x=(w-text_w)/2:y=h*0.64:enable='between(t\\,${a.toFixed(2)}\\,${b.toFixed(2)})'`;
       }
     }
     // Konuşma altyazısı: sesin süresince alt kısımda, küçük ve sade
-    else if (m.subtitles && s.text && s.text.trim() && s.voice && font) {
+    else if (m.subtitles && s.text && s.text.trim() && spoken && font) {
       const fsz = Math.round(Math.min(W, H) / 26), maxc = Math.max(14, Math.floor(W * 0.84 / (fsz * 0.52)));
       const words = s.text.trim().split(/\s+/), lines = [''];
       for (const w of words) { const cur = lines[lines.length - 1]; if ((cur + ' ' + w).trim().length > maxc && cur) lines.push(w); else lines[lines.length - 1] = (cur + ' ' + w).trim(); }
       const ls = lines.slice(0, 3), gap = Math.round(fsz * 0.3), block = ls.length * fsz + (ls.length - 1) * gap;
-      const a = 0.25, b = Math.min(D - 0.1, a + (s.voice_sec || 2) + 0.35);
+      const a = off0, b = s.cap ? Math.min(D - 0.05, s.cap_end || D) : Math.min(D - 0.1, a + (s.voice_sec || 2) + 0.35);
       let y = Math.round(H * 0.93 - block);
       for (let k = 0; k < ls.length; k++) {
         const tf = path.join(dir, `s${i}_${k}.txt`); await writeFile(tf, ls[k]);
@@ -188,6 +190,12 @@ async function main() {
     fl.push(`[${k}:a]${radio}aresample=44100,aformat=channel_layouts=stereo,adelay=${d}|${d}[va${k}]`); voices.push(`[va${k}]`); k++;
   }
   // Ses efektleri: her sahnenin başında, sahne süresince, yumuşak giriş/çıkışla
+  // Ses kaydı modu: kullanıcının kaydı filmin baştan sona sesidir
+  if (m.master_audio) {
+    const f = await fetchTo(m.master_audio, path.join(dir, 'kayit' + (path.extname(new URL(m.master_audio, 'file:///').pathname) || '.mp3')));
+    ain.push('-i', f);
+    fl.push(`[${k}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${total},asetpts=PTS-STARTPTS[va${k}]`); voices.push(`[va${k}]`); k++;
+  }
   const sfxs = [];
   for (let i = 0; i < n; i++) if (parts[i].sfx) {
     try {

@@ -52,7 +52,7 @@ async function listView() {
 function chipGroup(name, items, val) { return `<div class="chips" data-chips="${name}">${items.map(([v, t]) => `<span class="chip ${v == val ? 'on' : ''}" data-v="${v}">${t}</span>`).join('')}</div>`; }
 function bindChips() { document.querySelectorAll('[data-chips]').forEach(g => g.onclick = e => { const c = e.target.closest('.chip'); if (!c) return; g.querySelectorAll('.chip').forEach(x => x.classList.remove('on')); c.classList.add('on'); }); }
 const chipVal = n => document.querySelector(`[data-chips="${n}"] .chip.on`)?.dataset.v;
-const LOOKS_UI = [['', 'Gerçekçi'], ['anime', 'Çizgi film (2B)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']];
+const LOOKS_UI = [['', 'Gerçekçi'], ['duz_cizgi', 'Düz çizgi film (webçizgi)'], ['anime', 'Çizgi film (2B)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']];
 let lookTimer = null;
 async function loadLookSamples() {
   clearTimeout(lookTimer);
@@ -65,7 +65,10 @@ async function loadLookSamples() {
 function newView() {
   app.innerHTML = `<h1>Yeni film</h1><p class="mute">Sadece konuyu yazın. Senaryo, karakterler, sahne planı, görseller, videolar, müzik ve kurgu sırayla hazırlanır; her aşamada onayınız istenir (isterseniz tam otomatik).</p>
   <form class="card" id="f" style="max-width:760px">
-    <label>Konu / anlatılacak olay</label>
+    <label>Kaynak</label>${chipGroup('src', [['konu', 'Konudan yaz (senaryoyu Claude yazar)'], ['ses', 'Ses kaydından (anlatımı canlandır)']], 'konu')}
+    <div id="srcBox" style="display:none;margin-bottom:10px"><div class="dim small" style="margin-bottom:6px">Birinin bir olayı anlattığı ses ya da video kaydını yükleyin (MP3, M4A, WAV, MP4; en fazla ~200 MB). Kayıt yazıya dökülür, anlatılan her cümle sırayla çizilir; filmin sesi kaydın kendisidir, altyazı sözlerle eş zamanlı çıkar. Başkasına ait kaydı yalnızca izniyle kullanın.</div>
+      <input type="file" id="srcFile" accept="audio/*,video/mp4"><label class="switch" style="margin-top:6px"><input type="checkbox" id="srcMusic"> Arkaya hafif fon müziği ekle</label></div>
+    <label id="topicLbl">Konu / anlatılacak olay</label>
     <textarea id="topic" rows="4" placeholder="Örnek: 27 Aralık 1919'da Mustafa Kemal'in Heyet-i Temsiliye ile Ankara'ya gelişi; Dikmen sırtlarında halkın karşılaması, zeybek gösterisi, Hacı Bayram Camii önünde çocuklarla karşılaşma."></textarea>
     <label>Süre</label>${chipGroup('duration', [[30, '30 sn'], [60, '1 dk'], [90, '1,5 dk'], [120, '2 dk'], [180, '3 dk']], 90)}
     <label>Format</label>${chipGroup('aspect', [['1:1', 'Kare 1:1 (Instagram)'], ['16:9', 'Yatay 16:9 (YouTube)'], ['9:16', 'Dikey 9:16 (Reels / Shorts)']], '1:1')}
@@ -93,6 +96,8 @@ function newView() {
     <div class="row tight" style="margin-top:16px"><button class="gold" id="go">Başlat →</button><span class="dim small">İlk adımda Claude senaryoyu yazar (1–3 dk).</span></div>
   </form>`;
   bindChips(); loadLookSamples();
+  const srcSync = () => { const r = chipVal('src') === 'ses'; $('#srcBox').style.display = r ? '' : 'none'; $('#topicLbl').textContent = r ? 'Kısa açıklama (isteğe bağlı: kim anlatıyor, nerede geçiyor)' : 'Konu / anlatılacak olay'; document.querySelectorAll('[data-chips="duration"],[data-chips="tempo"]').forEach(x => { x.style.opacity = r ? .4 : 1; x.style.pointerEvents = r ? 'none' : ''; }); };
+  document.querySelector('[data-chips="src"]').addEventListener('click', () => setTimeout(srcSync));
   let placeFiles = [];
   const drawPlaces = () => { $('#placeList').innerHTML = placeFiles.map((f, i) => `<div class="card" style="display:flex;gap:10px;align-items:flex-start;padding:10px"><img src="${f.url}" style="width:110px;height:74px;object-fit:cover;border-radius:6px">
       <div style="flex:1"><input data-pn="${i}" value="${esc(f.name)}" placeholder="Mekân adı (ör. Koridor)"><input data-pd="${i}" value="${esc(f.desc)}" placeholder="Kısa açıklama (ör. derslik koridoru, dolaplar, tavanda yuvarlak ışıklar)" style="margin-top:6px"></div>
@@ -119,7 +124,13 @@ function newView() {
       for (let i = 0; i < castFiles.length; i++) { toast(`Karakter görseli yükleniyor (${i + 1}/${castFiles.length})…`); const f = castFiles[i]; const r = await api('/upload', { method: 'POST', body: f.file, headers: { 'Content-Type': f.file.type || 'image/jpeg' } }); cast.push({ path: r.path, name: f.name, desc: f.desc }); }
       const places = [];
       for (let i = 0; i < placeFiles.length; i++) { toast(`Mekân görseli yükleniyor (${i + 1}/${placeFiles.length})…`); const f = placeFiles[i]; const r = await api('/upload', { method: 'POST', body: f.file, headers: { 'Content-Type': f.file.type || 'image/jpeg' } }); places.push({ path: r.path, name: f.name, desc: f.desc }); }
-      const p = await api('/projects', { method: 'POST', body: { cast, places, from_id: $('#fromId').value || null, from_chars: [...document.querySelectorAll('[data-fc]:checked')].map(x => x.dataset.fc), topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), look: chipVal('look'), motion: chipVal('motion'), notes: $('#notes').value, auto: $('#auto').checked } });
+      let source_audio = null;
+      if (chipVal('src') === 'ses') {
+        const f = $('#srcFile').files[0]; if (!f) throw new Error('Ses ya da video kaydını seçin');
+        toast(`Kayıt yükleniyor (${(f.size / 1048576).toFixed(1)} MB)…`);
+        const r = await api('/upload', { method: 'POST', body: f, headers: { 'Content-Type': f.type || 'audio/mpeg' } }); source_audio = r.path;
+      }
+      const p = await api('/projects', { method: 'POST', body: { source_audio, music: $('#srcMusic').checked, cast, places, from_id: $('#fromId').value || null, from_chars: [...document.querySelectorAll('[data-fc]:checked')].map(x => x.dataset.fc), topic: $('#topic').value, duration: +chipVal('duration'), aspect: chipVal('aspect'), tone: chipVal('tone'), narration: $('#narration').checked, bridge: $('#bridge').checked, tempo: chipVal('tempo'), look: chipVal('look'), motion: chipVal('motion'), notes: $('#notes').value, auto: $('#auto').checked } });
       route('#/p/' + p.id);
     } catch (er) { toast(er.message, true); $('#go').disabled = false; }
   };
@@ -231,12 +242,14 @@ const STAGE_VIEW = {
   board(p, el) {
     const sc = p.scenes || [];
     if (!sc.length) { el.innerHTML = working() ? '<div class="card mute">Claude sahne planını hazırlıyor…</div>' : ''; return; }
-    const total = sc.reduce((a, s) => a + s.sec, 0);
+    const total = Math.round(sc.reduce((a, s) => a + s.sec, 0));
     const chars = p.characters || [];
-    el.innerHTML = `<p class="mute">${sc.length} sahne · yaklaşık ${total} sn ham görüntü. Her sahnede önce ilk kare fotoğraf olarak, sonra kısa video üretilir. Metinleri doğrudan düzenleyebilirsiniz.</p>
+    const rec = !!(p.opts && p.opts.source_audio);
+    const mmss = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+    el.innerHTML = `<p class="mute">${sc.length} sahne · ${rec ? `ses kaydı ${total} sn; her sahnenin süresi kayıttaki söze göre ayarlandı` : `yaklaşık ${total} sn ham görüntü`}. Her sahnede önce ilk kare fotoğraf olarak, sonra kısa video üretilir. Metinleri doğrudan düzenleyebilirsiniz.</p>
     <div class="stack">${sc.map((s, i) => `<div class="card sc" data-i="${i}"><div class="num">${s.n}</div><div>
-      <div class="row"><div style="flex:3"><label>Ne oluyor</label><input data-k="what" value="${esc(s.what)}"></div><div style="flex:1;min-width:110px"><label>Süre</label><select data-k="sec">${[...new Set([3, 4, 5, 6, 8, 10, 12, 15, +s.sec])].sort((a, b) => a - b).map(v => `<option value="${v}" ${s.sec == v ? 'selected' : ''}>${v} sn</option>`).join('')}</select></div></div>
-      <label class="switch" style="margin-top:6px"><input type="checkbox" data-k="card" ${s.card ? 'checked' : ''}> Siyah kart (görüntü yok, yalnızca ekran yazısı)</label>
+      <div class="row"><div style="flex:3"><label>Ne oluyor</label><input data-k="what" value="${esc(s.what)}"></div>${rec ? `<div style="flex:1;min-width:110px"><label>Kayıtta</label><div class="small" style="padding:9px 0">${mmss(s.t0 || 0)}–${mmss((s.t0 || 0) + s.sec)} · ${s.sec.toFixed(1)} sn</div></div>` : `<div style="flex:1;min-width:110px"><label>Süre</label><select data-k="sec">${[...new Set([3, 4, 5, 6, 8, 10, 12, 15, +s.sec])].sort((a, b) => a - b).map(v => `<option value="${v}" ${s.sec == v ? 'selected' : ''}>${v} sn</option>`).join('')}</select></div>`}</div>
+      ${rec ? `<div class="small" style="margin:6px 0;padding:8px 10px;border-left:3px solid var(--gold);background:rgba(255,255,255,.03)">🎙 “${esc(s.narration || '')}”</div>` : `<label class="switch" style="margin-top:6px"><input type="checkbox" data-k="card" ${s.card ? 'checked' : ''}> Siyah kart (görüntü yok, yalnızca ekran yazısı)</label>`}
       ${p.opts && p.opts.motion !== 'kamera' ? `<label class="switch"><input type="checkbox" data-k="still" ${s.still ? 'checked' : ''}> Durağan kare (video üretme, kamera kaydırması yeterli)</label>` : ''}
       ${((p.opts && p.opts.places) || []).length ? `<div><label>Mekân</label><select data-k="place"><option value="">— yapay zekâ oluştursun —</option>${p.opts.places.map(m => `<option value="${esc(m.id)}" ${s.place === m.id ? 'selected' : ''}>${esc(m.id)} · ${esc(m.name)}</option>`).join('')}</select></div>` : ''}
       <div class="row"><div><label>Ekran yazısı <span class="dim">(her satır ayrı satırda görünür)</span></label><textarea data-k="overlay" rows="${Math.max(1, (s.overlay || '').split('\n').length)}" placeholder="(yok)">${esc(s.overlay)}</textarea></div>${p.opts.narration ? `<div style="flex:2"><label>Söz</label><input data-k="narration" value="${esc(s.narration)}" placeholder="(sessiz plan)"></div><div style="flex:1;min-width:130px"><label>Kim söylüyor</label><select data-k="speaker">${speakerOpts(p, s.speaker)}</select></div>` : ''}</div>
