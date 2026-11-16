@@ -52,7 +52,7 @@ async function listView() {
 function chipGroup(name, items, val) { return `<div class="chips" data-chips="${name}">${items.map(([v, t]) => `<span class="chip ${v == val ? 'on' : ''}" data-v="${v}">${t}</span>`).join('')}</div>`; }
 function bindChips() { document.querySelectorAll('[data-chips]').forEach(g => g.onclick = e => { const c = e.target.closest('.chip'); if (!c) return; g.querySelectorAll('.chip').forEach(x => x.classList.remove('on')); c.classList.add('on'); }); }
 const chipVal = n => document.querySelector(`[data-chips="${n}"] .chip.on`)?.dataset.v;
-const LOOKS_UI = [['', 'Gerçekçi'], ['duz_cizgi', 'Düz çizgi film (webçizgi)'], ['anime', 'Çizgi film (2B)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']];
+const LOOKS_UI = [['', 'Gerçekçi'], ['karikatur', 'Gerçekçi karikatür (komedi)'], ['duz_cizgi', 'Düz çizgi film (webçizgi)'], ['anime', 'Çizgi film (2B)'], ['cizgi_roman', 'Çizgi roman'], ['sulu_boya', 'Suluboya'], ['animasyon', '3B animasyon'], ['gravur', 'Eski gravür']];
 let lookTimer = null;
 async function loadLookSamples() {
   clearTimeout(lookTimer);
