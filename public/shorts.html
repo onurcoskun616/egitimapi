@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="tr" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shorts Stüdyosu · Eğitim Stüdyosu</title>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/sinema.css?v=2">
+<style>
+  .scn { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); margin-bottom: 10px; }
+  .scn .no { font: 700 18px var(--serif, Georgia); color: var(--gold); }
+  .scn label { font-size: 12px; color: var(--dim); display: block; margin: 6px 0 3px; }
+  .scn input, .scn select, .scn textarea { width: 100%; }
+  .pv { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .pv img { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; }
+  @media (max-width: 700px) { .pv { grid-template-columns: repeat(2, 1fr); } }
+  .warnbox { border-left: 3px solid var(--red); padding: 8px 12px; background: rgba(255,80,80,.06); margin: 10px 0; font-size: 13px; }
+  .src a { color: var(--gold); word-break: break-all; }
+  video.final { width: 100%; max-width: 360px; border-radius: 14px; background: #000; display: block; }
+</style>
+</head>
+<body>
+<header class="top" id="top" hidden>
+  <a class="brand" href="#/"><span class="reel"></span>Shorts Stüdyosu</a>
+  <nav>
+    <a href="#/" data-nav="list">Videolar</a>
+    <a href="#/yeni" data-nav="new" class="btn small gold">+ Yeni Shorts</a>
+    <a href="/#/yonetim">← Eğitim Stüdyosu</a>
+  </nav>
+</header>
+<main id="app"><div class="spin" style="margin:40px auto"></div></main>
+<div id="toast" class="toast" hidden></div>
+<script src="/shorts.js?v=1"></script>
+</body>
+</html>

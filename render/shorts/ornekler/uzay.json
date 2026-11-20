@@ -1,0 +1,156 @@
+{
+ "template": "karsilastirma",
+ "title": "Dünya çok mu büyük?",
+ "unit": "km",
+ "size_label": "Çap",
+ "group": 5,
+ "objects": [
+  {
+   "name": "Ay",
+   "kind": "moon",
+   "size": 3474,
+   "compare": null
+  },
+  {
+   "name": "Merkür",
+   "kind": "mercury",
+   "size": 4879,
+   "compare": null
+  },
+  {
+   "name": "Mars",
+   "kind": "mars",
+   "size": 6779,
+   "compare": null
+  },
+  {
+   "name": "Venüs",
+   "kind": "venus",
+   "size": 12104,
+   "compare": null
+  },
+  {
+   "name": "Dünya",
+   "kind": "earth",
+   "size": 12742,
+   "compare": null
+  },
+  {
+   "name": "Neptün",
+   "kind": "neptune",
+   "size": 49244,
+   "compare": "Dünya'nın ~4 katı"
+  },
+  {
+   "name": "Uranüs",
+   "kind": "uranus",
+   "size": 50724,
+   "compare": "Dünya'nın ~4 katı"
+  },
+  {
+   "name": "Satürn",
+   "kind": "saturn",
+   "size": 116460,
+   "compare": "Dünya'nın ~9 katı"
+  },
+  {
+   "name": "Jüpiter",
+   "kind": "jupiter",
+   "size": 139820,
+   "compare": "Dünya'nın 11 katı"
+  },
+  {
+   "name": "Güneş",
+   "kind": "sun",
+   "size": 1392700,
+   "compare": "Dünya'nın 109 katı"
+  },
+  {
+   "name": "Sirius",
+   "kind": "sirius",
+   "size": 2380000,
+   "compare": "Güneş'in 1,7 katı",
+   "size_text": "~2,4 milyon km"
+  },
+  {
+   "name": "Arcturus",
+   "kind": "arcturus",
+   "size": 35400000,
+   "compare": "Güneş'in ~25 katı",
+   "size_text": "~35 milyon km"
+  },
+  {
+   "name": "Betelgeuse",
+   "kind": "betel",
+   "size": 1060000000.0,
+   "compare": "Güneş'in ~760 katı*",
+   "size_text": "~1 milyar km",
+   "note": "*Tahmini; kaynaklara göre 640–1000 kat"
+  }
+ ],
+ "scenes": [
+  {
+   "dur": 6,
+   "caption": "Dünya'yı büyük mü sanıyorsun? Önce kayalık komşularıyla yan yana koyalım.",
+   "type": "group",
+   "title1": "DÜNYA ÇOK MU",
+   "title2": "BÜYÜK?"
+  },
+  {
+   "dur": 5,
+   "caption": "Neptün, Dünya'nın neredeyse 4 katı genişlikte.",
+   "type": "focus",
+   "obj": 5
+  },
+  {
+   "dur": 4,
+   "caption": "Uranüs ondan da biraz daha büyük.",
+   "type": "focus",
+   "obj": 6
+  },
+  {
+   "dur": 5,
+   "caption": "Satürn, halkaları olmadan bile 9 Dünya genişliğinde.",
+   "type": "focus",
+   "obj": 7
+  },
+  {
+   "dur": 5,
+   "caption": "Jüpiter'in içine yaklaşık 1.300 Dünya sığar.",
+   "type": "focus",
+   "obj": 8
+  },
+  {
+   "dur": 7,
+   "caption": "Ama Güneş'in yanında hepsi küçücük: içine 1,3 milyon Dünya sığar!",
+   "type": "focus",
+   "obj": 9
+  },
+  {
+   "dur": 6,
+   "caption": "Gece gökyüzünün en parlak yıldızı Sirius, Güneş'ten bile büyük.",
+   "type": "focus",
+   "obj": 10
+  },
+  {
+   "dur": 7,
+   "caption": "Dev yıldız Arcturus, Güneş'in 25 katı genişlikte.",
+   "type": "focus",
+   "obj": 11
+  },
+  {
+   "dur": 8,
+   "caption": "Betelgeuse Güneş'in yerinde olsa, Mars'ın yörüngesini bile yutardı!",
+   "type": "focus",
+   "obj": 12
+  },
+  {
+   "dur": 7,
+   "caption": "Evrende bundan da büyük yıldızlar var. Sence en büyüğü hangisi? Yorumlara yaz!",
+   "type": "outro",
+   "obj": 12,
+   "title1": "DÜNYA",
+   "title2": "TOZ ZERRESİ BİLE DEĞİL"
+  }
+ ]
+}

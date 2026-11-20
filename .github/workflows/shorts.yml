@@ -1,0 +1,45 @@
+name: shorts
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Shorts Stüdyosu görevi (gen_tasks)
+        required: true
+      api_base:
+        description: Uygulama adresi
+        required: true
+      token:
+        description: Tek kullanımlık görev jetonu
+        required: true
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Jetonu gizle
+        env:
+          TASK_TOKEN: ${{ inputs.token }}
+        run: echo "::add-mask::$TASK_TOKEN"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: render/shorts/requirements.txt
+      - name: ffmpeg ve Python kütüphaneleri
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q -r render/shorts/requirements.txt
+      - name: Ön hesap önbelleği (gezegen dokuları)
+        uses: actions/cache@v4
+        with:
+          path: render/shorts/.cache
+          key: shorts-cache-v1-${{ hashFiles('render/shorts/t_scale.py') }}
+      - name: Render
+        working-directory: render/shorts
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          API_BASE: ${{ inputs.api_base }}
+          TASK_TOKEN: ${{ inputs.token }}
+        run: python3 main.py

@@ -1,5 +1,5 @@
 // GitHub Actions Claude işçisi: görevdeki istemleri Claude Code (abonelik jetonu) ile çalıştırır,
-// yanıtları uygulamaya geri gönderir. Araç kullanımı kapalıdır; yalnızca metin üretir.
+// yanıtları uygulamaya geri gönderir. Araç kullanımı kapalıdır (web: true istemlerde yalnızca web araması açılır).
 import { spawn } from 'node:child_process';
 import { writeFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,11 +9,14 @@ const { TASK_ID, API_BASE, TASK_TOKEN } = process.env;
 const api = p => `${API_BASE.replace(/\/$/, '')}/api/task/${TASK_ID}${p}?token=${TASK_TOKEN}`;
 const CONCURRENCY = 5;
 
-function runClaude(system, user, model, dir, i) {
+function runClaude(system, user, model, dir, i, web) {
   return new Promise(async (ok) => {
     const sysFile = path.join(dir, `sys-${i}.txt`);
     await writeFile(sysFile, system);
-    const args = ['-p', '--output-format', 'json', '--system-prompt-file', sysFile, '--tools', '', '--max-turns', '1', '--no-session-persistence'];
+    // web: true olan istemlerde (Shorts Stüdyosu bilgi doğrulaması) yalnızca web araması ve sayfa okuma açılır
+    const args = web
+      ? ['-p', '--output-format', 'json', '--system-prompt-file', sysFile, '--tools', 'WebSearch,WebFetch', '--allowedTools', 'WebSearch', 'WebFetch', '--max-turns', '30', '--no-session-persistence']
+      : ['-p', '--output-format', 'json', '--system-prompt-file', sysFile, '--tools', '', '--max-turns', '1', '--no-session-persistence'];
     if (model) args.push('--model', model);
     const p = spawn('claude', args, { env: process.env, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '', err = '';
@@ -39,7 +42,7 @@ async function main() {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
     while (next < items.length) {
       const k = next++; const t0 = Date.now();
-      results[k] = await runClaude(items[k].system, items[k].user, model, dir, k);
+      results[k] = await runClaude(items[k].system, items[k].user, model, dir, k, !!items[k].web);
       console.log(`#${k + 1}: ${results[k].error ? 'HATA ' + results[k].error : 'tamam'} (${Math.round((Date.now() - t0) / 1000)} sn)`);
       done++;
       fetch(api('/progress'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done, total: items.length }) }).catch(() => {});

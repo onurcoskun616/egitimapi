@@ -404,6 +404,7 @@ const SERIES = require('./lib/series')({ on, db, q, send, readBody, isAdmin, act
 require('./lib/ortak')({ series: SERIES, storage, on, db, q, send, readBody, isAdmin, claude, ctxFor, logClaude, now, shortId: () => shortId(), publicBase });
 // Sinematik film modülü (yalnızca yönetici): /sinema sayfası ve /api/sinema/* uçları
 require('./lib/sinema')({ on, db, q, send, readBody, storage, ctxFor, logClaude, logUsage, dispatch, publicBase, now });
+require('./lib/shorts')({ on, db, q, send, readBody, storage, ctxFor, logClaude, dispatch, now });
 /* ---------- R2 taşıma: Supabase'deki videoları ve sesleri Cloudflare R2'ye kopyalar (asıllar silinmez) ---------- */
 const R2MIG = { running: false, done: 0, failed: 0, total: 0, bytes: 0, last: null, errors: [] };
 async function r2Migrate() {
@@ -1000,6 +1001,7 @@ http.createServer(async (req, res) => {
     else if (/^\/test\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'test.html');
     else if (/^\/calisma\/[\w-]+\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'calisma.html');
     else if (/^\/sinema\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'sinema.html');
+    else if (/^\/shorts\/?$/.test(url.pathname)) file = path.join(PUBLIC, 'shorts.html');
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
     const hdr = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' };
     if (file.endsWith('sw.js')) hdr['Service-Worker-Allowed'] = '/';

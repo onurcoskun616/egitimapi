@@ -627,7 +627,7 @@
         links = ['<a href="#/projeler">Videolar</a>', '<a href="#/egitimler">Eğitimlerim</a>', '<a href="#/ortak-sinav">Ortak sınav</a>', `<a href="#/talepler">Talepler${ME.pending ? ` <b class="badge">${ME.pending}</b>` : ''}</a>`, '<a href="#/sonuclar">Sonuçlar</a>', '<a href="#/paketim">Paketim</a>'];
         tabs = [['#/projeler', 'video', 'Videolar'], ['#/egitimler', 'layers', 'Eğitimler'], ['#/talepler', 'inbox', 'Talepler', ME.pending], ['#/sonuclar', 'chart', 'Sonuçlar'], ['#/profil', 'user', 'Profil']];
       } else tabs = [['#/', 'home', 'Ana sayfa'], ['#/profil', 'user', 'Profil']];
-      if (u.role === 'admin') { links.push('<a href="#/yonetim">Yönetim</a>', '<a href="/sinema">🎬 Sinema</a>'); tabs.splice(tabs.length - 1, 0, ['/sinema', 'film', 'Sinema']); }
+      if (u.role === 'admin') { links.push('<a href="#/yonetim">Yönetim</a>', '<a href="/sinema">🎬 Sinema</a>', '<a href="/shorts">⚡ Shorts</a>'); tabs.splice(tabs.length - 1, 0, ['/sinema', 'film', 'Sinema']); }
       links.push(`<a href="#/profil" title="Profil">${esc(u.name)}</a>`, '<button type="button" id="logout" class="linkbtn">Çıkış</button>');
     }
     if (!isStandalone()) links.push(`<a href="#/uygulama" class="appl" title="Telefon uygulaması">📱 Uygulama</a>`);
@@ -808,7 +808,7 @@
   async function viewProfile() {
     setSub('Profil');
     const u = ME.user;
-    const qlinks = [u.role !== 'student' && isTeacher() ? ['#/paketim', 'Paketim'] : null, u.role === 'admin' ? ['#/yonetim', 'Yönetim'] : null, u.role === 'admin' ? ['/sinema', '🎬 Sinema'] : null, u.role === 'student' ? ['#/derslerim', 'Derslerim'] : ['#/projeler', 'Videolar'], ['#/', 'Eğitim vitrini'], isStandalone() ? null : ['#/uygulama', 'Telefon uygulaması']].filter(Boolean);
+    const qlinks = [u.role !== 'student' && isTeacher() ? ['#/paketim', 'Paketim'] : null, u.role === 'admin' ? ['#/yonetim', 'Yönetim'] : null, u.role === 'admin' ? ['/sinema', '🎬 Sinema'] : null, u.role === 'admin' ? ['/shorts', '⚡ Shorts Stüdyosu'] : null, u.role === 'student' ? ['#/derslerim', 'Derslerim'] : ['#/projeler', 'Videolar'], ['#/', 'Eğitim vitrini'], isStandalone() ? null : ['#/uygulama', 'Telefon uygulaması']].filter(Boolean);
     app.innerHTML = `<h1>Profil</h1>
       <div class="card qcard"><div class="qlinks">${qlinks.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}<button type="button" class="btn danger" id="lo2">Çıkış yap</button></div>
       <label for="thm">Görünüm</label><select id="thm"><option value="">Otomatik (telefonun ayarı)</option><option value="light">Açık</option><option value="dark">Koyu</option></select></div>

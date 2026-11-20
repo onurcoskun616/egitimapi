@@ -1,0 +1,142 @@
+{
+ "template": "siralama",
+ "title": "Türkiye'nin en yüksek 10 dağı",
+ "unit": "m",
+ "bg": "dag",
+ "scenes": [
+  {
+   "type": "intro",
+   "dur": 5,
+   "title_top": "TÜRKİYE'NİN",
+   "title_main": "EN YÜKSEK",
+   "title_big": "10 DAĞI",
+   "caption": "Türkiye'nin en yüksek 10 dağı. Sonuncusu 5 bin metreyi aşıyor!"
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 10,
+   "name": "Bolkar Dağları",
+   "sub": "Medetsiz Tepesi",
+   "place": "Niğde · Mersin",
+   "value": 3524,
+   "kind": "jag",
+   "palette": "day",
+   "caption": "Bolkar Dağları, buzul gölü Karagöl'e ev sahipliği yapıyor."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 9,
+   "name": "Tendürek Dağı",
+   "sub": null,
+   "place": "Ağrı · Van",
+   "value": 3533,
+   "kind": "vol",
+   "palette": "sunset",
+   "caption": "Tendürek, zirvesinden hâlâ gaz çıkan uyuyan bir volkan."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 8,
+   "name": "Esence Dağları",
+   "sub": "Keşiş Dağı",
+   "place": "Erzincan",
+   "value": 3549,
+   "kind": "jag",
+   "palette": "dusk",
+   "caption": "Esence Dağları, Erzincan Ovası'na tepeden bakıyor."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 7,
+   "name": "Aladağlar",
+   "sub": "Kızılkaya Tepesi",
+   "place": "Niğde · Kayseri · Adana",
+   "value": 3771,
+   "kind": "jag",
+   "palette": "dawn",
+   "caption": "Kızılkaya, Aladağlar'ın en yüksek zirvesi."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 6,
+   "name": "Küçük Ağrı Dağı",
+   "sub": null,
+   "place": "Iğdır",
+   "value": 3896,
+   "kind": "vol",
+   "palette": "day",
+   "caption": "Küçük Ağrı, dev kardeşinin hemen yanında yükseliyor."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 5,
+   "name": "Erciyes Dağı",
+   "sub": null,
+   "place": "Kayseri",
+   "value": 3917,
+   "kind": "vol",
+   "palette": "golden",
+   "caption": "Erciyes, İç Anadolu'nun çatısı ve dev bir kayak merkezi."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 4,
+   "name": "Kaçkar Dağı",
+   "sub": null,
+   "place": "Rize",
+   "value": 3937,
+   "kind": "jag",
+   "palette": "dusk",
+   "caption": "Kaçkar, Karadeniz Bölgesi'nin en yüksek zirvesi."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 3,
+   "name": "Süphan Dağı",
+   "sub": null,
+   "place": "Bitlis",
+   "value": 4058,
+   "kind": "vol",
+   "palette": "sunset",
+   "caption": "Süphan, Van Gölü kıyısında yükselen dev bir volkan."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 2,
+   "name": "Cilo Dağı",
+   "sub": "Uludoruk Tepesi",
+   "place": "Hakkari",
+   "value": 4135,
+   "kind": "jag",
+   "palette": "dawn",
+   "caption": "Cilo, Türkiye'nin en büyük buzullarını saklıyor."
+  },
+  {
+   "type": "item",
+   "dur": 5,
+   "rank": 1,
+   "name": "Ağrı Dağı",
+   "sub": null,
+   "place": "Ağrı · Iğdır",
+   "value": 5137,
+   "kind": "vol",
+   "palette": "golden",
+   "caption": "Ağrı Dağı! Zirvesinde 10 kilometrekarelik bir buz takkesi var."
+  },
+  {
+   "type": "outro",
+   "dur": 5,
+   "title": "SIRALAMA",
+   "caption": "Sen hangisine tırmandın? Yorumlara yaz!"
+  }
+ ]
+}

@@ -1,0 +1,55 @@
+{
+ "template": "mekanizma",
+ "mechanism": "4zamanli",
+ "title": "Motor nasıl çalışır?",
+ "scenes": [
+  {
+   "key": "intro",
+   "dur": 5,
+   "title1": "MOTOR NASIL",
+   "title2": "ÇALIŞIR?",
+   "subtitle": "4 zamanlı benzinli motor",
+   "caption": "Arabanın motoru her saniye onlarca kez bu dört adımı tekrarlıyor."
+  },
+  {
+   "key": "parts",
+   "dur": 5,
+   "caption": "Önce parçaları tanıyalım: piston, biyel kolu, krank mili ve supaplar."
+  },
+  {
+   "key": "emme",
+   "dur": 8,
+   "caption": "Piston aşağı iner, emme supabı açılır ve yakıt-hava karışımı içeri dolar."
+  },
+  {
+   "key": "sik",
+   "dur": 8,
+   "caption": "Supaplar kapanır, piston yukarı çıkar ve karışımı sıkıştırır."
+  },
+  {
+   "key": "is",
+   "dur": 8,
+   "caption": "Buji kıvılcım çakar, yanan karışım pistonu güçle aşağı iter."
+  },
+  {
+   "key": "egz",
+   "dur": 8,
+   "caption": "Egzoz supabı açılır, piston yanmış gazları dışarı süpürür."
+  },
+  {
+   "key": "fast",
+   "dur": 8,
+   "caption": "Krank mili 2 tur döner, 1 iş zamanı oluşur. 3000 devirde bu, saniyede 25 kez olur!"
+  },
+  {
+   "key": "dizel",
+   "dur": 5,
+   "caption": "Dizelde buji yok: yakıt, sıkıştırılıp ısınan havaya püskürtülünce kendiliğinden tutuşur."
+  },
+  {
+   "key": "outro",
+   "dur": 5,
+   "caption": "Sırada hangi motor konusu olsun? Yorumlara yaz!"
+  }
+ ]
+}
