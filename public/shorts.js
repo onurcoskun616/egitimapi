@@ -40,10 +40,36 @@ async function listView() {
 }
 
 /* ---------- yeni ---------- */
-async function voiceOptions(sel) {
-  try { const vs = await fetch('/api/sinema/voices').then(r => r.ok ? r.json() : []); return `<option value="">Varsayılan anlatıcı sesi</option>` + vs.map(v => `<option value="${esc(v.voice_id || v.id)}" ${sel === (v.voice_id || v.id) ? 'selected' : ''}>${esc(v.name)}</option>`).join(''); }
-  catch { return '<option value="">Varsayılan anlatıcı sesi</option>'; }
+const LTR = { female: 'kadın', male: 'erkek', neutral: 'nötr', young: 'genç', middle_aged: 'orta yaş', middle: 'orta yaş', old: 'yaşlı', turkish: 'Türkçe' };
+let VOICES = null;
+async function loadVoices() {
+  if (!VOICES) VOICES = await fetch('/api/sinema/voices').then(r => r.ok ? r.json() : []).catch(() => []);
+  return VOICES;
 }
+// Ses seçici: kullanıcının kendi oluşturduğu sesler üstte; her sesin örneği dinlenebilir
+async function voicePicker(sel) {
+  const vs = await loadVoices();
+  if (!vs.length) return '<div class="err">ElevenLabs ses listesi alınamadı. Sinema → Ayarlar\'dan anahtarı kontrol edin.</div>';
+  const own = vs.filter(v => ['cloned', 'generated', 'professional'].includes(v.category));
+  const lib = vs.filter(v => !own.includes(v));
+  const card = v => `<label class="vc ${sel === v.id ? 'on' : ''}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid ${sel === v.id ? 'var(--gold)' : 'var(--line)'};border-radius:10px;cursor:pointer;margin:4px 0">
+      <input type="radio" name="vpick" value="${esc(v.id)}" ${sel === v.id ? 'checked' : ''} style="width:auto">
+      <span style="flex:1"><b>${esc(v.name)}</b> <span class="small dim">${esc([v.labels.gender, v.labels.age, v.labels.accent].filter(Boolean).map(x => LTR[x] || x).join(' · '))}</span></span>
+      ${v.preview ? `<button type="button" class="small" data-play="${esc(v.preview)}">▶ Dinle</button>` : ''}</label>`;
+  return `<div id="vlist" style="max-height:340px;overflow:auto;padding-right:4px">
+    ${own.length ? `<div class="small" style="margin:6px 0 2px;color:var(--gold)">Sizin oluşturduğunuz sesler</div>${own.map(card).join('')}` : '<div class="small dim">ElevenLabs\'te sizin oluşturduğunuz ses bulunamadı.</div>'}
+    ${lib.length ? `<details ${own.length ? '' : 'open'} style="margin-top:8px"><summary class="small dim">Diğer sesler (${lib.length})</summary>${lib.map(card).join('')}</details>` : ''}</div>
+    <div class="small dim" style="margin-top:6px">Yeni oluşturduğunuz ses görünmüyorsa sayfayı yenileyin.</div>`;
+}
+let AUDIO = null;
+function bindPicker(root, onPick) {
+  root.querySelectorAll('[data-play]').forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); if (AUDIO) AUDIO.pause(); AUDIO = new Audio(b.dataset.play); AUDIO.play(); });
+  root.querySelectorAll('input[name=vpick]').forEach(r => r.onchange = () => {
+    root.querySelectorAll('.vc').forEach(l => { const on = l.querySelector('input').checked; l.classList.toggle('on', on); l.style.borderColor = on ? 'var(--gold)' : 'var(--line)'; });
+    onPick && onPick(r.value);
+  });
+}
+const pickedVoice = root => { const r = root.querySelector('input[name=vpick]:checked'); return r ? r.value : ''; };
 async function newView() {
   app.innerHTML = `<h1>Yeni Shorts</h1><div class="card">
     <label>Konu</label><textarea id="topic" rows="3" placeholder="Örn: Türkiye'nin en uzun 10 köprüsü · Motor nasıl çalışır? · Güneş sistemi gezegenlerinin boyutları"></textarea>
@@ -52,14 +78,16 @@ async function newView() {
     <div class="small dim" style="margin-top:6px">${Object.entries(META.templates).map(([k, v]) => `<div>• <b>${esc(TPL_TR[k])}</b>: ${esc(v.split('—')[1] || v)}</div>`).join('')}</div>
     <label style="margin-top:12px">Ek istekler (isteğe bağlı)</label><textarea id="notes" rows="2" placeholder="Örn: öğrencilere yönelik sade anlatım; son sahnede soru sor"></textarea>
     <label class="switch"><input type="checkbox" id="voice"> ElevenLabs seslendirmesi ekle (kapalıyken yalnızca müzik, efekt ve altyazı)</label>
-    <div id="voiceBox" hidden><label>Ses</label><select id="voiceId">${await voiceOptions('')}</select></div>
+    <div id="voiceBox" hidden><label>Bu videoda kullanılacak ses</label>${await voicePicker('')}</div>
     <label>Müzik seviyesi</label><input type="range" id="music" min="0.2" max="1.5" step="0.1" value="1">
     <div style="margin-top:14px"><button class="gold" id="go">Planı hazırla →</button></div></div>`;
   let tpl = 'otomatik';
   $('#tpl').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; $('#tpl').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === c)); tpl = c.dataset.v; };
   $('#voice').onchange = () => $('#voiceBox').hidden = !$('#voice').checked;
+  bindPicker(app);
   $('#go').onclick = async () => {
-    try { const r = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, template: tpl, notes: $('#notes').value, voice: $('#voice').checked, voice_id: $('#voiceId').value, music_level: +$('#music').value } }); location.hash = '#/p/' + r.id; }
+    if ($('#voice').checked && !pickedVoice(app)) return toast('Seslendirme için listeden bir ses seçin', true);
+    try { const r = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, template: tpl, notes: $('#notes').value, voice: $('#voice').checked, voice_id: pickedVoice(app), music_level: +$('#music').value } }); location.hash = '#/p/' + r.id; }
     catch (e) { toast(e.message, true); }
   };
 }
@@ -127,7 +155,7 @@ async function projectView(id) {
   }
   if (p.stage === 'approve' || p.stage === 'review') {
     body += `<div class="card" style="margin-bottom:12px"><label class="switch"><input type="checkbox" id="voice" ${p.opts.voice ? 'checked' : ''}> ElevenLabs seslendirmesi</label>
-      <div id="voiceBox" ${p.opts.voice ? '' : 'hidden'}><label>Ses</label><select id="voiceId">${await voiceOptions(p.opts.voice_id)}</select><div class="small dim">Seslendirme önce üretilir, sahne süreleri sese göre uzar; altyazı kelime zamanlarına oturur, müzik konuşma altında kısılır.</div></div>
+      <div id="voiceBox" ${p.opts.voice ? '' : 'hidden'}><label>Bu videoda kullanılacak ses</label>${await voicePicker(p.opts.voice_id)}<div class="small dim" style="margin-top:6px">Seslendirme önce üretilir, sahne süreleri sese göre uzar; altyazı kelime zamanlarına oturur, müzik konuşma altında kısılır.</div></div>
       <label>Müzik seviyesi</label><input type="range" id="music" min="0.2" max="1.5" step="0.1" value="${p.opts.music_level || 1}"></div>`;
   }
   if (p.final) {
@@ -146,9 +174,9 @@ async function projectView(id) {
     app.querySelectorAll('[data-obj]').forEach(el => { const o = pl.objects[+el.dataset.obj]; el.querySelectorAll('[data-o]').forEach(inp => { const k = inp.dataset.o; o[k] = k === 'size' ? +inp.value : (inp.value || null); }); });
     return pl;
   };
-  const saveOpts = async () => { if ($('#voice')) await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'opts', voice: $('#voice').checked, voice_id: $('#voiceId') ? $('#voiceId').value : '', music_level: +$('#music').value } }); };
+  const saveOpts = async () => { if ($('#voice')) await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'opts', voice: $('#voice').checked, voice_id: pickedVoice(app), music_level: +$('#music').value } }); };
   if ($('#voice')) $('#voice').onchange = () => { $('#voiceBox').hidden = !$('#voice').checked; saveOpts(); };
-  if ($('#voiceId')) $('#voiceId').onchange = saveOpts;
+  bindPicker(app, () => { saveOpts(); toast('Ses seçildi'); });
   if ($('#music')) $('#music').onchange = saveOpts;
   if ($('#retry')) $('#retry').onclick = () => act(id, { action: 'retry' });
   if ($('#save')) $('#save').onclick = () => act(id, { action: 'save', plan: collect() }, 'Kaydedildi');
@@ -156,6 +184,7 @@ async function projectView(id) {
   if ($('#replan')) $('#replan').onclick = () => act(id, { action: 'replan', feedback: $('#fb').value }, 'Claude planı yeniden yazıyor');
   if ($('#next')) $('#next').onclick = async () => {
     if (p.stage === 'review') { await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'save', plan: collect() } }).catch(e => toast(e.message, true)); return act(id, { action: 'preview' }, 'Önizleme kareleri çiziliyor'); }
+    if ($('#voice') && $('#voice').checked && !pickedVoice(app)) return toast('Seslendirme için listeden bir ses seçin', true);
     await saveOpts(); act(id, { action: 'approve' }, 'Video üretimi başladı');
   };
   if ($('#repv')) $('#repv').onclick = async () => { await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'save', plan: collect() } }).catch(e => toast(e.message, true)); act(id, { action: 'preview' }, 'Önizleme yenileniyor'); };
