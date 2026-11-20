@@ -8,6 +8,14 @@ import common
 from common import W, H, FPS, write_srt, check_fonts
 from sound import Mixer
 
+def _ffmpeg():
+    # Sistemde ffmpeg yoksa pip'le gelen hazır (libx264 içeren) ffmpeg kullanılır
+    p = shutil.which('ffmpeg')
+    if p: return p
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
+FFMPEG = _ffmpeg()
+
 def build(plan):
     t = plan.get('template')
     if t == 'siralama': from t_ranking import Ranking; return Ranking(plan)
@@ -19,7 +27,7 @@ TPL = None; OUTDIR = None
 CHUNK = 150   # 5 sn'lik parçalar
 
 def ff(args, what):
-    r = subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y'] + args, capture_output=True, text=True)
+    r = subprocess.run([FFMPEG, '-hide_banner', '-loglevel', 'error', '-y'] + args, capture_output=True, text=True)
     if r.returncode != 0: raise RuntimeError(f'{what}: {r.stderr[-800:]}')
 
 def render_chunk(n):
@@ -27,7 +35,7 @@ def render_chunk(n):
     total_f = int(math.ceil(TPL.tl.total * FPS))
     f0, f1 = n * CHUNK, min(total_f, (n + 1) * CHUNK)
     tmp = os.path.join(OUTDIR, f'c{n:03d}.tmp.mp4'); out = os.path.join(OUTDIR, f'c{n:03d}.mp4')
-    p = subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
+    p = subprocess.Popen([FFMPEG, '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
                           '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', str(FPS), tmp], stdin=subprocess.PIPE)
     for f in range(f0, f1):
         p.stdin.write(TPL.draw(f / FPS).convert('RGB').tobytes())

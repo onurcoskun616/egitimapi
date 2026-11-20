@@ -26,11 +26,9 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: render/shorts/requirements.txt
-      - name: ffmpeg ve Python kütüphaneleri
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg > /dev/null
-          pip install -q -r render/shorts/requirements.txt
+      - name: Python kütüphaneleri ve ffmpeg (pip ile; apt aynası takılırsa beklemeyelim)
+        timeout-minutes: 6
+        run: pip install -q -r render/shorts/requirements.txt
       - name: Ön hesap önbelleği (gezegen dokuları)
         uses: actions/cache@v4
         with:
