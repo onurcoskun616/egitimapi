@@ -2,7 +2,8 @@
 import math
 import numpy as np
 from PIL import Image, ImageDraw
-from common import (W, H, ACCENT, F, BOLD, MED, text_img, fit_font, put, pill, Caption, ease_out, ease_back,
+import re
+from common import (W, H, ACCENT, F, BOLD, MED, text_img, fit_font, put, wrap_lines, pill, Caption, ease_out, ease_back,
                     fmt, flash, fade_black, follow_button, top_shade, lerp, Timeline, CAP_Y)
 
 PAL = {
@@ -191,8 +192,12 @@ class Ranking:
             obj = AbstractScenery(rel, s.get('rank') if typ == 'item' else None, pal, 500 + j * 31, dark=(typ != 'item'))
         self.cache[j] = obj; return obj
 
+    @staticmethod
+    def has_unit(s):   # "~7 ay", "1,2 milyar" gibi gösterimler kendi birimini taşır
+        return bool(s.get('value_text') and re.search(r'[A-Za-zÇĞİÖŞÜçğıöşü]', s['value_text']))
+
     def value_text(self, s, k=1.0):
-        if s.get('value_text') and k >= 1: return s['value_text']
+        if s.get('value_text') and (k >= 1 or self.has_unit(s)): return s['value_text']
         v = float(s.get('value') or 0); val = v * k
         return fmt(round(val, 1) if not float(v).is_integer() else int(round(val)))
 
@@ -236,7 +241,7 @@ class Ranking:
             k = ease_out((u - 0.55) / 1.45)
             if u > 0.5:
                 ci = text_img(self.value_text(s, k), fit_font(self.value_text(s), BOLD, 140, 760), ACCENT + (255,), stroke=6)
-                mimg = text_img(self.unit, F(BOLD, 70), ACCENT + (255,)) if self.unit else None
+                mimg = text_img(self.unit, F(BOLD, 70), ACCENT + (255,)) if self.unit and not self.has_unit(s) else None
                 total = ci.width + (mimg.width - 20 if mimg else 0)
                 sc2 = 1.0 + 0.12 * max(0, 1 - abs(u - 2.05) / 0.18) if u > 1.9 else 1.0
                 al = min(1, (u - 0.5) / 0.2)
@@ -252,7 +257,9 @@ class Ranking:
                 blk.alpha_composite(pin, (22, 12)); blk.alpha_composite(ptxt, (62, int(38 - ptxt.height / 2)))
                 put(c, blk, W / 2, ylay['place'], alpha=a3, dy=20 * (1 - a3), label=place)
         if s.get('note'):
-            put(c, text_img(s['note'], fit_font(s['note'], MED, 30, 900), (220, 228, 250, 255), stroke=2), W / 2, 1330, alpha=ease_out((u - 1.2) / 0.4))
+            fnt = F(MED, 30); a4 = ease_out((u - 1.2) / 0.4)
+            for li, line in enumerate(wrap_lines(s['note'], fnt, 880)):
+                put(c, text_img(line, fnt, (220, 228, 250, 255), stroke=2), W / 2, 1310 + li * 40, alpha=a4)
 
     def draw_outro(self, c, u, s, dur):
         c.alpha_composite(Image.new('RGBA', (W, H), (6, 8, 18, 175)))
@@ -270,7 +277,8 @@ class Ranking:
                 nm += '…'
             ni = text_img(nm, fn, (255, 255, 255, 255), stroke=0)
             put(c, ni, 70 + ni.width / 2, y, alpha=a)
-            vi = text_img((it.get('value_text') or fmt(float(it.get('value') or 0))) + (' ' + self.unit if self.unit and not it.get('value_text') else ''), fv, (230, 236, 255, 255), stroke=0)
+            vt = it.get('value_text') or fmt(float(it.get('value') or 0))
+            vi = text_img(vt + (' ' + self.unit if self.unit and not self.has_unit(it) else ''), fv, (230, 236, 255, 255), stroke=0)
             bmax = max(80, min(300, W - 110 - 540 - vi.width - 10))
             bl = int(bmax * (abs(float(it.get('value') or 0)) / self.vmax) * ease_out(tt / 0.6))
             c.alpha_composite(pill(max(bl, 2), 30, (ACCENT + (255,)) if jj == 0 else (255, 255, 255, 200), r=15), (540, int(y - 13)))

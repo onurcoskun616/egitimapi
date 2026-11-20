@@ -79,6 +79,19 @@ def fit_font(txt, name, size, maxw, minsize=34):
     if F(name, s).getlength(txt) > maxw: warn(f'Metin sığmıyor: “{txt[:40]}”')
     return F(name, s)
 
+def wrap_lines(txt, font, maxw, maxlines=2):
+    """Metni en fazla maxlines satıra böler; sığmayan son satır … ile kısaltılır."""
+    words = (txt or '').split(); lines = [[]]
+    for w in words:
+        if lines[-1] and font.getlength(' '.join(lines[-1] + [w])) > maxw: lines.append([w])
+        else: lines[-1].append(w)
+    out = [' '.join(l) for l in lines if l]
+    if len(out) > maxlines:
+        last = ' '.join(out[maxlines - 1:])
+        while last and font.getlength(last + '…') > maxw: last = last[:-1]
+        out = out[:maxlines - 1] + [last.rstrip() + '…']; warn(f'Dipnot kısaltıldı: “{txt[:40]}…”')
+    return out
+
 def put(canvas, im, cx, cy, alpha=1.0, scale=1.0, dy=0, label=None):
     if alpha <= 0.01 or scale <= 0.01: return
     if abs(scale - 1) > 1e-3:

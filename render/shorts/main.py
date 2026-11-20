@@ -91,9 +91,22 @@ def render(plan, outdir, voices=None, music_level=1.0, progress=None, sfx=None, 
         fl.append(f"[mu0]{''.join(labs)}amix=inputs={len(labs) + 1}:normalize=0:dropout_transition=0[mu1]"); bed = '[mu1]'
     if voices:
         labs = []
-        for k, (vf, at) in enumerate(voices):
-            ins += ['-i', vf]; ms = int(max(0, at) * 1000)
-            fl.append(f'[{n}:a]aresample=44100,aformat=channel_layouts=stereo,adelay={ms}|{ms}[v{k}]'); labs.append(f'[v{k}]'); n += 1
+        idx = {}
+        for v in voices:
+            if v[0] not in idx: ins += ['-i', v[0]]; idx[v[0]] = n; n += 1
+        uses = {}
+        for k, v in enumerate(voices): uses.setdefault(v[0], []).append(k)
+        srcs = {}
+        for vf, ks in uses.items():   # aynı dosya birden çok sahnede kullanılıyorsa girişi çoğalt
+            if len(ks) == 1: srcs[ks[0]] = f'[{idx[vf]}:a]'
+            else:
+                fl.append(f'[{idx[vf]}:a]asplit={len(ks)}' + ''.join(f'[vs{k}]' for k in ks))
+                for k in ks: srcs[k] = f'[vs{k}]'
+        for k, v in enumerate(voices):
+            at = v[1]; a, b = (v[2], v[3]) if len(v) > 3 and v[3] else (None, None)
+            ms = int(max(0, at) * 1000)
+            cut = f'atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS,afade=t=in:d=0.04,afade=t=out:st={max(0, b - a - 0.06):.3f}:d=0.06,' if a is not None else ''
+            fl.append(f'{srcs[k]}aresample=44100,aformat=channel_layouts=stereo,{cut}adelay={ms}|{ms}[v{k}]'); labs.append(f'[v{k}]')
         fl.append(f"{''.join(labs)}amix=inputs={len(labs)}:normalize=0:dropout_transition=0,apad=whole_dur={total:.2f}[vo]")
         fl.append('[vo]asplit=2[vo1][vo2]')
         # seslendirme konuşurken müzik, efekt ve ortam sesleri otomatik kısılır (ducking)
@@ -141,9 +154,11 @@ def task_main():
             up = [upload(p, t, 'image/jpeg') for p, t in zip(paths, m['uploads']['previews'])]
             post('/result', {'results': [{'previews': up, 'warnings': warns, 'total': total, 'font': check_fonts()}]})
         else:
-            voices = []
+            voices = []; got = {}
             for k, v in enumerate(m.get('voices') or []):
-                fp = os.path.join(work, f'ses{k}.mp3'); _, b = http(v['url']); open(fp, 'wb').write(b); voices.append((fp, float(v['at'])))
+                if v['url'] not in got:
+                    fp = os.path.join(work, f'ses{len(got)}.mp3'); _, b = http(v['url']); open(fp, 'wb').write(b); got[v['url']] = fp
+                voices.append((got[v['url']], float(v['at']), v.get('from'), v.get('to')))
             sfx = []
             for k, v in enumerate(m.get('sfx') or []):
                 fp = os.path.join(work, f'efekt{k}.mp3'); _, b = http(v['url']); open(fp, 'wb').write(b); sfx.append((fp, float(v['at']), float(v.get('dur', 5))))

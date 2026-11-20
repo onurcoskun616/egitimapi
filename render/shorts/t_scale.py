@@ -202,7 +202,9 @@ class Scale:
                 a3 = ease_back((u - 0.75) / 0.45); im = text_img(o['compare'], fit_font(o['compare'], BOLD, 46, 860), (20, 22, 30, 255), stroke=0)
                 al = min(1, max(0, (u - 0.75) / 0.1))
                 put(c, pill(im.width + 50, 80, ACCENT + (255,), r=26), W / 2, 450, alpha=al, scale=a3); put(c, im, W / 2, 452, alpha=al, scale=a3)
-            if o.get('note'): put(c, text_img(o['note'], fit_font(o['note'], MED, 30, 900), (190, 200, 225, 255), stroke=2), W / 2, 1420, alpha=ease_out((u - 1.2) / 0.4))
+            if o.get('note'):
+                from common import wrap_lines
+                for li, line in enumerate(wrap_lines(o['note'], F(MED, 30), 880)): put(c, text_img(line, F(MED, 30), (190, 200, 225, 255), stroke=2), W / 2, 1400 + li * 40, alpha=ease_out((u - 1.2) / 0.4))
         else:
             o1, o2 = sc.get('title1', ''), sc.get('title2', '')
             a = ease_out((u - 0.2) / 0.5)
