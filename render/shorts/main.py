@@ -77,7 +77,9 @@ def render(plan, outdir, voices=None, music_level=1.0, progress=None, sfx=None, 
     vid = os.path.join(outdir, 'goruntu.mp4')
     ff(['-f', 'concat', '-safe', '0', '-i', lst, '-c', 'copy', vid], 'Birleştirme')
     # ---- ses: kodla sentezlenen müzik + efektler ----
-    mx = Mixer(total + 0.05); TPL.sound(mx)
+    mx = Mixer(total + 0.05); mx.voice_mode = bool(voices); TPL.sound(mx)
+    if voices:   # anlatım aralıkları: konuşma başlangıcı → bitişi
+        mx.under_voice([(v[1], v[1] + ((v[3] - v[2]) if len(v) > 3 and v[3] else 3.0)) for v in voices])
     music = os.path.join(outdir, 'muzik.wav'); mx.write(music)
     if progress: progress(nchunks + 1, nchunks + 2)
     final = os.path.join(outdir, 'video.mp4')
@@ -86,7 +88,7 @@ def render(plan, outdir, voices=None, music_level=1.0, progress=None, sfx=None, 
         labs = []
         for k, (sf, at, d) in enumerate(sfx):
             ins += ['-i', sf]; ms = int(max(0, at) * 1000); d = max(0.8, float(d))
-            fl.append(f'[{n}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:{d:.2f},asetpts=PTS-STARTPTS,afade=t=in:d=0.3,afade=t=out:st={max(0, d - 0.6):.2f}:d=0.6,volume={sfx_level:.2f},adelay={ms}|{ms}[s{k}]')
+            fl.append(f'[{n}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:{d:.2f},asetpts=PTS-STARTPTS,afade=t=in:d=0.3,afade=t=out:st={max(0, d - 0.6):.2f}:d=0.6,volume={sfx_level * (0.45 if voices else 1):.2f},adelay={ms}|{ms}[s{k}]')
             labs.append(f'[s{k}]'); n += 1
         fl.append(f"[mu0]{''.join(labs)}amix=inputs={len(labs) + 1}:normalize=0:dropout_transition=0[mu1]"); bed = '[mu1]'
     if voices:
@@ -105,13 +107,12 @@ def render(plan, outdir, voices=None, music_level=1.0, progress=None, sfx=None, 
         for k, v in enumerate(voices):
             at = v[1]; a, b = (v[2], v[3]) if len(v) > 3 and v[3] else (None, None)
             ms = int(max(0, at) * 1000)
-            cut = f'atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS,afade=t=in:d=0.04,afade=t=out:st={max(0, b - a - 0.06):.3f}:d=0.06,' if a is not None else ''
+            # yalnızca baştaki sessizlik atlanır; cümle sonu KESİLMEZ (son hecenin doğal sönümü korunur)
+            cut = f'atrim=start={max(0, a - 0.03):.3f},asetpts=PTS-STARTPTS,afade=t=in:d=0.03,' if a is not None else ''
             fl.append(f'{srcs[k]}aresample=44100,aformat=channel_layouts=stereo,{cut}adelay={ms}|{ms}[v{k}]'); labs.append(f'[v{k}]')
         fl.append(f"{''.join(labs)}amix=inputs={len(labs)}:normalize=0:dropout_transition=0,apad=whole_dur={total:.2f}[vo]")
-        fl.append('[vo]asplit=2[vo1][vo2]')
-        # seslendirme konuşurken müzik, efekt ve ortam sesleri otomatik kısılır (ducking)
-        fl.append(f'{bed}[vo1]sidechaincompress=threshold=0.03:ratio=8:attack=30:release=500[duck]')
-        fl.append('[duck][vo2]amix=inputs=2:normalize=0,alimiter=limit=0.95[a]')
+        # müzik zaten anlatım boyunca yumuşakça kısıldı (Mixer.under_voice); burada pompalayan kompresör yok
+        fl.append(f'{bed}volume=0.85[bd];[bd][vo]amix=inputs=2:normalize=0,alimiter=limit=0.97:attack=10:release=200[a]')
     else:
         fl.append(f'{bed}alimiter=limit=0.95[a]')
     ff(ins + ['-filter_complex', ';'.join(fl), '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', f'{total:.2f}', '-movflags', '+faststart', final], 'Ses karışımı')

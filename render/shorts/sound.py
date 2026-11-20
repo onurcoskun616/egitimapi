@@ -15,6 +15,7 @@ class Mixer:
         self.L = np.zeros(self.N); self.R = np.zeros(self.N)
         self.rng = np.random.default_rng(seed)
         self.duck = np.ones(self.N)
+        self.voice_mode = False   # seslendirme varken davul vuruşu müziği pompalamaz (kelime kelime dalgalanma olmasın)
 
     def add(self, sig, t0, gain=1.0, pan=0.0):
         i = int(max(0, t0) * SR)
@@ -57,9 +58,9 @@ class Mixer:
         K, Hh = self.kick(), self.hat(); step = 60 / bpm
         for b in np.arange(t0, t1, step):
             if skip and skip[0] <= b < skip[1]: continue
-            self.add(K, b, 0.55)
+            self.add(K, b, 0.3 if self.voice_mode else 0.55)
             i = int(b * SR); n = int(0.25 * SR)
-            if i < self.N: self.duck[i:i + n] = np.minimum(self.duck[i:i + n], 0.55 + 0.45 * np.linspace(0, 1, len(self.duck[i:i + n])))
+            if i < self.N and not self.voice_mode: self.duck[i:i + n] = np.minimum(self.duck[i:i + n], 0.55 + 0.45 * np.linspace(0, 1, len(self.duck[i:i + n])))
             if hats_from is None or b >= hats_from: self.add(Hh, b + step / 2, 0.12, 0.3)
 
     def arp(self, t0, t1, chords, chord_len=4.0, step=0.25, gain=0.05):
@@ -107,6 +108,20 @@ class Mixer:
         n = np.arange(self.N) / SR
         self.L += self.filt(self.noise(self.N), 'low', 500) * (0.6 + 0.4 * np.sin(2 * np.pi * n / 7)) * gain
         self.R += self.filt(self.noise(self.N), 'low', 500) * (0.6 + 0.4 * np.cos(2 * np.pi * n / 9)) * gain
+
+    def under_voice(self, spans, low=0.32, ramp=0.45):
+        """Anlatım süren aralıklarda müzik+efekt yatağını YUMUŞAK ve SABİT kısar (kelime aralarında yükselip
+        alçalmaz). spans: [(başlangıç, bitiş)] saniye; yakın aralıklar birleştirilir."""
+        if not spans: return
+        spans = sorted(spans); merged = [list(spans[0])]
+        for a, b in spans[1:]:
+            if a - merged[-1][1] < 1.2: merged[-1][1] = max(merged[-1][1], b)
+            else: merged.append([a, b])
+        g = np.ones(self.N); t = np.arange(self.N) / SR
+        for a, b in merged:
+            up = np.clip((t - (a - ramp)) / ramp, 0, 1); down = np.clip(((b + ramp) - t) / ramp, 0, 1)
+            g = np.minimum(g, 1 - (1 - low) * np.minimum(up, down))
+        self.L *= g; self.R *= g
 
     def write(self, path, drive=1.6):
         L = self.L * self.duck ** 0.5; R = self.R * self.duck ** 0.5
