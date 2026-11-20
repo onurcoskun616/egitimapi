@@ -14,7 +14,7 @@ async function api(path, opts = {}) {
 function toast(msg, bad) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false; clearTimeout(t._t); t._t = setTimeout(() => t.hidden = true, bad ? 6000 : 2800); }
 window.addEventListener('hashchange', render);
 
-const TPL_TR = { otomatik: 'Otomatik (Claude seçsin)', siralama: 'Sıralama / geri sayım', mekanizma: 'Mekanizma / kesit', karsilastirma: 'Boyut karşılaştırma' };
+const TPL_TR = { otomatik: 'Otomatik (Claude seçsin)', siralama: 'Sıralama / geri sayım', mekanizma: 'Mekanizma / kesit', karsilastirma: 'Boyut karşılaştırma', tanitim: 'Tanıtım (ajan / terminal tarzı)' };
 const STEPS = [['plan', 'Sahne planı'], ['review', 'Plan onayı'], ['preview', 'Önizleme'], ['approve', 'Önizleme onayı'], ['voice', 'Ses ve efekt'], ['render', 'Render'], ['done', 'Tamamlandı']];
 
 async function render() {
@@ -110,6 +110,21 @@ function sceneFields(t, s) {
     if (s.type === 'intro') f.push(field('Üst satır', 'title_top', s.title_top), field('Orta satır', 'title_main', s.title_main), field('Büyük satır', 'title_big', s.title_big), field('Simge (emoji)', 'icon', s.icon));
     if (s.type === 'item') f.push(field('Sıra', 'rank', s.rank, 'number'), field('Ad', 'name', s.name), field('Alt ad', 'sub', s.sub), field('Konum', 'place', s.place), field('Değer (sayı)', 'value', s.value, 'number', 'step="any"'), field('Gösterilecek değer (isteğe bağlı)', 'value_text', s.value_text), field('Simge (emoji)', 'icon', s.icon), field('Gök cismi (küre)', 'body', s.body), field('Dipnot', 'note', s.note));
     if (s.type === 'outro') f.push(field('Başlık', 'title', s.title));
+  } else if (t === 'tanitim') {
+    if (s.type === 'roster') {
+      f.push(field('Başlık', 'title', s.title), field('Izgara başlığı (sonda tüm kartlar)', 'grid_title', s.grid_title));
+      f.push(`<div style="grid-column:1/-1"><label>Kartlar <span class="dim">(fotoğrafı yalnızca izinli kişilerin; öğrenci fotoğrafları için veli onayı gerekir)</span></label>${(s.cards || []).map((c, j) => `
+        <div data-card="${j}" style="display:grid;grid-template-columns:64px 1fr 1fr auto auto;gap:6px;align-items:center;margin-top:6px">
+          <div style="width:64px;height:64px;border-radius:8px;background:#0a1a0e center/cover;border:1px solid var(--line);${c.photo_url ? `background-image:url('${esc(c.photo_url)}')` : ''}"></div>
+          <input data-c="name" placeholder="Ad (ör. Ajan 9.8)" value="${esc(c.name || '')}"><input data-c="role" placeholder="Branş / rol" value="${esc(c.role || '')}">
+          <label class="btn small" style="margin:0">Fotoğraf<input type="file" accept="image/*" data-photo="${j}" hidden></label>
+          <button class="small" data-delcard="${j}" title="Kartı sil">✕</button></div>`).join('')}
+        <button class="small" data-addcard style="margin-top:8px">+ Kart ekle</button></div>`);
+    }
+    if (s.type === 'finale') f.push(field('Başlık', 'title', s.title), field('Gün', 'date', s.date), field('Saat', 'time', s.time), field('Düğme', 'button', s.button));
+    if (s.type === 'powerup') f.push(field('Başlık', 'title', s.title));
+    if (s.type === 'years') f.push(field('Etiket', 'tag', s.tag), field('Büyük cümle', 'statement', s.statement));
+    if (s.type === 'terminal') f.push(field('Ses kanalı etiketi', 'channel', s.channel));
   } else if (t === 'mekanizma') {
     if (s.key === 'intro') f.push(field('Başlık 1', 'title1', s.title1), field('Başlık 2', 'title2', s.title2), field('Alt başlık', 'subtitle', s.subtitle));
   } else {
@@ -121,6 +136,7 @@ function sceneFields(t, s) {
 }
 function sceneLabel(t, s) {
   if (t === 'siralama') return s.type === 'intro' ? 'Giriş' : s.type === 'outro' ? 'Kapanış' : `#${s.rank} ${esc(s.name)}`;
+  if (t === 'tanitim') return { years: 'Zaman çizelgesi', terminal: 'Terminal pencereleri', roster: 'Ekip seçimi (kartlar)', powerup: 'Güç çubukları', statement: 'Büyük cümle (*vurgu* için yıldız)', finale: 'Kapanış / duyuru' }[s.type] || s.type;
   if (t === 'mekanizma') return { intro: 'Giriş', parts: 'Parçalar', emme: '1. zaman: Emme', sik: '2. zaman: Sıkıştırma', is: '3. zaman: İş', egz: '4. zaman: Egzoz', fast: 'Tam çevrim (hızlanan)', dizel: 'Bonus: Dizel', outro: 'Kapanış' }[s.key] || s.key;
   return s.type === 'group' ? 'Giriş (yan yana)' : s.type === 'outro' ? 'Kapanış' : 'Odak: ' + esc((planCache.objects[s.obj] || {}).name || '');
 }
@@ -174,6 +190,8 @@ async function projectView(id) {
   const collect = () => {
     const pl = JSON.parse(JSON.stringify(p.plan));
     app.querySelectorAll('.scn').forEach(el => { const s = pl.scenes[+el.dataset.i]; el.querySelectorAll('[data-k]').forEach(inp => { const k = inp.dataset.k; let v = inp.value; if (inp.type === 'number') v = v === '' ? null : +v; else if (v === '' && k !== 'caption') v = null; s[k] = v; }); });
+    app.querySelectorAll('[data-card]').forEach(el => { const s = pl.scenes[+el.closest('.scn').dataset.i]; const c = s.cards[+el.dataset.card]; el.querySelectorAll('[data-c]').forEach(inp => { c[inp.dataset.c] = inp.value; }); delete c.photo_url; });
+    pl.scenes.forEach(s => (s.cards || []).forEach(c => delete c.photo_url));
     app.querySelectorAll('[data-obj]').forEach(el => { const o = pl.objects[+el.dataset.obj]; el.querySelectorAll('[data-o]').forEach(inp => { const k = inp.dataset.o; o[k] = k === 'size' ? +inp.value : (inp.value || null); }); });
     return pl;
   };
@@ -182,6 +200,19 @@ async function projectView(id) {
   if ($('#aisfx')) $('#aisfx').onchange = saveOpts;
   bindPicker(app, () => { saveOpts(); toast('Ses seçildi'); });
   if ($('#music')) $('#music').onchange = saveOpts;
+  const cardEdit = async fn => { const pl = collect(); fn(pl); await act(id, { action: 'save', plan: pl }); };
+  app.querySelectorAll('[data-addcard]').forEach(b => b.onclick = () => { const i = +b.closest('.scn').dataset.i; cardEdit(pl => { pl.scenes[i].cards = pl.scenes[i].cards || []; if (pl.scenes[i].cards.length >= 8) return toast('En fazla 8 kart', true); pl.scenes[i].cards.push({ name: 'Ajan', role: '', stats: { Bilgi: 90, 'Hız': 90, Enerji: 100 }, photo: null }); }); });
+  app.querySelectorAll('[data-delcard]').forEach(b => b.onclick = () => { const i = +b.closest('.scn').dataset.i; cardEdit(pl => pl.scenes[i].cards.splice(+b.dataset.delcard, 1)); });
+  app.querySelectorAll('[data-photo]').forEach(inp => inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return; if (f.size > 15e6) return toast('Fotoğraf 15 MB’tan küçük olmalı', true);
+    const i = +inp.closest('.scn').dataset.i, j = +inp.dataset.photo;
+    try {
+      toast('Fotoğraf yükleniyor…');
+      const r = await fetch('/api/sinema/upload', { method: 'POST', headers: { 'content-type': f.type || 'image/jpeg' }, body: f, credentials: 'same-origin' });
+      const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Yüklenemedi');
+      await cardEdit(pl => { pl.scenes[i].cards[j].photo = d.path; });
+    } catch (e) { toast(e.message, true); }
+  });
   if ($('#retry')) $('#retry').onclick = () => act(id, { action: 'retry' });
   if ($('#save')) $('#save').onclick = () => act(id, { action: 'save', plan: collect() }, 'Kaydedildi');
   if ($('#savejson')) $('#savejson').onclick = () => { let pl; try { pl = JSON.parse($('#json').value); } catch (e) { return toast('JSON hatalı: ' + e.message, true); } act(id, { action: 'save', plan: pl }, 'Kaydedildi'); };

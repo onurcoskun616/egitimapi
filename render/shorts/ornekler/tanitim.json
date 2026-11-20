@@ -1,0 +1,159 @@
+{
+ "template": "tanitim",
+ "title": "Eğitim Ajanları",
+ "channel": "",
+ "scenes": [
+  {
+   "type": "years",
+   "dur": 6,
+   "items": [
+    {
+     "year": "1963",
+     "label": "Karatahta ve tebeşir"
+    },
+    {
+     "year": "2025",
+     "label": "Uzaktan eğitim"
+    },
+    {
+     "year": "2026–2027",
+     "label": ""
+    }
+   ],
+   "tag": "Eğitim ajanları çağı",
+   "statement": "Ajanlar devrede",
+   "caption": "Eğitimde dijital çağın ötesine geçiliyor. Artık ajanlar devrede."
+  },
+  {
+   "type": "terminal",
+   "dur": 9,
+   "channel": "Ses kanalı: Ajan 3.14",
+   "windows": [
+    {
+     "title": "tymm.meb.gov.tr",
+     "lines": [
+      "> GET tymm.meb.gov.tr/ogretim-programlari",
+      "200 OK",
+      "Türkiye Yüzyılı Maarif Modeli",
+      "Öğretim programları indiriliyor...",
+      "Matematik ........",
+      "Türk Dili ve Edebiyatı ..."
+     ]
+    },
+    {
+     "title": "kazanim_tarama.exe",
+     "lines": [
+      "F.7.1.1   taranıyor",
+      "MAT.9.1.2 taranıyor",
+      "TDE.9.2.3 taranıyor",
+      "KİM.9.2.1 taranıyor"
+     ],
+     "progress": true
+    }
+   ],
+   "caption": "Aylardır sizin için çalışıyoruz. Önce müfredatı satır satır taradık."
+  },
+  {
+   "type": "terminal",
+   "dur": 7,
+   "channel": "Ses kanalı: Ajan 9.8",
+   "windows": [
+    {
+     "title": "ses_analiz.exe",
+     "kind": "wave",
+     "label": "ÖĞRETMEN SES ANALİZİ"
+    },
+    {
+     "title": "kontrol.log",
+     "kind": "approve",
+     "label": "ÖĞRETMEN KONTROLÜ",
+     "status": "ONAYLANDI"
+    }
+   ],
+   "caption": "Sonra gerçek öğretmenlerimizi dinledik ve her soruyu onlara onaylattık."
+  },
+  {
+   "type": "roster",
+   "dur": 10,
+   "title": "PLAYER SELECT",
+   "grid_title": "Göreve hazırız!",
+   "cards": [
+    {
+     "name": "Ajan 3.14",
+     "role": "Matematik",
+     "stats": {
+      "Bilgi": 95,
+      "Hız": 90,
+      "Enerji": 100
+     }
+    },
+    {
+     "name": "Ajan 9.8",
+     "role": "Fen · Fizik",
+     "stats": {
+      "Bilgi": 92,
+      "Hız": 96,
+      "Enerji": 98
+     }
+    },
+    {
+     "name": "Ajan 6.02",
+     "role": "Kimya",
+     "stats": {
+      "Bilgi": 90,
+      "Hız": 94,
+      "Enerji": 97
+     }
+    },
+    {
+     "name": "Ajan 1071",
+     "role": "Tarih · İnkılap",
+     "stats": {
+      "Bilgi": 99,
+      "Hız": 80,
+      "Enerji": 90
+     }
+    }
+   ],
+   "caption": "İşte ekibimiz. Her biri kendi dersinin uzmanı."
+  },
+  {
+   "type": "powerup",
+   "dur": 5,
+   "title": "POWER-UP!",
+   "bars": [
+    {
+     "label": "Yorulmaz",
+     "value": "∞"
+    },
+    {
+     "label": "Unutmaz",
+     "value": "∞"
+    },
+    {
+     "label": "En hızlı",
+     "value": "∞"
+    }
+   ],
+   "caption": "Yorulmayız, unutmayız. Bilgiye en hızlı biz ulaşırız."
+  },
+  {
+   "type": "statement",
+   "dur": 7,
+   "caption": "Ama unutma, hiçbir ajan sınıfta seni *tanıyan* *öğretmeninin* *yerini* *tutamaz.* Onlar öğretmeninin yanında, senin yanında."
+  },
+  {
+   "type": "finale",
+   "dur": 6,
+   "title": "Eğitim Ajanları",
+   "date": "Pazartesi",
+   "time": "16:30",
+   "button": "Start",
+   "footer": [
+    "HOCALARA GELDİK",
+    "5–12. sınıf · YouTube"
+   ],
+   "caption": "Pazartesi saat 16.30’da başlıyoruz."
+  }
+ ]
+}

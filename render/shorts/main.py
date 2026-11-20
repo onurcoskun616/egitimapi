@@ -21,6 +21,7 @@ def build(plan):
     if t == 'siralama': from t_ranking import Ranking; return Ranking(plan)
     if t == 'mekanizma': from t_mechanism import MechanismTemplate; return MechanismTemplate(plan)
     if t == 'karsilastirma': from t_scale import Scale; return Scale(plan)
+    if t == 'tanitim': from t_promo import Promo; return Promo(plan)
     raise ValueError('Bilinmeyen şablon: ' + str(t))
 
 TPL = None; OUTDIR = None
