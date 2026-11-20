@@ -37,6 +37,27 @@ def check_fonts():
     except Exception: pass
     return 'yedek yazı tipi (DejaVu)'
 
+# ---------- renkli emoji (öğe simgeleri) ----------
+EMOJI_PATHS = [os.path.join(_HERE, 'fonts', 'NotoColorEmoji.ttf'), '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf']
+_emoji = {}
+def emoji_img(ch, size):
+    """Renkli emoji görseli (Noto Color Emoji). Yazı tipi yoksa None döner."""
+    k = (ch, int(size))
+    if k in _emoji: return _emoji[k]
+    path = next((p for p in EMOJI_PATHS if os.path.exists(p)), None)
+    if not path or not ch: _emoji[k] = None; return None
+    f = ImageFont.truetype(path, 109)
+    im = Image.new('RGBA', (160 * max(1, len(ch)), 160), (0, 0, 0, 0))
+    ImageDraw.Draw(im).text((10, 10), ch, font=f, embedded_color=True)
+    bb = im.getbbox()
+    if not bb: _emoji[k] = None; return None
+    im = im.crop(bb); sc = size / max(im.width, im.height)
+    im = im.resize((max(1, int(im.width * sc)), max(1, int(im.height * sc))), Image.LANCZOS)
+    sh = Image.new('RGBA', (im.width + 60, im.height + 60), (0, 0, 0, 0))
+    a = Image.new('RGBA', im.size, (0, 0, 0, 0)); a.putalpha(im.getchannel('A').point(lambda v: v * 0.45))
+    sh.alpha_composite(a, (36, 44)); sh = sh.filter(ImageFilter.GaussianBlur(14)); sh.alpha_composite(im, (30, 30))
+    _emoji[k] = sh; return sh
+
 # ---------- uyarılar (taşan metin vb.) ----------
 WARN = []
 def warn(msg):

@@ -1,2 +1,3 @@
 Poppins (Indian Type Foundry) — SIL Open Font License 1.1 ile dağıtılır: https://openfontlicense.org
 Kaynak: https://fonts.google.com/specimen/Poppins
+Noto Color Emoji (Google) — SIL OFL 1.1; GitHub Actions'ta indirilir: https://github.com/googlefonts/noto-emoji

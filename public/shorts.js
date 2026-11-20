@@ -107,8 +107,8 @@ function sceneFields(t, s) {
   const f = [];
   f.push(field('Süre (sn)', 'dur', s.dur, 'number', 'step="0.5" min="2" max="15"'));
   if (t === 'siralama') {
-    if (s.type === 'intro') f.push(field('Üst satır', 'title_top', s.title_top), field('Orta satır', 'title_main', s.title_main), field('Büyük satır', 'title_big', s.title_big));
-    if (s.type === 'item') f.push(field('Sıra', 'rank', s.rank, 'number'), field('Ad', 'name', s.name), field('Alt ad', 'sub', s.sub), field('Konum', 'place', s.place), field('Değer (sayı)', 'value', s.value, 'number', 'step="any"'), field('Gösterilecek değer (isteğe bağlı)', 'value_text', s.value_text), field('Dipnot', 'note', s.note));
+    if (s.type === 'intro') f.push(field('Üst satır', 'title_top', s.title_top), field('Orta satır', 'title_main', s.title_main), field('Büyük satır', 'title_big', s.title_big), field('Simge (emoji)', 'icon', s.icon));
+    if (s.type === 'item') f.push(field('Sıra', 'rank', s.rank, 'number'), field('Ad', 'name', s.name), field('Alt ad', 'sub', s.sub), field('Konum', 'place', s.place), field('Değer (sayı)', 'value', s.value, 'number', 'step="any"'), field('Gösterilecek değer (isteğe bağlı)', 'value_text', s.value_text), field('Simge (emoji)', 'icon', s.icon), field('Gök cismi (küre)', 'body', s.body), field('Dipnot', 'note', s.note));
     if (s.type === 'outro') f.push(field('Başlık', 'title', s.title));
   } else if (t === 'mekanizma') {
     if (s.key === 'intro') f.push(field('Başlık 1', 'title1', s.title1), field('Başlık 2', 'title2', s.title2), field('Alt başlık', 'subtitle', s.subtitle));

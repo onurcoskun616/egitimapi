@@ -3,6 +3,7 @@ import math
 import numpy as np
 from PIL import Image, ImageDraw
 import re
+from common import emoji_img
 from common import (W, H, ACCENT, F, BOLD, MED, text_img, fit_font, put, wrap_lines, pill, Caption, ease_out, ease_back,
                     fmt, flash, fade_black, follow_button, top_shade, lerp, Timeline, CAP_Y)
 
@@ -177,7 +178,8 @@ class Ranking:
 
     def scenery(self, j):
         if j in self.cache: return self.cache[j]
-        if len(self.cache) > 2: self.cache.clear()
+        if len([k for k in self.cache if not isinstance(k, tuple)]) > 2:
+            for k in [k for k in self.cache if not isinstance(k, tuple)]: del self.cache[k]
         s = self.plan['scenes'][j]; typ = s.get('type')
         if typ == 'item':
             k = self.items.index(s); pal = s.get('palette') or PAL_CYCLE[k % len(PAL_CYCLE)]
@@ -189,7 +191,7 @@ class Ranking:
             kind = s.get('kind') or ('vol' if k % 2 else 'jag')
             obj = MountainScenery(rel, kind, pal, 1000 + j * 37, dark=(typ == 'intro'))
         else:
-            obj = AbstractScenery(rel, s.get('rank') if typ == 'item' else None, pal, 500 + j * 31, dark=(typ != 'item'))
+            obj = AbstractScenery(rel, s.get('rank') if typ == 'item' and not (s.get('icon') or s.get('body')) else None, pal, 500 + j * 31, dark=(typ != 'item'))
         self.cache[j] = obj; return obj
 
     @staticmethod
@@ -204,6 +206,10 @@ class Ranking:
     def draw(self, t):
         j, u = self.tl.at(t); s = self.plan['scenes'][j]; dur = self.tl.durs[j]; typ = s.get('type')
         c = self.scenery(j).frame(u, dur)
+        if typ == 'item': self.draw_visual(c, u, s)
+        if typ == 'intro' and s.get('icon'):
+            im = emoji_img(s['icon'], 360)
+            if im: put(c, im, W / 2, 1050 + 14 * math.sin(u * 2), alpha=ease_out((u - 1.0) / 0.5), scale=0.6 + 0.4 * ease_back((u - 1.0) / 0.6))
         if typ == 'intro': self.draw_intro(c, u, s, dur)
         elif typ == 'outro': self.draw_outro(c, u, s, dur)
         else: self.draw_item(c, u, s, dur)
@@ -211,6 +217,20 @@ class Ranking:
         if j > 0: flash(c, u)
         if j == len(self.tl.durs) - 1: fade_black(c, u, dur - 0.4, 0.4)
         return c
+
+    def draw_visual(self, c, u, s):
+        """Öğenin görseli: gök cismi ise 3B küre, değilse renkli simge (emoji). Anlatılanla ekran bağı kurar."""
+        a = ease_out((u - 0.25) / 0.5); sc = 0.55 + 0.45 * ease_back((u - 0.25) / 0.6); bob = 16 * math.sin(u * 1.8)
+        kind = s.get('body')
+        if kind:
+            key = ('body', kind)
+            if key not in self.cache:
+                from t_scale import body
+                img, fac = body(kind, 300); self.cache[key] = img.resize((int(img.width * 1.6), int(img.height * 1.6)), Image.LANCZOS)
+            put(c, self.cache[key], W / 2, 1040 + bob, alpha=a, scale=sc)
+        elif s.get('icon'):
+            im = emoji_img(s['icon'], 400)
+            if im: put(c, im, W / 2, 1030 + bob, alpha=a, scale=sc)
 
     def draw_intro(self, c, u, s, dur):
         c.alpha_composite(self.shade)

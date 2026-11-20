@@ -26,6 +26,16 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: render/shorts/requirements.txt
+      - name: Renkli emoji yazı tipi (önbellekli)
+        uses: actions/cache@v4
+        with:
+          path: render/shorts/fonts/NotoColorEmoji.ttf
+          key: noto-color-emoji-v1
+      - name: Emoji yazı tipini indir (yoksa)
+        timeout-minutes: 3
+        run: |
+          f=render/shorts/fonts/NotoColorEmoji.ttf
+          [ -s "$f" ] || curl -fsSL --retry 3 -o "$f" https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf || echo "Emoji yazı tipi indirilemedi; simgesiz devam"
       - name: Python kütüphaneleri ve ffmpeg (pip ile; apt aynası takılırsa beklemeyelim)
         timeout-minutes: 6
         run: pip install -q -r render/shorts/requirements.txt
