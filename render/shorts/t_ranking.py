@@ -275,7 +275,7 @@ class Ranking:
             bl = int(bmax * (abs(float(it.get('value') or 0)) / self.vmax) * ease_out(tt / 0.6))
             c.alpha_composite(pill(max(bl, 2), 30, (ACCENT + (255,)) if jj == 0 else (255, 255, 255, 200), r=15), (540, int(y - 13)))
             put(c, vi, 540 + bl + 10 + vi.width / 2, y + 2, alpha=a)
-        if u > 2.6: follow_button(c, u - 2.6, y=CAP_Y - 160)
+        if u > 2.6: follow_button(c, u - 2.6, y=min(CAP_Y - 330, 380 + len(rows) * rh + 140))
         fade_black(c, u, dur - 0.4, 0.4)
 
     # ---- önizleme: en kalabalık anlar ----
