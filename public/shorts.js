@@ -15,7 +15,7 @@ function toast(msg, bad) { const t = $('#toast'); t.textContent = msg; t.classNa
 window.addEventListener('hashchange', render);
 
 const TPL_TR = { otomatik: 'Otomatik (Claude seçsin)', siralama: 'Sıralama / geri sayım', mekanizma: 'Mekanizma / kesit', karsilastirma: 'Boyut karşılaştırma' };
-const STEPS = [['plan', 'Sahne planı'], ['review', 'Plan onayı'], ['preview', 'Önizleme'], ['approve', 'Önizleme onayı'], ['voice', 'Seslendirme'], ['render', 'Render'], ['done', 'Tamamlandı']];
+const STEPS = [['plan', 'Sahne planı'], ['review', 'Plan onayı'], ['preview', 'Önizleme'], ['approve', 'Önizleme onayı'], ['voice', 'Ses ve efekt'], ['render', 'Render'], ['done', 'Tamamlandı']];
 
 async function render() {
   clearTimeout(pollTimer);
@@ -77,6 +77,7 @@ async function newView() {
     <div class="chips" id="tpl">${Object.entries(TPL_TR).map(([k, v], i) => `<span class="chip ${i ? '' : 'on'}" data-v="${k}">${v}</span>`).join('')}</div>
     <div class="small dim" style="margin-top:6px">${Object.entries(META.templates).map(([k, v]) => `<div>• <b>${esc(TPL_TR[k])}</b>: ${esc(v.split('—')[1] || v)}</div>`).join('')}</div>
     <label style="margin-top:12px">Ek istekler (isteğe bağlı)</label><textarea id="notes" rows="2" placeholder="Örn: öğrencilere yönelik sade anlatım; son sahnede soru sor"></textarea>
+    <label class="switch"><input type="checkbox" id="aisfx"> Yapay zekâ ortam sesleri ekle (ElevenLabs ses efekti; kodla üretilen zamanlamalı seslerin üstüne)</label>
     <label class="switch"><input type="checkbox" id="voice"> ElevenLabs seslendirmesi ekle (kapalıyken yalnızca müzik, efekt ve altyazı)</label>
     <div id="voiceBox" hidden><label>Bu videoda kullanılacak ses</label>${await voicePicker('')}</div>
     <label>Müzik seviyesi</label><input type="range" id="music" min="0.2" max="1.5" step="0.1" value="1">
@@ -87,7 +88,7 @@ async function newView() {
   bindPicker(app);
   $('#go').onclick = async () => {
     if ($('#voice').checked && !pickedVoice(app)) return toast('Seslendirme için listeden bir ses seçin', true);
-    try { const r = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, template: tpl, notes: $('#notes').value, voice: $('#voice').checked, voice_id: pickedVoice(app), music_level: +$('#music').value } }); location.hash = '#/p/' + r.id; }
+    try { const r = await api('/projects', { method: 'POST', body: { topic: $('#topic').value, template: tpl, notes: $('#notes').value, ai_sfx: $('#aisfx').checked, voice: $('#voice').checked, voice_id: pickedVoice(app), music_level: +$('#music').value } }); location.hash = '#/p/' + r.id; }
     catch (e) { toast(e.message, true); }
   };
 }
@@ -115,6 +116,7 @@ function sceneFields(t, s) {
     if (s.type !== 'focus') f.push(field('Başlık 1', 'title1', s.title1), field('Başlık 2', 'title2', s.title2));
   }
   f.push(`<div style="grid-column:1/-1">${field('Altyazı / seslendirme cümlesi', 'caption', s.caption, 'area')}</div>`);
+  f.push(`<div style="grid-column:1/-1">${field('Yapay zekâ ortam sesi (İngilizce tarif; boşsa yok)', 'sfx_en', s.sfx_en)}</div>`);
   return `<div class="row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">${f.join('')}</div>`;
 }
 function sceneLabel(t, s) {
@@ -154,7 +156,8 @@ async function projectView(id) {
       <div class="pv">${(p.previews.urls || []).map(u => `<a href="${esc(u)}" target="_blank"><img src="${esc(u)}"></a>`).join('')}</div></div>`;
   }
   if (p.stage === 'approve' || p.stage === 'review') {
-    body += `<div class="card" style="margin-bottom:12px"><label class="switch"><input type="checkbox" id="voice" ${p.opts.voice ? 'checked' : ''}> ElevenLabs seslendirmesi</label>
+    body += `<div class="card" style="margin-bottom:12px"><label class="switch"><input type="checkbox" id="aisfx" ${p.opts.ai_sfx ? 'checked' : ''}> Yapay zekâ ortam sesleri (sahnelerdeki İngilizce tariflerden, ElevenLabs)</label>
+      <label class="switch"><input type="checkbox" id="voice" ${p.opts.voice ? 'checked' : ''}> ElevenLabs seslendirmesi</label>
       <div id="voiceBox" ${p.opts.voice ? '' : 'hidden'}><label>Bu videoda kullanılacak ses</label>${await voicePicker(p.opts.voice_id)}<div class="small dim" style="margin-top:6px">Seslendirme önce üretilir, sahne süreleri sese göre uzar; altyazı kelime zamanlarına oturur, müzik konuşma altında kısılır.</div></div>
       <label>Müzik seviyesi</label><input type="range" id="music" min="0.2" max="1.5" step="0.1" value="${p.opts.music_level || 1}"></div>`;
   }
@@ -174,8 +177,9 @@ async function projectView(id) {
     app.querySelectorAll('[data-obj]').forEach(el => { const o = pl.objects[+el.dataset.obj]; el.querySelectorAll('[data-o]').forEach(inp => { const k = inp.dataset.o; o[k] = k === 'size' ? +inp.value : (inp.value || null); }); });
     return pl;
   };
-  const saveOpts = async () => { if ($('#voice')) await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'opts', voice: $('#voice').checked, voice_id: pickedVoice(app), music_level: +$('#music').value } }); };
+  const saveOpts = async () => { if ($('#voice')) await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'opts', ai_sfx: $('#aisfx') ? $('#aisfx').checked : undefined, voice: $('#voice').checked, voice_id: pickedVoice(app), music_level: +$('#music').value } }); };
   if ($('#voice')) $('#voice').onchange = () => { $('#voiceBox').hidden = !$('#voice').checked; saveOpts(); };
+  if ($('#aisfx')) $('#aisfx').onchange = saveOpts;
   bindPicker(app, () => { saveOpts(); toast('Ses seçildi'); });
   if ($('#music')) $('#music').onchange = saveOpts;
   if ($('#retry')) $('#retry').onclick = () => act(id, { action: 'retry' });

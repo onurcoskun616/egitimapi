@@ -47,8 +47,9 @@ def stills(plan, outdir):
         TPL.draw(t).convert('RGB').save(p, quality=86); paths.append(p)
     return paths, list(common.WARN), round(TPL.tl.total, 1)
 
-def render(plan, outdir, voices=None, music_level=1.0, progress=None):
-    """voices: [(yerel_dosya, başlangıç_sn)] — ElevenLabs seslendirme parçaları (isteğe bağlı)."""
+def render(plan, outdir, voices=None, music_level=1.0, progress=None, sfx=None, sfx_level=0.55):
+    """voices: [(yerel_dosya, başlangıç_sn)] — ElevenLabs seslendirme parçaları (isteğe bağlı).
+    sfx: [(yerel_dosya, başlangıç_sn, süre)] — yapay zekâ ortam sesleri (isteğe bağlı), kodla üretilen müzik/efektin üstüne karışır."""
     global TPL, OUTDIR
     OUTDIR = os.path.join(outdir, 'parcalar'); os.makedirs(OUTDIR, exist_ok=True)
     TPL = build(plan)
@@ -72,19 +73,27 @@ def render(plan, outdir, voices=None, music_level=1.0, progress=None):
     music = os.path.join(outdir, 'muzik.wav'); mx.write(music)
     if progress: progress(nchunks + 1, nchunks + 2)
     final = os.path.join(outdir, 'video.mp4')
+    ins = ['-i', vid, '-i', music]; fl = [f'[1:a]volume={music_level:.2f}[mu0]']; n = 2; bed = '[mu0]'
+    if sfx:   # yapay zekâ ortam sesleri: sahne başında yumuşak girer, sahne sonunda söner
+        labs = []
+        for k, (sf, at, d) in enumerate(sfx):
+            ins += ['-i', sf]; ms = int(max(0, at) * 1000); d = max(0.8, float(d))
+            fl.append(f'[{n}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:{d:.2f},asetpts=PTS-STARTPTS,afade=t=in:d=0.3,afade=t=out:st={max(0, d - 0.6):.2f}:d=0.6,volume={sfx_level:.2f},adelay={ms}|{ms}[s{k}]')
+            labs.append(f'[s{k}]'); n += 1
+        fl.append(f"[mu0]{''.join(labs)}amix=inputs={len(labs) + 1}:normalize=0:dropout_transition=0[mu1]"); bed = '[mu1]'
     if voices:
-        ins = ['-i', vid, '-i', music]; fl = []; labs = []
+        labs = []
         for k, (vf, at) in enumerate(voices):
             ins += ['-i', vf]; ms = int(max(0, at) * 1000)
-            fl.append(f'[{k + 2}:a]aresample=44100,aformat=channel_layouts=stereo,adelay={ms}|{ms}[v{k}]'); labs.append(f'[v{k}]')
+            fl.append(f'[{n}:a]aresample=44100,aformat=channel_layouts=stereo,adelay={ms}|{ms}[v{k}]'); labs.append(f'[v{k}]'); n += 1
         fl.append(f"{''.join(labs)}amix=inputs={len(labs)}:normalize=0:dropout_transition=0,apad=whole_dur={total:.2f}[vo]")
         fl.append('[vo]asplit=2[vo1][vo2]')
-        # seslendirme konuşurken müzik ve efektler otomatik kısılır (ducking)
-        fl.append(f'[1:a]volume={music_level:.2f}[mu];[mu][vo1]sidechaincompress=threshold=0.03:ratio=8:attack=30:release=500[duck]')
+        # seslendirme konuşurken müzik, efekt ve ortam sesleri otomatik kısılır (ducking)
+        fl.append(f'{bed}[vo1]sidechaincompress=threshold=0.03:ratio=8:attack=30:release=500[duck]')
         fl.append('[duck][vo2]amix=inputs=2:normalize=0,alimiter=limit=0.95[a]')
-        ff(ins + ['-filter_complex', ';'.join(fl), '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', f'{total:.2f}', '-movflags', '+faststart', final], 'Ses karışımı')
     else:
-        ff(['-i', vid, '-i', music, '-filter_complex', f'[1:a]volume={music_level:.2f}[a]', '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', final], 'Ses ekleme')
+        fl.append(f'{bed}alimiter=limit=0.95[a]')
+    ff(ins + ['-filter_complex', ';'.join(fl), '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', f'{total:.2f}', '-movflags', '+faststart', final], 'Ses karışımı')
     # ---- altyazı dosyası ve kapak ----
     cues = []
     for j, cap in enumerate(TPL.caps): cues += cap.cues(TPL.tl.starts[j])
@@ -127,7 +136,10 @@ def task_main():
             voices = []
             for k, v in enumerate(m.get('voices') or []):
                 fp = os.path.join(work, f'ses{k}.mp3'); _, b = http(v['url']); open(fp, 'wb').write(b); voices.append((fp, float(v['at'])))
-            final, srt, cover, total = render(m['plan'], work, voices, float(m.get('music_level', 1.0)), prog)
+            sfx = []
+            for k, v in enumerate(m.get('sfx') or []):
+                fp = os.path.join(work, f'efekt{k}.mp3'); _, b = http(v['url']); open(fp, 'wb').write(b); sfx.append((fp, float(v['at']), float(v.get('dur', 5))))
+            final, srt, cover, total = render(m['plan'], work, voices, float(m.get('music_level', 1.0)), prog, sfx, float(m.get('sfx_level', 0.55)))
             u = m['uploads']
             res = {'video': upload(final, u['video'], 'video/mp4'), 'srt': upload(srt, u['srt'], 'application/x-subrip'),
                    'cover': upload(cover, u['cover'], 'image/jpeg'), 'sec': round(total, 1), 'mb': round(os.path.getsize(final) / 1048576, 1)}
