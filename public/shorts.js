@@ -168,14 +168,16 @@ async function projectView(id) {
         <div style="display:grid;grid-template-columns:120px 1fr 150px;gap:14px;margin-top:10px;align-items:start">
           <div><div style="width:120px;height:160px;border-radius:10px;border:1px solid var(--line);background:#111 center/cover;${ch.photo_url ? `background-image:url('${esc(ch.photo_url)}')` : ''}"></div>
             <label class="btn small" style="margin:6px 0 0;display:block;text-align:center">${ch.photo ? 'Fotoğrafı değiştir' : 'Fotoğraf yükle'}<input type="file" accept="image/*" id="chphoto" hidden></label></div>
-          <div><label>Ad (videonun başında etiket olarak görünür)</label><input data-ch="name" value="${esc(ch.name || '')}" placeholder="Ör. Onur Hoca">
+          <div><label class="switch" style="margin:0 0 8px"><input type="checkbox" data-chk="ready" ${ch.ready ? 'checked' : ''}> Yüklediğim görsel <b>hazır çizim</b>, olduğu gibi kullan (çizim ücreti yok)</label>
+            <div class="small dim" style="margin-bottom:6px">Hazır çizim için: dikey (9:16) görsel, karakter kameraya bakıyor, yüzü net, ağzı kapalı, göğüsten yukarı, tek kişi.</div>
+            <label>Ad (videonun başında etiket olarak görünür)</label><input data-ch="name" value="${esc(ch.name || '')}" placeholder="Ör. Onur Hoca">
             <label>Çizim tarzı</label><select data-ch="style">${Object.entries(META.char_styles || {}).map(([k, v]) => `<option value="${k}" ${k === (ch.style || 'animasyon') ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
             <label>Arka plan / mekân (isteğe bağlı)</label><input data-ch="setting" value="${esc(ch.setting || '')}" placeholder="Ör. otomotiv atölyesi, arkada motor bloğu">
             <div class="small dim" style="margin-top:6px">Yüzü net, önden çekilmiş tek kişilik fotoğraf en iyi sonucu verir. Başkasının fotoğrafını yalnızca izniyle, öğrenci fotoğrafını yalnızca veli onayıyla kullanın.</div></div>
           <div>${ch.portrait_url ? `<a href="${esc(ch.portrait_url)}" target="_blank"><img src="${esc(ch.portrait_url)}" style="width:150px;border-radius:10px;border:1px solid var(--line);display:block"></a>
-            <button class="small" id="redraw" style="margin-top:6px;width:100%" ${working ? 'disabled' : ''}>Yeniden çiz</button>
+            ${ch.ready ? '<div class="small dim" style="margin-top:6px">Hazır çizim kullanılıyor.</div>' : `<button class="small" id="redraw" style="margin-top:6px;width:100%" ${working ? 'disabled' : ''}>Yeniden çiz</button>`}
             <textarea id="chfix" rows="2" placeholder="Düzeltme (Türkçe): ör. gözlük ekle" style="margin-top:6px;width:100%"></textarea><button class="small" id="chfixbtn" style="width:100%" ${working ? 'disabled' : ''}>Düzelt</button>`
-            : '<div class="small dim">Çizim, “Önizleme karelerini çiz” adımında fotoğraftan üretilir (fal.ai, ≈ 0,08 $).</div>'}</div></div></div>`;
+            : `<div class="small dim">${ch.ready ? 'Hazır çiziminiz önizleme adımında doğrudan kullanılır.' : 'Çizim, “Önizleme karelerini çiz” adımında fotoğraftan üretilir (fal.ai, ≈ 0,08 $).'}</div>`}</div></div></div>`;
     }
     body += pl.scenes.map((s, i) => `<div class="scn" data-i="${i}"><div class="no">${i + 1}</div><div><b>${sceneLabel(pl.template, s)}</b>${sceneFields(pl.template, s)}</div></div>`).join('');
     body += `<div class="card" style="margin:12px 0"><div class="row tight"><button id="save" ${working ? 'disabled' : ''}>Değişiklikleri kaydet</button></div>
@@ -208,7 +210,7 @@ async function projectView(id) {
   const collect = () => {
     const pl = JSON.parse(JSON.stringify(p.plan));
     app.querySelectorAll('.scn').forEach(el => { const s = pl.scenes[+el.dataset.i]; el.querySelectorAll('[data-k]').forEach(inp => { const k = inp.dataset.k; let v = inp.value; if (inp.type === 'number') v = v === '' ? null : +v; else if (v === '' && k !== 'caption') v = null; s[k] = v; }); });
-    if (pl.character) { app.querySelectorAll('[data-ch]').forEach(inp => { pl.character[inp.dataset.ch] = inp.value; }); delete pl.character.photo_url; delete pl.character.portrait_url; }
+    if (pl.character) { app.querySelectorAll('[data-ch]').forEach(inp => { pl.character[inp.dataset.ch] = inp.value; }); app.querySelectorAll('[data-chk]').forEach(inp => { pl.character[inp.dataset.chk] = inp.checked; }); delete pl.character.photo_url; delete pl.character.portrait_url; }
     app.querySelectorAll('[data-card]').forEach(el => { const s = pl.scenes[+el.closest('.scn').dataset.i]; const c = s.cards[+el.dataset.card]; el.querySelectorAll('[data-c]').forEach(inp => { c[inp.dataset.c] = inp.value; }); delete c.photo_url; });
     pl.scenes.forEach(s => (s.cards || []).forEach(c => delete c.photo_url));
     app.querySelectorAll('[data-obj]').forEach(el => { const o = pl.objects[+el.dataset.obj]; el.querySelectorAll('[data-o]').forEach(inp => { const k = inp.dataset.o; o[k] = k === 'size' ? +inp.value : (inp.value || null); }); });
