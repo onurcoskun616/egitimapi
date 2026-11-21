@@ -14,7 +14,7 @@ async function api(path, opts = {}) {
 function toast(msg, bad) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false; clearTimeout(t._t); t._t = setTimeout(() => t.hidden = true, bad ? 6000 : 2800); }
 window.addEventListener('hashchange', render);
 
-const TPL_TR = { otomatik: 'Otomatik (Claude seçsin)', siralama: 'Sıralama / geri sayım', mekanizma: 'Mekanizma / kesit', karsilastirma: 'Boyut karşılaştırma', tanitim: 'Tanıtım (ajan / terminal tarzı)' };
+const TPL_TR = { otomatik: 'Otomatik (Claude seçsin)', siralama: 'Sıralama / geri sayım', mekanizma: 'Mekanizma / kesit', karsilastirma: 'Boyut karşılaştırma', tanitim: 'Tanıtım (ajan / terminal tarzı)', konusan: 'Konuşan karakter (fotoğraftan)' };
 const STEPS = [['plan', 'Sahne planı'], ['review', 'Plan onayı'], ['preview', 'Önizleme'], ['approve', 'Önizleme onayı'], ['voice', 'Ses ve efekt'], ['render', 'Render'], ['done', 'Tamamlandı']];
 
 async function render() {
@@ -110,6 +110,8 @@ function sceneFields(t, s) {
     if (s.type === 'intro') f.push(field('Üst satır', 'title_top', s.title_top), field('Orta satır', 'title_main', s.title_main), field('Büyük satır', 'title_big', s.title_big), field('Simge (emoji)', 'icon', s.icon));
     if (s.type === 'item') f.push(field('Sıra', 'rank', s.rank, 'number'), field('Ad', 'name', s.name), field('Alt ad', 'sub', s.sub), field('Konum', 'place', s.place), field('Değer (sayı)', 'value', s.value, 'number', 'step="any"'), field('Gösterilecek değer (isteğe bağlı)', 'value_text', s.value_text), field('Simge (emoji)', 'icon', s.icon), field('Gök cismi (küre)', 'body', s.body), field('Dipnot', 'note', s.note));
     if (s.type === 'outro') f.push(field('Başlık', 'title', s.title));
+  } else if (t === 'konusan') {
+    f.push(field('Ekran başlığı (isteğe bağlı)', 'title', s.title));
   } else if (t === 'tanitim') {
     if (s.type === 'roster') {
       f.push(field('Başlık', 'title', s.title), field('Izgara başlığı (sonda tüm kartlar)', 'grid_title', s.grid_title));
@@ -136,6 +138,7 @@ function sceneFields(t, s) {
 }
 function sceneLabel(t, s) {
   if (t === 'siralama') return s.type === 'intro' ? 'Giriş' : s.type === 'outro' ? 'Kapanış' : `#${s.rank} ${esc(s.name)}`;
+  if (t === 'konusan') return 'Konuşma';
   if (t === 'tanitim') return { years: 'Zaman çizelgesi', terminal: 'Terminal pencereleri', roster: 'Ekip seçimi (kartlar)', powerup: 'Güç çubukları', statement: 'Büyük cümle (*vurgu* için yıldız)', finale: 'Kapanış / duyuru' }[s.type] || s.type;
   if (t === 'mekanizma') return { intro: 'Giriş', parts: 'Parçalar', emme: '1. zaman: Emme', sik: '2. zaman: Sıkıştırma', is: '3. zaman: İş', egz: '4. zaman: Egzoz', fast: 'Tam çevrim (hızlanan)', dizel: 'Bonus: Dizel', outro: 'Kapanış' }[s.key] || s.key;
   return s.type === 'group' ? 'Giriş (yan yana)' : s.type === 'outro' ? 'Kapanış' : 'Odak: ' + esc((planCache.objects[s.obj] || {}).name || '');
@@ -159,6 +162,21 @@ async function projectView(id) {
       ${pl.objects.map((o, i) => `<div class="row" data-obj="${i}" style="display:grid;grid-template-columns:30px repeat(5,1fr);gap:6px;margin-top:6px"><span class="dim">${i}</span>
         <input data-o="name" value="${esc(o.name)}"><input data-o="size" type="number" step="any" value="${o.size}"><input data-o="size_text" placeholder="gösterim" value="${esc(o.size_text || '')}">
         <input data-o="compare" placeholder="karşılaştırma" value="${esc(o.compare || '')}"><select data-o="kind">${META.kinds.map(k => `<option ${k === o.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></div>`).join('')}</div>`;
+    if (pl.template === 'konusan') {
+      const ch = pl.character || {};
+      body += `<div class="card" style="margin-bottom:12px" id="chcard"><b>Karakter</b>
+        <div style="display:grid;grid-template-columns:120px 1fr 150px;gap:14px;margin-top:10px;align-items:start">
+          <div><div style="width:120px;height:160px;border-radius:10px;border:1px solid var(--line);background:#111 center/cover;${ch.photo_url ? `background-image:url('${esc(ch.photo_url)}')` : ''}"></div>
+            <label class="btn small" style="margin:6px 0 0;display:block;text-align:center">${ch.photo ? 'Fotoğrafı değiştir' : 'Fotoğraf yükle'}<input type="file" accept="image/*" id="chphoto" hidden></label></div>
+          <div><label>Ad (videonun başında etiket olarak görünür)</label><input data-ch="name" value="${esc(ch.name || '')}" placeholder="Ör. Onur Hoca">
+            <label>Çizim tarzı</label><select data-ch="style">${Object.entries(META.char_styles || {}).map(([k, v]) => `<option value="${k}" ${k === (ch.style || 'animasyon') ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+            <label>Arka plan / mekân (isteğe bağlı)</label><input data-ch="setting" value="${esc(ch.setting || '')}" placeholder="Ör. otomotiv atölyesi, arkada motor bloğu">
+            <div class="small dim" style="margin-top:6px">Yüzü net, önden çekilmiş tek kişilik fotoğraf en iyi sonucu verir. Başkasının fotoğrafını yalnızca izniyle, öğrenci fotoğrafını yalnızca veli onayıyla kullanın.</div></div>
+          <div>${ch.portrait_url ? `<a href="${esc(ch.portrait_url)}" target="_blank"><img src="${esc(ch.portrait_url)}" style="width:150px;border-radius:10px;border:1px solid var(--line);display:block"></a>
+            <button class="small" id="redraw" style="margin-top:6px;width:100%" ${working ? 'disabled' : ''}>Yeniden çiz</button>
+            <textarea id="chfix" rows="2" placeholder="Düzeltme (Türkçe): ör. gözlük ekle" style="margin-top:6px;width:100%"></textarea><button class="small" id="chfixbtn" style="width:100%" ${working ? 'disabled' : ''}>Düzelt</button>`
+            : '<div class="small dim">Çizim, “Önizleme karelerini çiz” adımında fotoğraftan üretilir (fal.ai, ≈ 0,08 $).</div>'}</div></div></div>`;
+    }
     body += pl.scenes.map((s, i) => `<div class="scn" data-i="${i}"><div class="no">${i + 1}</div><div><b>${sceneLabel(pl.template, s)}</b>${sceneFields(pl.template, s)}</div></div>`).join('');
     body += `<div class="card" style="margin:12px 0"><div class="row tight"><button id="save" ${working ? 'disabled' : ''}>Değişiklikleri kaydet</button></div>
       <label style="margin-top:12px">Claude'a düzelttir</label><textarea id="fb" rows="2" placeholder="Örn: 8 öğe olsun; giriş cümlesini daha merak uyandırıcı yap"></textarea>
@@ -174,7 +192,7 @@ async function projectView(id) {
   if (p.stage === 'approve' || p.stage === 'review') {
     body += `<div class="card" style="margin-bottom:12px"><label class="switch"><input type="checkbox" id="aisfx" ${p.opts.ai_sfx ? 'checked' : ''}> Yapay zekâ ortam sesleri (sahnelerdeki İngilizce tariflerden, ElevenLabs)</label>
       <label class="switch"><input type="checkbox" id="voice" ${p.opts.voice ? 'checked' : ''}> ElevenLabs seslendirmesi</label>
-      <div id="voiceBox" ${p.opts.voice ? '' : 'hidden'}><label>Bu videoda kullanılacak ses</label>${await voicePicker(p.opts.voice_id)}<div class="small dim" style="margin-top:6px">Seslendirme önce üretilir, sahne süreleri sese göre uzar; altyazı kelime zamanlarına oturur, müzik konuşma altında kısılır.</div></div>
+      <div id="voiceBox" ${p.opts.voice ? '' : 'hidden'}><label>Bu videoda kullanılacak ses</label>${await voicePicker(p.opts.voice_id)}${p.plan && p.plan.template === 'konusan' ? '<div class="small" style="margin-top:6px;color:var(--gold)">Konuşan karakterde ses zorunlu. Ses üretildikten sonra her sahne için dudak senkronlu konuşma videosu yapılır (fal.ai Kling Avatar, ≈ 0,06 $/sn; 60 sn ≈ 3,4 $).</div>' : ''}<div class="small dim" style="margin-top:6px">Seslendirme önce üretilir, sahne süreleri sese göre uzar; altyazı kelime zamanlarına oturur, müzik konuşma altında kısılır.</div></div>
       <label>Müzik seviyesi</label><input type="range" id="music" min="0.2" max="1.5" step="0.1" value="${p.opts.music_level || 1}"></div>`;
   }
   if (p.final) {
@@ -190,6 +208,7 @@ async function projectView(id) {
   const collect = () => {
     const pl = JSON.parse(JSON.stringify(p.plan));
     app.querySelectorAll('.scn').forEach(el => { const s = pl.scenes[+el.dataset.i]; el.querySelectorAll('[data-k]').forEach(inp => { const k = inp.dataset.k; let v = inp.value; if (inp.type === 'number') v = v === '' ? null : +v; else if (v === '' && k !== 'caption') v = null; s[k] = v; }); });
+    if (pl.character) { app.querySelectorAll('[data-ch]').forEach(inp => { pl.character[inp.dataset.ch] = inp.value; }); delete pl.character.photo_url; delete pl.character.portrait_url; }
     app.querySelectorAll('[data-card]').forEach(el => { const s = pl.scenes[+el.closest('.scn').dataset.i]; const c = s.cards[+el.dataset.card]; el.querySelectorAll('[data-c]').forEach(inp => { c[inp.dataset.c] = inp.value; }); delete c.photo_url; });
     pl.scenes.forEach(s => (s.cards || []).forEach(c => delete c.photo_url));
     app.querySelectorAll('[data-obj]').forEach(el => { const o = pl.objects[+el.dataset.obj]; el.querySelectorAll('[data-o]').forEach(inp => { const k = inp.dataset.o; o[k] = k === 'size' ? +inp.value : (inp.value || null); }); });
@@ -213,6 +232,17 @@ async function projectView(id) {
       await cardEdit(pl => { pl.scenes[i].cards[j].photo = d.path; });
     } catch (e) { toast(e.message, true); }
   });
+  if ($('#chphoto')) $('#chphoto').onchange = async () => {
+    const f = $('#chphoto').files[0]; if (!f) return; if (f.size > 15e6) return toast('Fotoğraf 15 MB’tan küçük olmalı', true);
+    try {
+      toast('Fotoğraf yükleniyor…');
+      const r = await fetch('/api/sinema/upload', { method: 'POST', headers: { 'content-type': f.type || 'image/jpeg' }, body: f, credentials: 'same-origin' });
+      const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Yüklenemedi');
+      await cardEdit(pl => { pl.character = { ...(pl.character || {}), photo: d.path, portrait: null, portrait_of: null }; });
+    } catch (e) { toast(e.message, true); }
+  };
+  if ($('#redraw')) $('#redraw').onclick = async () => { await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'save', plan: collect() } }).catch(e => toast(e.message, true)); act(id, { action: 'redraw' }, 'Karakter yeniden çiziliyor'); };
+  if ($('#chfixbtn')) $('#chfixbtn').onclick = async () => { const fix = $('#chfix').value.trim(); if (!fix) return toast('Ne düzeltilsin, yazın', true); await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'save', plan: collect() } }).catch(e => toast(e.message, true)); act(id, { action: 'redraw', fix }, 'Karakter düzeltiliyor'); };
   if ($('#retry')) $('#retry').onclick = () => act(id, { action: 'retry' });
   if ($('#save')) $('#save').onclick = () => act(id, { action: 'save', plan: collect() }, 'Kaydedildi');
   if ($('#savejson')) $('#savejson').onclick = () => { let pl; try { pl = JSON.parse($('#json').value); } catch (e) { return toast('JSON hatalı: ' + e.message, true); } act(id, { action: 'save', plan: pl }, 'Kaydedildi'); };
