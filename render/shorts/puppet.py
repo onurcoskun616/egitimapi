@@ -32,7 +32,7 @@ def detect_face(img):
             urllib.request.urlretrieve(MODEL_URL, MODEL + '.part'); os.replace(MODEL + '.part', MODEL)
         from mediapipe.tasks.python import vision, BaseOptions
         det = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=MODEL), num_faces=1, min_face_detection_confidence=0.3, min_face_presence_confidence=0.3))
+            base_options=BaseOptions(model_asset_path=MODEL, delegate=BaseOptions.Delegate.CPU), num_faces=1, min_face_detection_confidence=0.3, min_face_presence_confidence=0.3))
         arr = np.ascontiguousarray(np.asarray(img.convert('RGB')))
         res = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=arr))
         if not res.face_landmarks: return None, 'yüz bulunamadı'
