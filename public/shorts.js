@@ -204,7 +204,8 @@ async function projectView(id) {
   if (p.final) {
     body += `<div class="card" style="margin-bottom:12px"><b>Sonuç</b> · ${p.final.sec} sn · ${p.final.mb} MB
       <video class="final" src="${esc(p.final.video_url)}" controls playsinline poster="${esc(p.final.cover_url)}" style="margin:10px 0"></video>
-      <div class="row tight"><a class="btn gold" href="${esc(p.final.video_url)}" download>MP4 indir</a><a class="btn" href="${esc(p.final.srt_url)}" download>SRT indir</a><a class="btn" href="${esc(p.final.cover_url)}" download>Kapak görseli</a></div></div>`;
+      <div class="row tight"><a class="btn gold" href="${esc(p.final.video_url)}" download>MP4 indir</a><a class="btn" href="${esc(p.final.srt_url)}" download>SRT indir</a><a class="btn" href="${esc(p.final.cover_url)}" download>Kapak görseli</a></div>
+      ${p.stage === 'done' && !working ? '<button class="small" id="rerender" style="margin-top:10px">Videoyu yeniden çiz (ses ve efektler aynı kalır, ek ücret yok)</button>' : ''}</div>`;
   }
   const nextBtn = working ? '' : p.stage === 'review' ? '<button class="gold" id="next">Önizleme karelerini çiz →</button>'
     : p.stage === 'approve' ? '<button class="small" id="repv">Önizlemeyi yenile</button> <button class="gold" id="next">Onayla ve videoyu üret →</button>' : '';
@@ -252,6 +253,7 @@ async function projectView(id) {
   app.querySelectorAll('[data-lip]').forEach(r => r.onchange = () => cardEdit(() => {}));
   if ($('#redraw')) $('#redraw').onclick = async () => { await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'save', plan: collect() } }).catch(e => toast(e.message, true)); act(id, { action: 'redraw' }, 'Karakter yeniden çiziliyor'); };
   if ($('#chfixbtn')) $('#chfixbtn').onclick = async () => { const fix = $('#chfix').value.trim(); if (!fix) return toast('Ne düzeltilsin, yazın', true); await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'save', plan: collect() } }).catch(e => toast(e.message, true)); act(id, { action: 'redraw', fix }, 'Karakter düzeltiliyor'); };
+  if ($('#rerender')) $('#rerender').onclick = () => act(id, { action: 'retry' }, 'Video yeniden çiziliyor');
   if ($('#retry')) $('#retry').onclick = () => act(id, { action: 'retry' });
   if ($('#save')) $('#save').onclick = () => act(id, { action: 'save', plan: collect() }, 'Kaydedildi');
   if ($('#savejson')) $('#savejson').onclick = () => { let pl; try { pl = JSON.parse($('#json').value); } catch (e) { return toast('JSON hatalı: ' + e.message, true); } act(id, { action: 'save', plan: pl }, 'Kaydedildi'); };
