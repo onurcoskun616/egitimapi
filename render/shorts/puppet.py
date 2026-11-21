@@ -49,10 +49,10 @@ def detect_face(img):
     except Exception as e:
         return None, str(e)[:80]
 
-def guess_face(img, mouth=None):
-    """Yüz noktası yoksa: kullanıcının işaretlediği ağız (tuval pikseli) ya da dikey portre için tahmin."""
+def guess_face(img, mouth):
+    """Yüz noktası bulunamadıysa kullanıcının portrede işaretlediği ağız noktası (tuval pikseli) kullanılır."""
     w, h = img.size
-    cx, cy = mouth if mouth else (w * 0.5, h * 0.41)
+    cx, cy = mouth
     mw = w * 0.13
     return {'mc': [cx, cy], 'mw': mw, 'gap': 0.0, 'chin': cy + mw * 1.0, 'eyes': [], 'auto': False}
 

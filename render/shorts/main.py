@@ -124,6 +124,7 @@ def render(plan, outdir, voices=None, music_level=1.0, progress=None, sfx=None, 
     for j, cap in enumerate(TPL.caps): cues += cap.cues(TPL.tl.starts[j])
     srt = os.path.join(outdir, 'altyazi.srt'); write_srt(cues, srt)
     cover = os.path.join(outdir, 'kapak.jpg'); TPL.draw(min(TPL.tl.durs[0] * 0.8, TPL.tl.total - 0.1)).convert('RGB').save(cover, quality=88)
+    if common.WARN: print('Uyarılar:', *common.WARN, sep='\n  ', flush=True)
     if progress: progress(nchunks + 2, nchunks + 2)
     print(f'Bitti: {time.time() - t0:.0f} sn', flush=True)
     return final, srt, cover, total

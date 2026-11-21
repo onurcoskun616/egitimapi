@@ -31,11 +31,13 @@ jobs:
         with:
           path: render/shorts/fonts/NotoColorEmoji.ttf
           key: noto-color-emoji-v1
-      - name: Emoji yazı tipini indir (yoksa)
+      - name: Sistem kütüphaneleri (yüz tanıma için GLES) ve emoji yazı tipi
         timeout-minutes: 3
         run: |
+          timeout 150 sudo apt-get install -y -q --no-install-recommends libgles2 libegl1 fonts-noto-color-emoji >/dev/null 2>&1 || echo "apt kurulumu tamamlanamadı; devam"
           f=render/shorts/fonts/NotoColorEmoji.ttf
-          [ -s "$f" ] || curl -fsSL --retry 3 -o "$f" https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf || echo "Emoji yazı tipi indirilemedi; simgesiz devam"
+          [ -s "$f" ] || cp /usr/share/fonts/truetype/noto/NotoColorEmoji.ttf "$f" 2>/dev/null || curl -fsSL --retry 3 -o "$f" https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf || echo "Emoji yazı tipi bulunamadı; simgesiz devam"
+          ls -la "$f" 2>/dev/null || true
       - name: Python kütüphaneleri ve ffmpeg (pip ile; apt aynası takılırsa beklemeyelim)
         timeout-minutes: 6
         run: pip install -q -r render/shorts/requirements.txt

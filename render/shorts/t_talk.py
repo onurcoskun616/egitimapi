@@ -139,11 +139,13 @@ class Talk:
             face, err = detect_face(self.portrait)
             if face and manual and (abs(face['mc'][0] - manual[0]) > face['mw'] or abs(face['mc'][1] - manual[1]) > face['mw']):
                 face = None   # kullanıcının işareti otomatiğe baskın
-            if not face:
-                face = guess_face(self.portrait, manual)
-                if not manual: warn(f'Ağız otomatik bulunamadı ({err}); karakter kartında portrede ağzın ortasına tıklayın')
-            self.face = face; self.puppet = Puppet(self.portrait, face)
-            self.build_env()
+            print('Yüz noktaları:', 'otomatik' if face else ('elle işaret' if manual else 'BULUNAMADI'), err or '', flush=True)
+            if not face and manual: face = guess_face(self.portrait, manual)
+            if face:
+                self.face = face; self.puppet = Puppet(self.portrait, face)
+                self.build_env()
+            else:   # yanlış yerde ağız çizmektense hiç oynatma
+                warn(f'Ağız otomatik bulunamadı ({err}); karakter KONUŞMAYACAK. Karakter kartında portrede ağzın ortasına tıklayıp önizlemeyi yenileyin')
         for j, s in enumerate(self.plan['scenes']):
             u = s.get('video_url')
             if not u: continue
