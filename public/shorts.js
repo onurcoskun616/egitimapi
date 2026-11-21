@@ -170,11 +170,15 @@ async function projectView(id) {
             <label class="btn small" style="margin:6px 0 0;display:block;text-align:center">${ch.photo ? 'Fotoğrafı değiştir' : 'Fotoğraf yükle'}<input type="file" accept="image/*" id="chphoto" hidden></label></div>
           <div><label class="switch" style="margin:0 0 8px"><input type="checkbox" data-chk="ready" ${ch.ready ? 'checked' : ''}> Yüklediğim görsel <b>hazır çizim</b>, olduğu gibi kullan (çizim ücreti yok)</label>
             <div class="small dim" style="margin-bottom:6px">Hazır çizim için: dikey (9:16) görsel, karakter kameraya bakıyor, yüzü net, ağzı kapalı, göğüsten yukarı, tek kişi.</div>
+            <label>Konuşma (dudak hareketi)</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:13px;color:inherit;cursor:pointer"><input type="radio" name="lip" data-lip="ucretsiz" ${ch.lip !== 'fal' ? 'checked' : ''} style="width:auto;margin-top:3px"><span> <b>Ücretsiz</b>: ağız sese göre kodla açılıp kapanır, göz kırpar, baş hafifçe oynar (çizim karakterlerde en iyisi)</span></label>
+            <label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0 10px;font-size:13px;color:inherit;cursor:pointer"><input type="radio" name="lip" data-lip="fal" ${ch.lip === 'fal' ? 'checked' : ''} style="width:auto;margin-top:3px"><span> <b>Kaliteli</b>: fal.ai Kling Avatar, doğal yüz ve baş hareketi (≈ 0,06 $/sn; 60 sn ≈ 3,4 $)</span></label>
             <label>Ad (videonun başında etiket olarak görünür)</label><input data-ch="name" value="${esc(ch.name || '')}" placeholder="Ör. Onur Hoca">
             <label>Çizim tarzı</label><select data-ch="style">${Object.entries(META.char_styles || {}).map(([k, v]) => `<option value="${k}" ${k === (ch.style || 'animasyon') ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
             <label>Arka plan / mekân (isteğe bağlı)</label><input data-ch="setting" value="${esc(ch.setting || '')}" placeholder="Ör. otomotiv atölyesi, arkada motor bloğu">
             <div class="small dim" style="margin-top:6px">Yüzü net, önden çekilmiş tek kişilik fotoğraf en iyi sonucu verir. Başkasının fotoğrafını yalnızca izniyle, öğrenci fotoğrafını yalnızca veli onayıyla kullanın.</div></div>
-          <div>${ch.portrait_url ? `<a href="${esc(ch.portrait_url)}" target="_blank"><img src="${esc(ch.portrait_url)}" style="width:150px;border-radius:10px;border:1px solid var(--line);display:block"></a>
+          <div>${ch.portrait_url ? `<div style="position:relative;width:150px;cursor:crosshair" id="pwrap" title="Ağzın ortasına tıklayın"><img id="pimg" src="${esc(ch.portrait_url)}" style="width:150px;border-radius:10px;border:1px solid var(--line);display:block">${ch.mouth ? `<span style="position:absolute;left:${ch.mouth[0] * 100}%;top:${ch.mouth[1] * 100}%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #ff4d6d;border-radius:50%;box-shadow:0 0 0 2px #fff"></span>` : ''}</div>
+            ${ch.lip !== 'fal' ? `<div class="small dim" style="margin-top:4px">Ağız yeri otomatik bulunur; önizlemede yanlışsa portrede <b>ağzın ortasına tıklayın</b>.${ch.mouth ? ' <a href="#" id="mclear">İşareti kaldır</a>' : ''}</div>` : ''}
             ${ch.ready ? '<div class="small dim" style="margin-top:6px">Hazır çizim kullanılıyor.</div>' : `<button class="small" id="redraw" style="margin-top:6px;width:100%" ${working ? 'disabled' : ''}>Yeniden çiz</button>`}
             <textarea id="chfix" rows="2" placeholder="Düzeltme (Türkçe): ör. gözlük ekle" style="margin-top:6px;width:100%"></textarea><button class="small" id="chfixbtn" style="width:100%" ${working ? 'disabled' : ''}>Düzelt</button>`
             : `<div class="small dim">${ch.ready ? 'Hazır çiziminiz önizleme adımında doğrudan kullanılır.' : 'Çizim, “Önizleme karelerini çiz” adımında fotoğraftan üretilir (fal.ai, ≈ 0,08 $).'}</div>`}</div></div></div>`;
@@ -194,7 +198,7 @@ async function projectView(id) {
   if (p.stage === 'approve' || p.stage === 'review') {
     body += `<div class="card" style="margin-bottom:12px"><label class="switch"><input type="checkbox" id="aisfx" ${p.opts.ai_sfx ? 'checked' : ''}> Yapay zekâ ortam sesleri (sahnelerdeki İngilizce tariflerden, ElevenLabs)</label>
       <label class="switch"><input type="checkbox" id="voice" ${p.opts.voice ? 'checked' : ''}> ElevenLabs seslendirmesi</label>
-      <div id="voiceBox" ${p.opts.voice ? '' : 'hidden'}><label>Bu videoda kullanılacak ses</label>${await voicePicker(p.opts.voice_id)}${p.plan && p.plan.template === 'konusan' ? '<div class="small" style="margin-top:6px;color:var(--gold)">Konuşan karakterde ses zorunlu. Ses üretildikten sonra her sahne için dudak senkronlu konuşma videosu yapılır (fal.ai Kling Avatar, ≈ 0,06 $/sn; 60 sn ≈ 3,4 $).</div>' : ''}<div class="small dim" style="margin-top:6px">Seslendirme önce üretilir, sahne süreleri sese göre uzar; altyazı kelime zamanlarına oturur, müzik konuşma altında kısılır.</div></div>
+      <div id="voiceBox" ${p.opts.voice ? '' : 'hidden'}><label>Bu videoda kullanılacak ses</label>${await voicePicker(p.opts.voice_id)}${p.plan && p.plan.template === 'konusan' ? `<div class="small" style="margin-top:6px;color:var(--gold)">Konuşan karakterde ses zorunlu. ${(p.plan.character || {}).lip === 'fal' ? 'Ses üretildikten sonra her sahne için fal.ai Kling Avatar ile konuşma videosu yapılır (≈ 0,06 $/sn; 60 sn ≈ 3,4 $).' : 'Ücretsiz mod: ağız hareketi sesten kodla üretilir, ek ücret yok.'}</div>` : ''}<div class="small dim" style="margin-top:6px">Seslendirme önce üretilir, sahne süreleri sese göre uzar; altyazı kelime zamanlarına oturur, müzik konuşma altında kısılır.</div></div>
       <label>Müzik seviyesi</label><input type="range" id="music" min="0.2" max="1.5" step="0.1" value="${p.opts.music_level || 1}"></div>`;
   }
   if (p.final) {
@@ -210,7 +214,7 @@ async function projectView(id) {
   const collect = () => {
     const pl = JSON.parse(JSON.stringify(p.plan));
     app.querySelectorAll('.scn').forEach(el => { const s = pl.scenes[+el.dataset.i]; el.querySelectorAll('[data-k]').forEach(inp => { const k = inp.dataset.k; let v = inp.value; if (inp.type === 'number') v = v === '' ? null : +v; else if (v === '' && k !== 'caption') v = null; s[k] = v; }); });
-    if (pl.character) { app.querySelectorAll('[data-ch]').forEach(inp => { pl.character[inp.dataset.ch] = inp.value; }); app.querySelectorAll('[data-chk]').forEach(inp => { pl.character[inp.dataset.chk] = inp.checked; }); delete pl.character.photo_url; delete pl.character.portrait_url; }
+    if (pl.character) { app.querySelectorAll('[data-ch]').forEach(inp => { pl.character[inp.dataset.ch] = inp.value; }); app.querySelectorAll('[data-chk]').forEach(inp => { pl.character[inp.dataset.chk] = inp.checked; }); const lp = app.querySelector('[data-lip]:checked'); if (lp) pl.character.lip = lp.dataset.lip; delete pl.character.photo_url; delete pl.character.portrait_url; }
     app.querySelectorAll('[data-card]').forEach(el => { const s = pl.scenes[+el.closest('.scn').dataset.i]; const c = s.cards[+el.dataset.card]; el.querySelectorAll('[data-c]').forEach(inp => { c[inp.dataset.c] = inp.value; }); delete c.photo_url; });
     pl.scenes.forEach(s => (s.cards || []).forEach(c => delete c.photo_url));
     app.querySelectorAll('[data-obj]').forEach(el => { const o = pl.objects[+el.dataset.obj]; el.querySelectorAll('[data-o]').forEach(inp => { const k = inp.dataset.o; o[k] = k === 'size' ? +inp.value : (inp.value || null); }); });
@@ -243,6 +247,9 @@ async function projectView(id) {
       await cardEdit(pl => { pl.character = { ...(pl.character || {}), photo: d.path, portrait: null, portrait_of: null }; });
     } catch (e) { toast(e.message, true); }
   };
+  if ($('#pimg')) $('#pimg').onclick = e => { const r = e.target.getBoundingClientRect(); const m = [+((e.clientX - r.left) / r.width).toFixed(4), +((e.clientY - r.top) / r.height).toFixed(4)]; cardEdit(pl => { pl.character.mouth = m; }).then(() => toast('Ağız yeri işaretlendi; önizlemeyi yenileyin')); };
+  if ($('#mclear')) $('#mclear').onclick = e => { e.preventDefault(); cardEdit(pl => { pl.character.mouth = null; }); };
+  app.querySelectorAll('[data-lip]').forEach(r => r.onchange = () => cardEdit(() => {}));
   if ($('#redraw')) $('#redraw').onclick = async () => { await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'save', plan: collect() } }).catch(e => toast(e.message, true)); act(id, { action: 'redraw' }, 'Karakter yeniden çiziliyor'); };
   if ($('#chfixbtn')) $('#chfixbtn').onclick = async () => { const fix = $('#chfix').value.trim(); if (!fix) return toast('Ne düzeltilsin, yazın', true); await api(`/projects/${id}/action`, { method: 'POST', body: { action: 'save', plan: collect() } }).catch(e => toast(e.message, true)); act(id, { action: 'redraw', fix }, 'Karakter düzeltiliyor'); };
   if ($('#retry')) $('#retry').onclick = () => act(id, { action: 'retry' });

@@ -2,7 +2,7 @@
 # Konuşma videoları (dudak senkronlu, fal.ai Kling Avatar) sunucuda üretilir; burada tam ekran arka plan olur,
 # üstüne başlık, ad etiketi ve 2–4 kelimelik grup altyazı (Reels tarzı) çizilir.
 # Önizlemede video henüz yoktur: karakter portresi hafif yakınlaşmayla gösterilir.
-import os, shutil, subprocess, hashlib, urllib.request
+import os, math, shutil, subprocess, hashlib, urllib.request
 import numpy as np
 from PIL import Image, ImageDraw
 from common import (W, H, F, BOLD, MED, ACCENT, text_img, put, pill, ease_out, ease_back, clamp,
@@ -26,11 +26,21 @@ def _fetch(url):
         urllib.request.urlretrieve(url, p + '.part'); os.replace(p + '.part', p)
     return p
 
-def cover(img, w, h):
+def cover(img, w, h, info=None):
     s = max(w / img.width, h / img.height)
     im = img.resize((max(w, int(img.width * s + 0.5)), max(h, int(img.height * s + 0.5))), Image.LANCZOS)
     x = (im.width - w) // 2; y = int((im.height - h) * 0.35)
+    if info is not None: info.update(s=s, x=x, y=y, ow=img.width, oh=img.height)
     return im.crop((x, y, x + w, y + h))
+
+def envelope(path, frm, to, fps=FPS):
+    """Ses dosyasının kare başına (1/30 sn) ses yüksekliği."""
+    r = subprocess.run([_ffmpeg(), '-hide_banner', '-loglevel', 'error', '-i', path, '-ac', '1', '-ar', '16000', '-f', 's16le', '-'], capture_output=True)
+    x = np.frombuffer(r.stdout, np.int16).astype(np.float32) / 32768
+    a = int(max(0, frm or 0) * 16000); b = int(to * 16000) if to else len(x); x = x[a:b]
+    hop = 16000 // fps; n = len(x) // hop
+    if n < 1: return np.zeros(1, np.float32)
+    return np.sqrt((x[:n * hop].reshape(n, hop) ** 2).mean(1))
 
 class Groups:
     """Kelime zamanlarından 2–4 kelimelik, tek satırlık altyazı grupları (noktalamada grup biter)."""
@@ -81,13 +91,59 @@ class Talk:
         self.portrait = None; self.clips = [None] * len(sc)
         self.shade_t = top_shade(0.3, 170); self.shade_b = bottom_shade(190)
         self._title = {}
+        self.voices = []; self.puppet = None; self.env = None
+
+    def set_voices(self, voices):
+        self.voices = list(voices or [])
+
+    def build_env(self):
+        """Ağız açıklığı (0–1), kare kare. Ses varsa sesten; yoksa (önizleme) kelime zamanlarından."""
+        n = int(self.tl.total * FPS) + 2; env = np.zeros(n, np.float32)
+        if self.voices:
+            for v in self.voices:
+                try:
+                    e = envelope(v[0], v[2] if len(v) > 2 else 0, v[3] if len(v) > 3 else None)
+                    i = int(round(float(v[1]) * FPS)); e = e[:max(0, n - i)]; env[i:i + len(e)] = np.maximum(env[i:i + len(e)], e)
+                except Exception as ex: warn(f'Ses okunamadı (ağız animasyonu): {str(ex)[:60]}')
+            ref = np.percentile(env[env > 1e-4], 92) if (env > 1e-4).any() else 1
+            env = np.clip((env / max(ref, 1e-4) - 0.12) / 0.75, 0, 1) ** 0.8
+        else:
+            for j, cap in enumerate(self.caps):
+                st = self.tl.starts[j]
+                for k, (t, w) in enumerate(cap.ws):
+                    t1 = cap.ws[k + 1][0] if k + 1 < len(cap.ws) else t + 0.5
+                    a, b = int((st + t) * FPS), int((st + min(t1, t + 0.15 * len(w) + 0.2)) * FPS)
+                    for f in range(a, min(n, b)): env[f] = max(env[f], 0.55 + 0.4 * abs(math.sin((f - a) * 1.7)))
+        # yumuşatma: hızlı açılır, biraz daha yavaş kapanır
+        out = np.zeros_like(env); v = 0.0
+        for i, x in enumerate(env):
+            v = v + (x - v) * (0.65 if x > v else 0.4); out[i] = v
+        self.env = out
+        # konuşma var mı (baş hareketi için daha yavaş zarf)
+        k = np.ones(15) / 15; self.talk = np.convolve((out > 0.08).astype(np.float32), k, 'same')
+        rng = np.random.default_rng(11); bl = []; t = 1.2
+        while t < self.tl.total: bl.append(t); t += rng.uniform(2.4, 4.8)
+        self.blinks = bl
 
     def load(self):
         src = self.ch.get('portrait_url') or self.ch.get('portrait') or self.ch.get('photo_url')
         if src:
-            try: self.portrait = cover(Image.open(_fetch(src)).convert('RGB'), W, H)
+            try: info = {}; self.portrait = cover(Image.open(_fetch(src)).convert('RGB'), W, H, info)
             except Exception as e: warn(f'Karakter portresi açılamadı: {str(e)[:60]}')
         if not self.portrait: warn('Karakter portresi yok (önizlemeyi yenileyin)')
+        need = self.portrait is not None and any(not s.get('video_url') for s in self.plan['scenes'])
+        if need:   # ücretsiz mod: portreden kodla konuşan kukla
+            from puppet import Puppet, detect_face, guess_face
+            mo = self.ch.get('mouth')
+            manual = (mo[0] * info['ow'] * info['s'] - info['x'], mo[1] * info['oh'] * info['s'] - info['y']) if mo else None
+            face, err = detect_face(self.portrait)
+            if face and manual and (abs(face['mc'][0] - manual[0]) > face['mw'] or abs(face['mc'][1] - manual[1]) > face['mw']):
+                face = None   # kullanıcının işareti otomatiğe baskın
+            if not face:
+                face = guess_face(self.portrait, manual)
+                if not manual: warn(f'Ağız otomatik bulunamadı ({err}); karakter kartında portrede ağzın ortasına tıklayın')
+            self.face = face; self.puppet = Puppet(self.portrait, face)
+            self.build_env()
         for j, s in enumerate(self.plan['scenes']):
             u = s.get('video_url')
             if not u: continue
@@ -112,6 +168,12 @@ class Talk:
             mm = np.memmap(raw, dtype=np.uint8, mode='r', shape=(n, VH, VW, 3))
             k = min(n - 1, max(0, int(u * FPS)))
             return Image.fromarray(np.array(mm[k])).resize((W, H), Image.BICUBIC).convert('RGBA')
+        if self.puppet:
+            t_abs = self.tl.starts[j] + u; f = min(len(self.env) - 1, int(t_abs * FPS))
+            bl = 0.0
+            for b in self.blinks:
+                if b <= t_abs < b + 0.18: bl = math.sin(math.pi * (t_abs - b) / 0.18)
+            return self.puppet.render(float(self.env[f]), bl, t_abs, float(self.talk[f])).convert('RGBA')
         if self.portrait:   # önizleme / yedek: portre, çok hafif yakınlaşma
             z = 1 + 0.035 * clamp(u / max(1, self.tl.durs[j]))
             w, h = int(W * z), int(H * z); im = self.portrait.resize((w, h), Image.BILINEAR)

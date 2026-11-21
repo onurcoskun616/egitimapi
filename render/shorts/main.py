@@ -63,6 +63,7 @@ def render(plan, outdir, voices=None, music_level=1.0, progress=None, sfx=None, 
     global TPL, OUTDIR
     OUTDIR = os.path.join(outdir, 'parcalar'); os.makedirs(OUTDIR, exist_ok=True)
     TPL = build(plan)
+    if hasattr(TPL, 'set_voices'): TPL.set_voices(voices)
     if hasattr(TPL, 'load'): TPL.load()       # ağır ön hesap: bir kez, işçilerden önce
     total = TPL.tl.total; nchunks = int(math.ceil(total * FPS / CHUNK))
     workers = max(1, os.cpu_count() or 1)
